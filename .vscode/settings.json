@@ -1,0 +1,16 @@
+{
+    // Configure locations for AI agent prompt files (slash commands)
+  "chat.promptFilesLocations": {
+    ".agent/commands/**/*.prompt.md": true
+  },
+  // Configure locations for AI agent mode files (chat modes)
+  "chat.instructionsFilesLocations": {
+    ".agent/instructions/**/*.instructions.md": true
+  },
+  "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+    {
+      "file": ".agent/commands/azdo/azdo.generate-pr-description.prompt.md"
+    }
+  ],
+  "chat.useAgentsMdFile": true
+}

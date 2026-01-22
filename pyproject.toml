@@ -1,0 +1,31 @@
+[project]
+name = "copilotplay"
+version = "0.1.0"
+description = "A small Python sandbox for Copilot/model workflows"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "python-dotenv>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.8.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.uv]
+package = false

@@ -1,0 +1,9 @@
+## Deprecated
+# This project uses `uv` and `pyproject.toml` for dependency management.
+#
+# Install deps with:
+#   uv sync
+#
+# Run the app with:
+#   uv run python src/app.py
+
