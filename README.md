@@ -5,12 +5,13 @@
 TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-192%20passing-green.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-88%25-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-404%20passing-green.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-86%25-green.svg)]()
 
 ## Features
 
 - 🤖 **Multi-Agent Orchestration** - 6 specialized agent personas working in parallel or sequentially
+- ⚡ **Parallel Task Execution** - Run multiple agents simultaneously with `&`, `,`, and `->` operators
 - 📋 **Prescriptive Workflow** - 13-stage workflow from Setup to Post-Implementation Review
 - 🔄 **Autonomous Operation** - Define objectives in markdown, let the team execute
 - 📁 **Shared Context** - Agents collaborate via `.teambot/` directory with history files
@@ -22,6 +23,7 @@ TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Interactive Mode Examples](#interactive-mode-examples)
 - [CLI Commands](#cli-commands)
 - [Agent Personas](#agent-personas)
 - [Prescriptive Workflow](#prescriptive-workflow)
@@ -96,6 +98,201 @@ uv run teambot run objectives/build-chatbot.md
 # Check status
 uv run teambot status
 ```
+
+---
+
+## Interactive Mode Examples
+
+TeamBot's interactive mode supports parallel task execution, pipelines, and background tasks. Here are practical examples:
+
+### Basic Agent Commands
+
+```bash
+# Send a task to a single agent (waits for response)
+teambot: @pm Create a project plan for the new feature
+
+# Get help
+teambot: /help
+teambot: /help parallel
+```
+
+### Background Tasks (Fire and Forget)
+
+Use `&` to run tasks in the background without waiting:
+
+```bash
+# Start a task in the background
+teambot: @pm Create a detailed project timeline &
+Task #1 started in background
+
+# Start another while the first is still running
+teambot: @ba Gather user requirements &
+Task #2 started in background
+
+# Check status of all tasks
+teambot: /tasks
+  🔄 #1    @pm           RUNNING    Create a detailed project timeline
+  🔄 #2    @ba           RUNNING    Gather user requirements
+
+# View a specific task's result when complete
+teambot: /task 1
+```
+
+### Multi-Agent Parallel (Same Prompt)
+
+Use `,` to send the same prompt to multiple agents simultaneously:
+
+```bash
+# Ask multiple agents to analyze the same thing
+teambot: @pm,ba,writer Analyze the requirements for the login feature
+
+# All three agents work in parallel and results are combined:
+# === @pm ===
+# From a project management perspective...
+#
+# === @ba ===
+# The business requirements include...
+#
+# === @writer ===
+# Documentation needs for this feature...
+```
+
+### Pipelines with Dependencies
+
+Use `->` to chain tasks where each depends on the previous output:
+
+```bash
+# Two-stage pipeline: plan then implement
+teambot: @pm Create a plan for user authentication -> @builder-1 Implement based on this plan
+
+# Three-stage pipeline: requirements -> implementation -> review
+teambot: @ba Write requirements for the API -> @builder-1 Implement this API -> @reviewer Review the implementation
+
+# The output from each stage is automatically injected into the next:
+# === @ba ===
+# Requirements: 1. REST API endpoint...
+#
+# === @builder-1 ===
+# [Receives: "=== Output from @ba ===\n{requirements}\n\n=== Your Task ===\nImplement this API"]
+# Implementation complete...
+#
+# === @reviewer ===
+# [Receives output from @builder-1]
+# Code review feedback...
+```
+
+### Parallel Groups with Dependencies
+
+Combine `,` and `->` for complex workflows:
+
+```bash
+# Multiple analysts work in parallel, then multiple builders implement
+teambot: @pm,ba Analyze the feature requirements -> @builder-1,builder-2 Implement based on analysis
+
+# Stage 1: @pm and @ba work in parallel
+# Stage 2: Their combined output goes to both builders who also work in parallel
+```
+
+### Background Pipelines
+
+Add `&` to run entire pipelines in the background:
+
+```bash
+# Start a multi-stage pipeline without waiting
+teambot: @pm Create plan -> @builder-1 Implement -> @reviewer Review &
+Pipeline started in background (3 stages)
+
+# Continue working while it runs
+teambot: @writer Update the README
+
+# Check pipeline progress
+teambot: /tasks
+  ✅ #1    @pm           COMPLETED  Create plan
+  🔄 #2    @builder-1    RUNNING    Implement
+  ⏳ #3    @reviewer     PENDING    Review
+```
+
+### Running Multiple Independent Tasks
+
+For different prompts to different agents in parallel, use separate background commands:
+
+```bash
+# Start multiple independent tasks
+teambot: @pm Create project timeline &
+Task #1 started in background
+teambot: @ba Write user stories &
+Task #2 started in background
+teambot: @writer Draft API documentation &
+Task #3 started in background
+
+# All three run concurrently (up to max_concurrent limit of 3)
+teambot: /tasks
+  🔄 #1    @pm           RUNNING    Create project timeline
+  🔄 #2    @ba           RUNNING    Write user stories
+  🔄 #3    @writer       RUNNING    Draft API documentation
+```
+
+### Task Management Commands
+
+```bash
+# List all tasks
+teambot: /tasks
+
+# Filter by status
+teambot: /tasks running
+teambot: /tasks completed
+teambot: /tasks failed
+
+# View task details and output
+teambot: /task 1
+
+# Cancel a pending task
+teambot: /cancel 3
+Cancelled task #3
+```
+
+### Real-World Workflow Example
+
+Here's a complete example of a feature development workflow:
+
+```bash
+# 1. Start with parallel analysis (background)
+teambot: @pm,ba Analyze requirements for user dashboard feature &
+Pipeline started in background
+
+# 2. While that runs, have writer start on docs
+teambot: @writer Create documentation outline for dashboard &
+Task #4 started in background
+
+# 3. Check progress
+teambot: /tasks
+  ✅ #1    @pm           COMPLETED  Analyze requirements...
+  ✅ #2    @ba           COMPLETED  Analyze requirements...
+  🔄 #4    @writer       RUNNING    Create documentation outline...
+
+# 4. Now create implementation pipeline using analysis results
+teambot: @builder-1 Implement dashboard frontend based on: [paste from /task 1] -> @reviewer Review frontend &
+
+# 5. Parallel backend work
+teambot: @builder-2 Implement dashboard API endpoints &
+
+# 6. Monitor everything
+teambot: /tasks
+```
+
+### Syntax Quick Reference
+
+| Syntax | Description | Example |
+|--------|-------------|---------|
+| `@agent task` | Single agent, wait for response | `@pm Create a plan` |
+| `@agent task &` | Single agent, background | `@pm Create a plan &` |
+| `@a,b,c task` | Multi-agent parallel, same prompt | `@pm,ba,writer Analyze feature` |
+| `@a task -> @b task` | Pipeline with dependency | `@pm Plan -> @builder-1 Implement` |
+| `@a,b t1 -> @c,d t2` | Parallel groups with dependency | `@pm,ba Analyze -> @builder-1,builder-2 Build` |
+| `... &` | Any command in background | `@pm Plan -> @builder-1 Build &` |
+| `/tasks` | List all tasks | `/tasks` or `/tasks running` |
+| `/task <id>` | View task details | `/task 1` |
+| `/cancel <id>` | Cancel pending task | `/cancel 3` |
 
 ---
 
@@ -632,7 +829,7 @@ teambot/
 │   └── workflow/
 │       ├── stages.py         # Workflow stage enum
 │       └── state_machine.py  # Workflow state management
-├── tests/                    # Test suite (192 tests)
+├── tests/                    # Test suite (404 tests)
 │   ├── test_cli.py
 │   ├── test_orchestrator.py
 │   ├── test_agent_runner.py
@@ -672,7 +869,7 @@ uv run pytest --cov=src/teambot --cov-report=html
 
 ### Test Coverage
 
-Current coverage: **88%** with **192 tests**
+Current coverage: **86%** with **404 tests**
 
 | Module | Coverage |
 |--------|----------|
