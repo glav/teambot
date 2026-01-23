@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import sys
 from pathlib import Path
@@ -126,11 +127,18 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     if objective:
         display.print_success("Objective loaded")
-    else:
-        display.print_warning("No objective file provided - running in interactive mode")
+        display.print_warning("File-based orchestration not yet implemented")
+        return 0
 
-    display.print_success("TeamBot initialized successfully")
-    display.print_warning("Full agent orchestration not yet implemented")
+    # No objective - run interactive mode
+    display.print_success("Starting interactive mode")
+
+    from teambot.repl import run_interactive_mode
+
+    try:
+        asyncio.run(run_interactive_mode(console=display.console))
+    except KeyboardInterrupt:
+        display.print_warning("Interrupted")
 
     return 0
 

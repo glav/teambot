@@ -148,6 +148,14 @@ class TestCLIRun:
         args = argparse.Namespace(config="teambot.json", objective=None)
         display = ConsoleDisplay()
 
+        # Mock the REPL to avoid hanging on input
+        import teambot.cli
+
+        async def mock_repl(*args, **kwargs):
+            pass
+
+        monkeypatch.setattr("teambot.repl.run_interactive_mode", mock_repl)
+
         result = cmd_run(args, display)
 
         assert result == 0

@@ -1,5 +1,5 @@
 {
-    "name": "devo",
+    "name": "teambot",
     "image": "mcr.microsoft.com/devcontainers/python:3.12",
     "customizations": {
         "vscode": {
@@ -40,9 +40,10 @@
         },
         "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {},
         "ghcr.io/devcontainers/features/azure-cli:1.2.5": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "22"
+        },
         "ghcr.io/devcontainers/features/copilot-cli:latest": {}
-
-
     },
     "remoteUser": "vscode",
     "forwardPorts": [
