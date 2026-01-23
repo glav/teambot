@@ -5,8 +5,8 @@
 TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-404%20passing-green.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-86%25-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-464%20passing-green.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-87%25-green.svg)]()
 
 ## Features
 
@@ -293,6 +293,28 @@ teambot: /tasks
 | `/tasks` | List all tasks | `/tasks` or `/tasks running` |
 | `/task <id>` | View task details | `/task 1` |
 | `/cancel <id>` | Cancel pending task | `/cancel 3` |
+| `/overlay` | Show overlay status | `/overlay` |
+| `/overlay on\|off` | Toggle overlay | `/overlay off` |
+| `/overlay position <pos>` | Move overlay | `/overlay position bottom-left` |
+
+### Status Overlay
+
+TeamBot displays a persistent status overlay in the terminal corner showing:
+- Active agents with spinner animation
+- Task counts (running, pending, completed)
+
+The overlay updates in real-time as tasks start and complete. Configure in `teambot.json`:
+
+```json
+{
+  "overlay": {
+    "enabled": true,
+    "position": "top-right"
+  }
+}
+```
+
+Valid positions: `top-right`, `top-left`, `bottom-right`, `bottom-left`
 
 ---
 
@@ -829,7 +851,7 @@ teambot/
 │   └── workflow/
 │       ├── stages.py         # Workflow stage enum
 │       └── state_machine.py  # Workflow state management
-├── tests/                    # Test suite (404 tests)
+├── tests/                    # Test suite (464 tests)
 │   ├── test_cli.py
 │   ├── test_orchestrator.py
 │   ├── test_agent_runner.py

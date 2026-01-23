@@ -1,6 +1,6 @@
 """System commands for TeamBot REPL.
 
-Provides /help, /status, /history, /quit, /tasks commands.
+Provides /help, /status, /history, /quit, /tasks, /overlay commands.
 """
 
 from dataclasses import dataclass
@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from teambot.tasks.executor import TaskExecutor
+    from teambot.visualization.overlay import OverlayRenderer
 
 
 @dataclass
@@ -87,6 +88,7 @@ Available commands:
   /tasks         - List running/completed tasks
   /task <id>     - View task details
   /cancel <id>   - Cancel pending task
+  /overlay       - Show/toggle status overlay
   /history       - Show command history
   /quit          - Exit interactive mode
 
@@ -212,7 +214,8 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
         }.get(task.status, "?")
 
         prompt = task.prompt[:40] + "..." if len(task.prompt) > 40 else task.prompt
-        lines.append(f"  {status_icon} #{task.id:4} @{task.agent_id:12} {task.status.value:10} {prompt}")
+        line = f"  {status_icon} #{task.id:4} @{task.agent_id:12} {task.status.value:10} {prompt}"
+        lines.append(line)
 
     return CommandResult(output="\n".join(lines))
 
@@ -261,7 +264,6 @@ def handle_task(args: list[str], executor: Optional["TaskExecutor"]) -> CommandR
         lines.append(f"  Depends: {', '.join(task.dependencies)}")
 
     # Get result if complete
-    from teambot.tasks.manager import TaskManager
 
     # Access manager through executor
     if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.SKIPPED):
@@ -311,21 +313,97 @@ def handle_cancel(args: list[str], executor: Optional["TaskExecutor"]) -> Comman
         )
 
 
+def handle_overlay(args: list[str], overlay: Optional["OverlayRenderer"]) -> CommandResult:
+    """Handle /overlay command.
+
+    Args:
+        args: Subcommand and arguments.
+        overlay: OverlayRenderer instance.
+
+    Returns:
+        CommandResult with overlay status or action result.
+    """
+    if overlay is None:
+        return CommandResult(
+            output="Overlay not available.",
+            success=False,
+        )
+
+    if not overlay.is_supported:
+        return CommandResult(
+            output="Overlay not supported in this terminal.",
+            success=False,
+        )
+
+    # No args - show status
+    if not args:
+        status = "enabled" if overlay.is_enabled else "disabled"
+        position = overlay.state.position.value
+        return CommandResult(
+            output=f"Overlay: {status}, position: {position}\n"
+            f"Use /overlay on|off to toggle, /overlay position <pos> to move."
+        )
+
+    subcommand = args[0].lower()
+
+    if subcommand == "on":
+        overlay.enable()
+        return CommandResult(output="Overlay enabled.")
+
+    elif subcommand == "off":
+        overlay.disable()
+        return CommandResult(output="Overlay disabled. Use /overlay on to re-enable.")
+
+    elif subcommand == "position":
+        if len(args) < 2:
+            return CommandResult(
+                output="Usage: /overlay position <top-right|top-left|bottom-right|bottom-left>",
+                success=False,
+            )
+
+        from teambot.visualization.overlay import OverlayPosition
+
+        pos_name = args[1].lower()
+        try:
+            position = OverlayPosition(pos_name)
+            overlay.set_position(position)
+            return CommandResult(output=f"Overlay position set to {pos_name}.")
+        except ValueError:
+            valid = ", ".join([p.value for p in OverlayPosition])
+            return CommandResult(
+                output=f"Invalid position: {pos_name}. Valid: {valid}",
+                success=False,
+            )
+
+    else:
+        return CommandResult(
+            output=f"Unknown overlay subcommand: {subcommand}. Use on, off, or position.",
+            success=False,
+        )
+
+
 class SystemCommands:
     """Handler for system commands in REPL.
 
     Provides dispatch and state management for system commands.
     """
 
-    def __init__(self, orchestrator: Any = None, executor: Optional["TaskExecutor"] = None):
+    def __init__(
+        self,
+        orchestrator: Any = None,
+        executor: Optional["TaskExecutor"] = None,
+        overlay: Optional["OverlayRenderer"] = None,
+    ):
         """Initialize system commands.
 
         Args:
             orchestrator: Optional orchestrator for status info.
             executor: Optional task executor for task commands.
+            overlay: Optional overlay renderer for overlay commands.
         """
         self._orchestrator = orchestrator
-        self._executor: Optional["TaskExecutor"] = executor
+        self._executor: TaskExecutor | None = executor
+        self._overlay: OverlayRenderer | None = overlay
         self._history: list[dict[str, Any]] = []
 
     def set_history(self, history: list[dict[str, Any]]) -> None:
@@ -343,6 +421,14 @@ class SystemCommands:
             executor: Task executor for task commands.
         """
         self._executor = executor
+
+    def set_overlay(self, overlay: "OverlayRenderer") -> None:
+        """Set overlay renderer.
+
+        Args:
+            overlay: Overlay renderer for overlay commands.
+        """
+        self._overlay = overlay
 
     def dispatch(self, command: str, args: list[str]) -> CommandResult:
         """Dispatch a system command.
@@ -363,6 +449,7 @@ class SystemCommands:
             "tasks": self.tasks,
             "task": self.task,
             "cancel": self.cancel,
+            "overlay": self.overlay,
         }
 
         handler = handlers.get(command)
@@ -412,3 +499,7 @@ class SystemCommands:
     def cancel(self, args: list[str]) -> CommandResult:
         """Handle /cancel <id> command."""
         return handle_cancel(args, self._executor)
+
+    def overlay(self, args: list[str]) -> CommandResult:
+        """Handle /overlay command."""
+        return handle_overlay(args, self._overlay)

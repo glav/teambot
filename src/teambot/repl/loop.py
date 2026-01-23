@@ -18,6 +18,7 @@ from teambot.repl.parser import parse_command, ParseError, CommandType
 from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor, ExecutionResult
 from teambot.tasks.models import Task, TaskResult, TaskStatus
+from teambot.visualization.overlay import OverlayRenderer
 
 
 class REPLLoop:
@@ -28,18 +29,21 @@ class REPLLoop:
     - Agent command routing to SDK
     - System command handling
     - Signal handling (Ctrl+C)
+    - Persistent status overlay
     """
 
     def __init__(
         self,
         console: Optional[Console] = None,
         sdk_client: Optional[CopilotSDKClient] = None,
+        enable_overlay: bool = True,
     ):
         """Initialize the REPL loop.
 
         Args:
             console: Rich console for output.
             sdk_client: Copilot SDK client (created if not provided).
+            enable_overlay: Whether to enable status overlay.
         """
         self._console = console or Console()
         self._sdk_client = sdk_client or CopilotSDKClient()
@@ -51,6 +55,10 @@ class REPLLoop:
 
         # Task executor for parallel execution
         self._executor: Optional[TaskExecutor] = None
+
+        # Status overlay
+        self._overlay = OverlayRenderer(console=self._console, enabled=enable_overlay)
+        self._commands.set_overlay(self._overlay)
 
         # Wire up handlers
         self._router.register_agent_handler(self._handle_agent_command)
@@ -119,14 +127,26 @@ class REPLLoop:
             task: The completed task.
             result: Task result.
         """
+        # Update overlay
+        self._overlay.on_task_completed(task, result)
+
+        # Print notification
         if result.success:
-            self._console.print(
+            self._overlay.print_with_overlay(
                 f"\n[green]✓ Task #{task.id} completed (@{task.agent_id})[/green]"
             )
         else:
-            self._console.print(
+            self._overlay.print_with_overlay(
                 f"\n[red]✗ Task #{task.id} failed (@{task.agent_id}): {result.error}[/red]"
             )
+
+    def _on_task_started(self, task: Task) -> None:
+        """Callback when task starts.
+
+        Args:
+            task: The started task.
+        """
+        self._overlay.on_task_started(task)
 
     def _handle_raw_input(self, content: str) -> str:
         """Handle raw (non-command) input.
@@ -215,8 +235,17 @@ class REPLLoop:
             self._executor = TaskExecutor(
                 sdk_client=self._sdk_client,
                 on_task_complete=self._on_task_complete,
+                on_task_started=self._on_task_started,
             )
             self._commands.set_executor(self._executor)
+
+        # Start overlay if supported
+        if self._overlay.is_supported:
+            self._console.print("[green]✓ Status overlay enabled[/green]")
+            await self._overlay.start_spinner()
+            self._overlay.render()
+        else:
+            self._console.print("[dim]Status overlay not available in this terminal[/dim]")
 
         # Main loop
         try:
@@ -300,6 +329,11 @@ class REPLLoop:
     async def _cleanup(self) -> None:
         """Clean up resources."""
         self._restore_signal_handlers()
+
+        # Stop overlay spinner
+        if self._overlay:
+            await self._overlay.stop_spinner()
+            self._overlay.clear()
 
         if self._sdk_client:
             try:

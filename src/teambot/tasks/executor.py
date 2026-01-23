@@ -47,6 +47,7 @@ class TaskExecutor:
         max_concurrent: int = 3,
         default_timeout: float = 120.0,
         on_task_complete: Optional[callable] = None,
+        on_task_started: Optional[callable] = None,
     ):
         """Initialize executor.
 
@@ -55,9 +56,11 @@ class TaskExecutor:
             max_concurrent: Maximum concurrent tasks.
             default_timeout: Default task timeout in seconds.
             on_task_complete: Callback when task completes (for notifications).
+            on_task_started: Callback when task starts (for overlay updates).
         """
         self._sdk_client = sdk_client
         self._on_task_complete = on_task_complete
+        self._on_task_started = on_task_started
 
         # Create manager with our executor function
         self._manager = TaskManager(
@@ -139,7 +142,11 @@ class TaskExecutor:
             )
         else:
             # Execute synchronously
+            if self._on_task_started:
+                self._on_task_started(task)
             result = await self._manager.execute_task(task.id)
+            if self._on_task_complete:
+                self._on_task_complete(task, self._manager.get_result(task.id))
             return ExecutionResult(
                 success=result.success,
                 output=result.output if result.success else f"Error: {result.error}",
@@ -284,12 +291,18 @@ class TaskExecutor:
             )
 
     async def _run_task_with_callback(self, task_id: str) -> None:
-        """Run a task and call callback when complete.
+        """Run a task and call callbacks when starting/complete.
 
         Args:
             task_id: Task to run.
         """
         try:
+            # Notify task started
+            if self._on_task_started:
+                task = self._manager.get_task(task_id)
+                if task:
+                    self._on_task_started(task)
+
             await self._manager.execute_task(task_id)
         finally:
             if self._on_task_complete:

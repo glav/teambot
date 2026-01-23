@@ -21,6 +21,13 @@ VALID_PERSONAS = {
     "reviewer",
 }
 
+VALID_OVERLAY_POSITIONS = {
+    "top-right",
+    "top-left",
+    "bottom-right",
+    "bottom-left",
+}
+
 
 def create_default_config() -> dict[str, Any]:
     """Create default configuration with MVP agents."""
@@ -125,6 +132,10 @@ class ConfigLoader:
         for agent in agents:
             self._validate_agent(agent, seen_ids)
 
+        # Validate overlay config if present
+        if "overlay" in config:
+            self._validate_overlay(config["overlay"])
+
     def _validate_agent(self, agent: dict[str, Any], seen_ids: set[str]) -> None:
         """Validate a single agent configuration."""
         if "id" not in agent:
@@ -145,6 +156,23 @@ class ConfigLoader:
                 f"Valid personas: {VALID_PERSONAS}"
             )
 
+    def _validate_overlay(self, overlay: dict[str, Any]) -> None:
+        """Validate overlay configuration."""
+        if not isinstance(overlay, dict):
+            raise ConfigError("'overlay' must be an object")
+
+        if "position" in overlay:
+            position = overlay["position"]
+            if position not in VALID_OVERLAY_POSITIONS:
+                raise ConfigError(
+                    f"Invalid overlay position '{position}'. "
+                    f"Valid positions: {VALID_OVERLAY_POSITIONS}"
+                )
+
+        if "enabled" in overlay:
+            if not isinstance(overlay["enabled"], bool):
+                raise ConfigError("'overlay.enabled' must be a boolean")
+
     def _apply_defaults(self, config: dict[str, Any]) -> None:
         """Apply default values for missing optional fields."""
         if "teambot_dir" not in config:
@@ -157,3 +185,12 @@ class ConfigLoader:
                 agent["parallel_capable"] = False
             if "workflow_stages" not in agent:
                 agent["workflow_stages"] = []
+
+        # Apply overlay defaults
+        if "overlay" not in config:
+            config["overlay"] = {}
+        overlay = config["overlay"]
+        if "enabled" not in overlay:
+            overlay["enabled"] = True
+        if "position" not in overlay:
+            overlay["position"] = "top-right"

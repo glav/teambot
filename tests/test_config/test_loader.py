@@ -181,3 +181,87 @@ class TestConfigValidation:
 
         with pytest.raises(ConfigError, match="persona"):
             loader.load(config_file)
+
+
+class TestOverlayConfig:
+    """Tests for overlay configuration."""
+
+    def test_overlay_defaults_applied(self, tmp_path):
+        """Test overlay defaults are applied."""
+        from teambot.config.loader import ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('{"agents": [{"id": "pm", "persona": "project_manager"}]}')
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert "overlay" in config
+        assert config["overlay"]["enabled"] is True
+        assert config["overlay"]["position"] == "top-right"
+
+    def test_overlay_position_valid(self, tmp_path):
+        """Test valid overlay position."""
+        from teambot.config.loader import ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "overlay": {"position": "bottom-left"}
+        }
+        ''')
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["overlay"]["position"] == "bottom-left"
+
+    def test_overlay_position_invalid(self, tmp_path):
+        """Test invalid overlay position raises error."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "overlay": {"position": "middle"}
+        }
+        ''')
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="Invalid overlay position"):
+            loader.load(config_file)
+
+    def test_overlay_enabled_bool(self, tmp_path):
+        """Test overlay enabled must be boolean."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "overlay": {"enabled": "yes"}
+        }
+        ''')
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="must be a boolean"):
+            loader.load(config_file)
+
+    def test_overlay_disabled(self, tmp_path):
+        """Test overlay can be disabled."""
+        from teambot.config.loader import ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "overlay": {"enabled": false}
+        }
+        ''')
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["overlay"]["enabled"] is False

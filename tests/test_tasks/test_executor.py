@@ -261,3 +261,84 @@ class TestTaskExecutorStatus:
 
         retrieved = executor.get_task(task.id)
         assert retrieved is task
+
+
+class TestTaskExecutorCallbacks:
+    """Tests for task start/complete callbacks."""
+
+    @pytest.mark.asyncio
+    async def test_on_task_started_callback(self):
+        """Test on_task_started callback is called."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        started_tasks = []
+
+        def on_started(task):
+            started_tasks.append(task)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_started=on_started,
+        )
+        cmd = parse_command("@pm Create a plan")
+
+        await executor.execute(cmd)
+
+        assert len(started_tasks) == 1
+        assert started_tasks[0].agent_id == "pm"
+
+    @pytest.mark.asyncio
+    async def test_on_task_started_with_complete(self):
+        """Test both started and complete callbacks."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        started_tasks = []
+        completed_tasks = []
+
+        def on_started(task):
+            started_tasks.append(task)
+
+        def on_complete(task, result):
+            completed_tasks.append((task, result))
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_started=on_started,
+            on_task_complete=on_complete,
+        )
+        cmd = parse_command("@pm Create a plan")
+
+        await executor.execute(cmd)
+
+        assert len(started_tasks) == 1
+        assert len(completed_tasks) == 1
+        assert completed_tasks[0][1].success
+
+    @pytest.mark.asyncio
+    async def test_on_task_started_background(self):
+        """Test on_task_started is called for background tasks."""
+        import asyncio
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        started_tasks = []
+
+        def on_started(task):
+            started_tasks.append(task)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_started=on_started,
+        )
+        cmd = parse_command("@pm Create a plan &")
+
+        result = await executor.execute(cmd)
+        assert result.background
+
+        # Give the background task time to start
+        await asyncio.sleep(0.1)
+
+        assert len(started_tasks) == 1
