@@ -1,0 +1,353 @@
+"""Task executor - bridges REPL commands to TaskManager."""
+
+import asyncio
+from dataclasses import dataclass, field
+from typing import Optional
+
+from teambot.repl.parser import Command, CommandType, PipelineStage
+from teambot.tasks.manager import TaskManager
+from teambot.tasks.models import Task, TaskResult, TaskStatus
+
+
+@dataclass
+class ExecutionResult:
+    """Result from executing a command.
+
+    Attributes:
+        success: Whether execution succeeded.
+        output: Combined output text.
+        task_id: ID of single task (for simple commands).
+        task_ids: IDs of all tasks (for multi-agent/pipeline).
+        background: Whether tasks are running in background.
+        error: Error message if failed.
+    """
+
+    success: bool
+    output: str
+    task_id: Optional[str] = None
+    task_ids: list[str] = field(default_factory=list)
+    background: bool = False
+    error: Optional[str] = None
+
+
+class TaskExecutor:
+    """Executes REPL commands using TaskManager.
+
+    Bridges the gap between parsed commands and task execution,
+    handling:
+    - Simple agent commands
+    - Background execution (&)
+    - Multi-agent fan-out (,)
+    - Pipelines with dependencies (->)
+    """
+
+    def __init__(
+        self,
+        sdk_client,
+        max_concurrent: int = 3,
+        default_timeout: float = 120.0,
+        on_task_complete: Optional[callable] = None,
+    ):
+        """Initialize executor.
+
+        Args:
+            sdk_client: Copilot SDK client for agent execution.
+            max_concurrent: Maximum concurrent tasks.
+            default_timeout: Default task timeout in seconds.
+            on_task_complete: Callback when task completes (for notifications).
+        """
+        self._sdk_client = sdk_client
+        self._on_task_complete = on_task_complete
+
+        # Create manager with our executor function
+        self._manager = TaskManager(
+            executor=self._execute_agent_task,
+            max_concurrent=max_concurrent,
+            default_timeout=default_timeout,
+        )
+
+        # Track background task futures
+        self._background_tasks: dict[str, asyncio.Task] = {}
+
+    @property
+    def task_count(self) -> int:
+        """Get total number of tasks."""
+        return self._manager.task_count
+
+    async def _execute_agent_task(self, agent_id: str, prompt: str) -> str:
+        """Execute a task via SDK.
+
+        Args:
+            agent_id: Agent to execute task.
+            prompt: Task prompt.
+
+        Returns:
+            Output from agent.
+        """
+        return await self._sdk_client.execute(agent_id, prompt)
+
+    async def execute(self, command: Command) -> ExecutionResult:
+        """Execute a parsed command.
+
+        Args:
+            command: Parsed command from REPL.
+
+        Returns:
+            ExecutionResult with output and status.
+        """
+        if command.type != CommandType.AGENT:
+            return ExecutionResult(
+                success=False,
+                output="",
+                error="Not an agent command",
+            )
+
+        if command.is_pipeline:
+            return await self._execute_pipeline(command)
+        elif len(command.agent_ids) > 1:
+            return await self._execute_multiagent(command)
+        else:
+            return await self._execute_simple(command)
+
+    async def _execute_simple(self, command: Command) -> ExecutionResult:
+        """Execute simple single-agent command.
+
+        Args:
+            command: Parsed command.
+
+        Returns:
+            ExecutionResult.
+        """
+        agent_id = command.agent_ids[0]
+        task = self._manager.create_task(
+            agent_id=agent_id,
+            prompt=command.content,
+            background=command.background,
+        )
+
+        if command.background:
+            # Start in background and return immediately
+            bg_task = asyncio.create_task(self._run_task_with_callback(task.id))
+            self._background_tasks[task.id] = bg_task
+
+            return ExecutionResult(
+                success=True,
+                output=f"Task #{task.id} started in background",
+                task_id=task.id,
+                task_ids=[task.id],
+                background=True,
+            )
+        else:
+            # Execute synchronously
+            result = await self._manager.execute_task(task.id)
+            return ExecutionResult(
+                success=result.success,
+                output=result.output if result.success else f"Error: {result.error}",
+                task_id=task.id,
+                task_ids=[task.id],
+                error=result.error if not result.success else None,
+            )
+
+    async def _execute_multiagent(self, command: Command) -> ExecutionResult:
+        """Execute multi-agent fan-out command.
+
+        Args:
+            command: Parsed command with multiple agents.
+
+        Returns:
+            ExecutionResult with combined outputs.
+        """
+        tasks = []
+        for agent_id in command.agent_ids:
+            task = self._manager.create_task(
+                agent_id=agent_id,
+                prompt=command.content,
+                background=command.background,
+            )
+            tasks.append(task)
+
+        task_ids = [t.id for t in tasks]
+
+        if command.background:
+            # Start all in background
+            for task in tasks:
+                bg_task = asyncio.create_task(self._run_task_with_callback(task.id))
+                self._background_tasks[task.id] = bg_task
+
+            return ExecutionResult(
+                success=True,
+                output=f"Tasks started in background: {', '.join(task_ids)}",
+                task_ids=task_ids,
+                background=True,
+            )
+        else:
+            # Execute all in parallel and wait
+            await asyncio.gather(
+                *[self._manager.execute_task(t.id) for t in tasks],
+                return_exceptions=True,
+            )
+
+            # Collect results
+            outputs = []
+            all_success = True
+            errors = []
+
+            for task in tasks:
+                result = self._manager.get_result(task.id)
+                if result:
+                    if result.success:
+                        outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
+                    else:
+                        all_success = False
+                        errors.append(f"@{task.agent_id}: {result.error}")
+                        outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+
+            return ExecutionResult(
+                success=all_success,
+                output="\n\n".join(outputs),
+                task_ids=task_ids,
+                error="; ".join(errors) if errors else None,
+            )
+
+    async def _execute_pipeline(self, command: Command) -> ExecutionResult:
+        """Execute pipeline command.
+
+        Args:
+            command: Parsed command with pipeline stages.
+
+        Returns:
+            ExecutionResult.
+        """
+        if not command.pipeline:
+            return ExecutionResult(success=False, output="", error="Empty pipeline")
+
+        all_task_ids: list[str] = []
+        previous_task_ids: list[str] = []
+
+        # Create tasks for each stage with dependencies
+        for stage in command.pipeline:
+            stage_task_ids = []
+
+            for agent_id in stage.agent_ids:
+                task = self._manager.create_task(
+                    agent_id=agent_id,
+                    prompt=stage.content,
+                    dependencies=previous_task_ids.copy(),
+                    background=command.background,
+                )
+                stage_task_ids.append(task.id)
+                all_task_ids.append(task.id)
+
+            previous_task_ids = stage_task_ids
+
+        if command.background:
+            # Start pipeline in background
+            bg_task = asyncio.create_task(self._run_pipeline_with_callback(all_task_ids))
+            for task_id in all_task_ids:
+                self._background_tasks[task_id] = bg_task
+
+            return ExecutionResult(
+                success=True,
+                output=f"Pipeline started in background ({len(command.pipeline)} stages)",
+                task_ids=all_task_ids,
+                background=True,
+            )
+        else:
+            # Execute pipeline synchronously
+            results = await self._manager.execute_all()
+
+            # Get final output
+            final_outputs = []
+            all_success = True
+            errors = []
+
+            for task_id in all_task_ids:
+                task = self._manager.get_task(task_id)
+                result = self._manager.get_result(task_id)
+
+                if result:
+                    if result.success:
+                        final_outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
+                    else:
+                        all_success = False
+                        if task.status == TaskStatus.SKIPPED:
+                            final_outputs.append(f"=== @{task.agent_id} ===\n[Skipped: {result.error}]")
+                        else:
+                            errors.append(f"@{task.agent_id}: {result.error}")
+                            final_outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+
+            return ExecutionResult(
+                success=all_success,
+                output="\n\n".join(final_outputs),
+                task_ids=all_task_ids,
+                error="; ".join(errors) if errors else None,
+            )
+
+    async def _run_task_with_callback(self, task_id: str) -> None:
+        """Run a task and call callback when complete.
+
+        Args:
+            task_id: Task to run.
+        """
+        try:
+            await self._manager.execute_task(task_id)
+        finally:
+            if self._on_task_complete:
+                task = self._manager.get_task(task_id)
+                result = self._manager.get_result(task_id)
+                self._on_task_complete(task, result)
+
+    async def _run_pipeline_with_callback(self, task_ids: list[str]) -> None:
+        """Run pipeline tasks and call callback when complete.
+
+        Args:
+            task_ids: All task IDs in pipeline.
+        """
+        try:
+            await self._manager.execute_all()
+        finally:
+            if self._on_task_complete:
+                for task_id in task_ids:
+                    task = self._manager.get_task(task_id)
+                    result = self._manager.get_result(task_id)
+                    if task and result:
+                        self._on_task_complete(task, result)
+
+    def get_task(self, task_id: str) -> Optional[Task]:
+        """Get a task by ID.
+
+        Args:
+            task_id: Task identifier.
+
+        Returns:
+            Task if found.
+        """
+        return self._manager.get_task(task_id)
+
+    def list_tasks(self, status: Optional[TaskStatus] = None) -> list[Task]:
+        """List tasks, optionally filtered by status.
+
+        Args:
+            status: Filter by status.
+
+        Returns:
+            List of tasks.
+        """
+        return self._manager.list_tasks(status=status)
+
+    def cancel_task(self, task_id: str) -> bool:
+        """Cancel a task.
+
+        Args:
+            task_id: Task to cancel.
+
+        Returns:
+            True if cancelled.
+        """
+        # Also cancel the asyncio task if running
+        if task_id in self._background_tasks:
+            bg_task = self._background_tasks[task_id]
+            if not bg_task.done():
+                bg_task.cancel()
+
+        return self._manager.cancel_task(task_id)

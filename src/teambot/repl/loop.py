@@ -16,6 +16,8 @@ from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 from teambot.repl.commands import SystemCommands
 from teambot.repl.parser import parse_command, ParseError, CommandType
 from teambot.repl.router import AgentRouter, RouterError
+from teambot.tasks.executor import TaskExecutor, ExecutionResult
+from teambot.tasks.models import Task, TaskResult, TaskStatus
 
 
 class REPLLoop:
@@ -46,6 +48,9 @@ class REPLLoop:
         self._running = False
         self._interrupted = False
         self._sdk_connected = False
+
+        # Task executor for parallel execution
+        self._executor: Optional[TaskExecutor] = None
 
         # Wire up handlers
         self._router.register_agent_handler(self._handle_agent_command)
@@ -82,6 +87,46 @@ class REPLLoop:
                     "[dim]Run 'copilot' then '/login' to authenticate, or set GITHUB_TOKEN.[/dim]"
                 )
             return f"[red]SDK Error: {e}[/red]"
+
+    async def _handle_advanced_command(self, command) -> str:
+        """Handle multi-agent, pipeline, or background commands.
+
+        Args:
+            command: Parsed command with advanced features.
+
+        Returns:
+            Result message.
+        """
+        if not self._executor:
+            return "[red]Task executor not available.[/red]"
+
+        # Execute via TaskExecutor
+        result = await self._executor.execute(command)
+
+        if result.background:
+            # Background task - just return the start message
+            return f"[green]{result.output}[/green]"
+
+        if result.success:
+            return result.output
+        else:
+            return f"[red]{result.error or 'Execution failed'}[/red]\n{result.output}"
+
+    def _on_task_complete(self, task: Task, result: TaskResult) -> None:
+        """Callback when background task completes.
+
+        Args:
+            task: The completed task.
+            result: Task result.
+        """
+        if result.success:
+            self._console.print(
+                f"\n[green]✓ Task #{task.id} completed (@{task.agent_id})[/green]"
+            )
+        else:
+            self._console.print(
+                f"\n[red]✗ Task #{task.id} failed (@{task.agent_id}): {result.error}[/red]"
+            )
 
     def _handle_raw_input(self, content: str) -> str:
         """Handle raw (non-command) input.
@@ -166,6 +211,13 @@ class REPLLoop:
                     "or set GITHUB_TOKEN env var.[/dim]"
                 )
 
+            # Initialize task executor
+            self._executor = TaskExecutor(
+                sdk_client=self._sdk_client,
+                on_task_complete=self._on_task_complete,
+            )
+            self._commands.set_executor(self._executor)
+
         # Main loop
         try:
             while self._running:
@@ -190,15 +242,26 @@ class REPLLoop:
 
                     # Route command
                     try:
-                        result = await self._router.route(command)
-
-                        # Handle system command results
-                        if command.type == CommandType.SYSTEM:
-                            self._console.print(result.output)
-                            if result.should_exit:
-                                self._running = False
-                        elif result:
+                        # Check if this is an advanced agent command
+                        if command.type == CommandType.AGENT and (
+                            command.is_pipeline or
+                            len(command.agent_ids) > 1 or
+                            command.background
+                        ):
+                            # Use task executor for parallel/pipeline/background
+                            result = await self._handle_advanced_command(command)
                             self._console.print(result)
+                        else:
+                            # Use existing router for simple commands
+                            result = await self._router.route(command)
+
+                            # Handle system command results
+                            if command.type == CommandType.SYSTEM:
+                                self._console.print(result.output)
+                                if result.should_exit:
+                                    self._running = False
+                            elif result:
+                                self._console.print(result)
 
                     except RouterError as e:
                         self._console.print(f"[red]Error: {e}[/red]")
