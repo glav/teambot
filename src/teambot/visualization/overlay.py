@@ -6,7 +6,9 @@ Provides a fixed-position terminal overlay showing agent and task status.
 import asyncio
 import os
 import shutil
+import signal
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -29,6 +31,8 @@ MOVE_TO = "\033[{row};{col}H"
 CLEAR_LINE = "\033[K"
 HIDE_CURSOR = "\033[?25l"
 SHOW_CURSOR = "\033[?25h"
+SET_SCROLL_REGION = "\033[{start};{end}r"
+RESET_SCROLL_REGION = "\033[r"
 
 # Spinner frames (Braille pattern)
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -95,6 +99,8 @@ class OverlayRenderer:
         self._state = OverlayState(enabled=enabled, position=position)
         self._spinner_task: asyncio.Task | None = None
         self._supported = self._check_terminal_support()
+        self._scroll_region_active = False
+        self._setup_resize_handler()
 
     def _check_terminal_support(self) -> bool:
         """Check if terminal supports ANSI positioning.
@@ -121,6 +127,29 @@ class OverlayRenderer:
 
         return True
 
+    def _setup_resize_handler(self) -> None:
+        """Setup handler for terminal resize events."""
+        if not self._supported:
+            return
+
+        def handle_resize(signum, frame):
+            """Handle SIGWINCH (window resize) signal."""
+            if self.is_enabled:
+                # Reset scroll region with new terminal size
+                if self._scroll_region_active:
+                    self._reset_scroll_region()
+                    top_positions = (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT)
+                    if self._state.position in top_positions:
+                        self._set_scroll_region(OVERLAY_HEIGHT + 2)
+                # Redraw overlay at new position
+                self.render()
+
+        try:
+            signal.signal(signal.SIGWINCH, handle_resize)
+        except (AttributeError, ValueError):
+            # SIGWINCH not available on this platform or can't set handler
+            pass
+
     @property
     def is_supported(self) -> bool:
         """Check if overlay is supported on this terminal."""
@@ -136,15 +165,51 @@ class OverlayRenderer:
         """Get current overlay state."""
         return self._state
 
+    def _set_scroll_region(self, start_row: int) -> None:
+        """Set scroll region to prevent overlay from scrolling.
+
+        Args:
+            start_row: First row of scroll region (rows above are reserved).
+        """
+        if not self._supported:
+            return
+
+        try:
+            _, height = shutil.get_terminal_size()
+            # Set scroll region from start_row to end of terminal
+            sys.stdout.write(SET_SCROLL_REGION.format(start=start_row, end=height))
+            # Move cursor to start of scroll region
+            sys.stdout.write(MOVE_TO.format(row=start_row, col=1))
+            sys.stdout.flush()
+            self._scroll_region_active = True
+        except Exception:
+            pass
+
+    def _reset_scroll_region(self) -> None:
+        """Reset scroll region to full terminal."""
+        if not self._supported or not self._scroll_region_active:
+            return
+
+        try:
+            sys.stdout.write(RESET_SCROLL_REGION)
+            sys.stdout.flush()
+            self._scroll_region_active = False
+        except Exception:
+            pass
+
     def enable(self) -> None:
         """Enable the overlay."""
         self._state.enabled = True
         if self._supported:
+            # Set scroll region for top overlays to prevent scrolling
+            if self._state.position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
+                self._set_scroll_region(OVERLAY_HEIGHT + 2)
             self.render()
 
     def disable(self) -> None:
         """Disable the overlay."""
         self._state.enabled = False
+        self._reset_scroll_region()
         self.clear()
 
     def set_position(self, position: OverlayPosition) -> None:
@@ -153,8 +218,19 @@ class OverlayRenderer:
         Args:
             position: New position.
         """
+        old_position = self._state.position
         self._state.position = position
+        
+        # Update scroll region if switching between top/bottom positions
         if self.is_enabled:
+            if old_position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
+                if position not in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
+                    # Moving from top to bottom - reset scroll region
+                    self._reset_scroll_region()
+            elif position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
+                # Moving from bottom to top - set scroll region
+                self._set_scroll_region(OVERLAY_HEIGHT + 2)
+            
             self.render()
 
     def _calculate_position(self) -> tuple[int, int]:
@@ -173,6 +249,50 @@ class OverlayRenderer:
         }
 
         return positions.get(self._state.position, positions[OverlayPosition.TOP_RIGHT])
+
+    def _display_width(self, text: str) -> int:
+        """Calculate display width of text accounting for Unicode characters.
+
+        Args:
+            text: Text to measure.
+
+        Returns:
+            Display width in columns.
+        """
+        width = 0
+        for char in text:
+            # East Asian characters and emoji are typically wide
+            if unicodedata.east_asian_width(char) in ('F', 'W'):
+                width += 2
+            else:
+                width += 1
+        return width
+
+    def _pad_to_width(self, text: str, target_width: int) -> str:
+        """Pad text to target display width.
+
+        Args:
+            text: Text to pad.
+            target_width: Target display width.
+
+        Returns:
+            Padded text.
+        """
+        current_width = self._display_width(text)
+        if current_width >= target_width:
+            # Truncate if too long
+            result = ""
+            width = 0
+            for char in text:
+                char_width = 2 if unicodedata.east_asian_width(char) in ('F', 'W') else 1
+                if width + char_width > target_width:
+                    break
+                result += char
+                width += char_width
+            # Pad remaining
+            return result + " " * (target_width - width)
+        else:
+            return text + " " * (target_width - current_width)
 
     def _build_content(self) -> list[str]:
         """Build overlay content lines.
@@ -221,10 +341,10 @@ class OverlayRenderer:
         output.append(MOVE_TO.format(row=row, col=col))
         output.append("┌" + "─" * inner_width + "┐")
 
-        # Content lines
+        # Content lines with proper padding
         for i, line in enumerate(lines):
             output.append(MOVE_TO.format(row=row + 1 + i, col=col))
-            padded = line.ljust(inner_width)[:inner_width]
+            padded = self._pad_to_width(line, inner_width)
             output.append(f"│{padded}│")
 
         # Bottom border
@@ -241,10 +361,15 @@ class OverlayRenderer:
         row, col = self._calculate_position()
         lines = self._build_content()
 
-        # Save cursor, render, restore cursor
-        output = SAVE_CURSOR
-        output += self._render_box(row, col, lines)
-        output += RESTORE_CURSOR
+        # When scroll region is active, don't save/restore cursor
+        # Just render and leave cursor where it is in the scroll region
+        if self._scroll_region_active:
+            output = self._render_box(row, col, lines)
+        else:
+            # For bottom overlays, save cursor, render, restore cursor
+            output = SAVE_CURSOR
+            output += self._render_box(row, col, lines)
+            output += RESTORE_CURSOR
 
         sys.stdout.write(output)
         sys.stdout.flush()
@@ -331,15 +456,20 @@ class OverlayRenderer:
     def print_with_overlay(self, *args, **kwargs) -> None:
         """Print while preserving overlay.
 
-        Clears overlay, prints, then redraws overlay.
+        For top-positioned overlays, prints in scroll region.
+        For bottom-positioned overlays, clears and redraws.
         """
-        if self.is_enabled:
+        if self.is_enabled and self._scroll_region_active:
+            # With scroll region active, just print normally
+            # The scroll region prevents overwriting the overlay
+            self._console.print(*args, **kwargs)
+        elif self.is_enabled:
+            # For bottom overlays, use the clear/print/redraw approach
             self.clear()
-
-        self._console.print(*args, **kwargs)
-
-        if self.is_enabled:
+            self._console.print(*args, **kwargs)
             self.render()
+        else:
+            self._console.print(*args, **kwargs)
 
     # Event handlers for TaskExecutor integration
     def on_task_started(self, task) -> None:
