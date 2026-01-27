@@ -1,17 +1,27 @@
 [project]
-name = "copilotplay"
+name = "teambot"
 version = "0.1.0"
-description = "A small Python sandbox for Copilot/model workflows"
+description = "CLI wrapper for GitHub Copilot CLI enabling autonomous AI agent teams"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "python-dotenv>=1.0.0",
+  "python-frontmatter>=1.0.0",
+  "rich>=13.0.0",
+  "github-copilot-sdk==0.1.16",
 ]
 
 [dependency-groups]
 dev = [
   "ruff>=0.8.0",
+  "pytest>=7.4.0",
+  "pytest-cov>=4.1.0",
+  "pytest-mock>=3.12.0",
+  "pytest-asyncio>=0.23.0",
 ]
+
+[project.scripts]
+teambot = "teambot.cli:main"
 
 [tool.ruff]
 target-version = "py312"
@@ -27,5 +37,13 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=src/teambot --cov-report=term-missing"
+asyncio_mode = "auto"
+
 [tool.uv]
-package = false
+package = true

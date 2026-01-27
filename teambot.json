@@ -1,0 +1,78 @@
+{
+  "teambot_dir": ".teambot",
+  "agents": [
+    {
+      "id": "pm",
+      "persona": "project_manager",
+      "display_name": "Project Manager",
+      "parallel_capable": false,
+      "workflow_stages": [
+        "setup",
+        "planning",
+        "coordination"
+      ]
+    },
+    {
+      "id": "ba",
+      "persona": "business_analyst",
+      "display_name": "Business Analyst",
+      "parallel_capable": false,
+      "workflow_stages": [
+        "business_problem",
+        "spec"
+      ]
+    },
+    {
+      "id": "writer",
+      "persona": "technical_writer",
+      "display_name": "Technical Writer",
+      "parallel_capable": false,
+      "workflow_stages": [
+        "documentation"
+      ]
+    },
+    {
+      "id": "builder-1",
+      "persona": "builder",
+      "display_name": "Builder (Primary)",
+      "parallel_capable": true,
+      "workflow_stages": [
+        "implementation",
+        "testing"
+      ]
+    },
+    {
+      "id": "builder-2",
+      "persona": "builder",
+      "display_name": "Builder (Secondary)",
+      "parallel_capable": true,
+      "workflow_stages": [
+        "implementation",
+        "testing"
+      ]
+    },
+    {
+      "id": "reviewer",
+      "persona": "reviewer",
+      "display_name": "Reviewer",
+      "parallel_capable": false,
+      "workflow_stages": [
+        "review"
+      ]
+    }
+  ],
+  "workflow": {
+    "stages": [
+      "setup",
+      "business_problem",
+      "spec",
+      "review",
+      "research",
+      "test_strategy",
+      "plan",
+      "implementation",
+      "test",
+      "post_review"
+    ]
+  }
+}

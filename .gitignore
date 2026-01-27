@@ -12,3 +12,5 @@ __pycache__
 output
 *.log
  git-credential-manager/
+*.egg-info/
+.coverage

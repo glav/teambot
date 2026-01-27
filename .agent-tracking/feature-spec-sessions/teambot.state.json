@@ -1,0 +1,91 @@
+{
+  "specFile": "docs/feature-specs/teambot.md",
+  "lastAccessed": "2026-01-22T02:47:22Z",
+  "testStrategy": {
+    "decision": "HYBRID",
+    "approvedDate": "2026-01-22T03:59:59Z",
+    "strategyDocument": ".agent-tracking/test-strategies/20260122-teambot-test-strategy.md",
+    "coverageTarget": 80,
+    "tddComponents": ["orchestrator", "messaging", "history", "config"],
+    "codeFirstComponents": ["window_manager", "visualization", "agent_runner"]
+  },
+  "currentPhase": "planning-ready",
+  "reviewStatus": {
+    "decision": "APPROVED",
+    "reviewDate": "2026-01-22",
+    "reviewReport": ".agent-tracking/spec-reviews/20260122-teambot-review.md",
+    "scores": {
+      "completeness": 9,
+      "clarity": 9,
+      "testability": 8,
+      "technicalReadiness": 9
+    },
+    "userConfirmation": "2026-01-22T02:47:22Z"
+  },
+  "lastAccessed": "2026-01-22T02:27:50Z",
+  "currentPhase": "requirements-refinement",
+  "questionsAsked": [
+    "product-name",
+    "what-building",
+    "core-problem",
+    "solution-approach",
+    "product-type",
+    "target-users",
+    "use-cases",
+    "primary-language",
+    "testing-approach",
+    "technical-constraints",
+    "existing-systems",
+    "agent-personas",
+    "frontmatter-schema",
+    "prescriptive-workflows",
+    "objective-format",
+    "visualization-approach",
+    "window-management"
+  ],
+  "answeredQuestions": {
+    "product-name": "TeamBot",
+    "what-building": "CLI tool to help build solutions using AI and Github Copilot CLI",
+    "core-problem": "Need for autonomous, collaborative AI agent teams that can work together to achieve defined objectives without constant manual intervention",
+    "solution-approach": "Prescriptive team-based workflow with multi-agent personas, parallel execution, shared workspace (.teambot), history file management, and visualization",
+    "product-type": "Wrapper for Copilot CLI",
+    "target-users": "Solo and team developers",
+    "use-cases": "Rapid prototyping and code generation (priority)",
+    "primary-language": "Python",
+    "testing-approach": "Code-first with TDD where appropriate for better product quality",
+    "technical-constraints": "No tmux for windowing - use independent windows with reliable messaging/synchronization mechanism. No specific Python version requirements or performance targets.",
+    "existing-systems": "No integration required",
+    "agent-personas": "PM/Planner/Coordinator, Reviewer (all artifacts), Builder/Implementer x2 (parallel work), Business Analyst, Technical Writer/Documentor",
+    "frontmatter-schema": "title, description, timestamp, agent-id, action-type (verbose but concise descriptor of what was done)",
+    "prescriptive-workflows": "Setup → Business Problem (for big changes) → Spec → review → research → test strategy → plan → review → task implementation → review → test → post implementation review",
+    "objective-format": "Markdown",
+    "visualization-approach": "Console output with good use of colors, positioning, simple but informative - NO tmux",
+    "window-management": "TeamBot automatically creates windows/panes based on default/initial configuration (user-configurable)",
+    "inter-agent-messaging": "Python multiprocessing queues for real-time coordination + file-based persistence in .teambot for durable state",
+    "window-creation": "Python subprocess with OS-native new console (subprocess.CREATE_NEW_CONSOLE on Windows, start_new_session on Linux/Unix, osascript for macOS Terminal)",
+    "configuration-format": "JSON",
+    "objective-structure": "Markdown with: project description, definition of done, success criteria, implementation specifics",
+    "success-metrics": "Autonomous completion without human intervention based on definition of done and success criteria",
+    "mvp-timeline": "No timeline - prioritize quality and reliability over speed",
+    "agent-prompts": "Dynamically generated based on task",
+    "history-file-limits": "No hard limits; smart warning system when approaching context boundaries with compaction options (little/medium/high summarization)"
+  },
+  "referencesProcessed": [],
+  "nextActions": [
+    "Create example configuration JSON schema",
+    "Create example objective markdown template",
+    "Define agent prompt generation rules",
+    "Specify history file compaction mechanism",
+    "Define message protocol for multiprocessing queues",
+    "Document orchestrator architecture"
+  ],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "core-requirements-captured"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}
