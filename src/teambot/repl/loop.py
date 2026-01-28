@@ -349,6 +349,44 @@ async def run_interactive_mode(console: Optional[Console] = None) -> None:
 
     Args:
         console: Optional Rich console for output.
+
+    Uses split-pane Textual interface when supported, falls back to legacy mode
+    for narrow terminals or when TEAMBOT_LEGACY_MODE=true.
     """
-    repl = REPLLoop(console=console)
-    await repl.run()
+    import os
+
+    # Check if split-pane is explicitly enabled via env var
+    split_pane_flag = os.environ.get("TEAMBOT_SPLIT_PANE", "").lower() == "true"
+
+    # Import here to avoid circular imports
+    from teambot.ui.app import TeamBotApp, should_use_split_pane
+
+    if split_pane_flag or should_use_split_pane():
+        # Use new Textual split-pane interface
+        from teambot.repl.router import AgentRouter
+
+        sdk_client = CopilotSDKClient()
+
+        # Start SDK client
+        try:
+            if sdk_client.is_available():
+                await sdk_client.start()
+        except Exception:
+            pass  # Will show error when command is executed
+
+        executor = TaskExecutor(sdk_client=sdk_client)
+        router = AgentRouter()
+
+        app = TeamBotApp(executor=executor, router=router)
+        try:
+            await app.run_async()
+        finally:
+            # Clean up SDK client
+            try:
+                await sdk_client.stop()
+            except Exception:
+                pass
+    else:
+        # Legacy mode with overlay
+        repl = REPLLoop(console=console)
+        await repl.run()

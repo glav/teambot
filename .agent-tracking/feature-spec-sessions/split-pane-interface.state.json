@@ -1,0 +1,67 @@
+{
+  "specFile": "docs/feature-specs/split-pane-interface.md",
+  "lastAccessed": "2026-01-28T00:59:20Z",
+  "currentPhase": "spec-complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "success-metrics",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries"
+  ],
+  "answeredQuestions": {
+    "product-name": "Split-Pane Terminal Interface",
+    "target-users": "TeamBot users (developers)",
+    "core-problem": "Input/output interference in single-pane terminal - prompts disrupted by agent output",
+    "success-metrics": "Stable input, async output display, zero visual artifacts",
+    "technical-stack": "Python with curses/blessed library, Rich for formatting",
+    "testing-approach": "Unit tests with terminal mocking, manual cross-platform testing",
+    "scope-boundaries": "Split-pane layout, remove & syntax, output routing - no mouse interaction or resizable dividers"
+  },
+  "referencesProcessed": [
+    {
+      "file": "docs/feature-specs/persistent-status-overlay.md",
+      "status": "analyzed",
+      "keyFindings": "Current ANSI-based overlay approach, terminal detection patterns, scroll region handling"
+    },
+    {
+      "file": "docs/feature-specs/teambot-interactive-mode.md",
+      "status": "analyzed",
+      "keyFindings": "REPL architecture, command syntax, SDK integration patterns"
+    },
+    {
+      "file": "src/teambot/visualization/overlay.py",
+      "status": "analyzed",
+      "keyFindings": "ANSI escape sequences, terminal capability detection, resize handling"
+    },
+    {
+      "file": "src/teambot/repl/loop.py",
+      "status": "analyzed",
+      "keyFindings": "Input handling with Prompt.ask(), output routing, background task model"
+    }
+  ],
+  "nextActions": [
+    "Run sdd.2-review-spec to validate specification completeness",
+    "Research curses vs blessed vs Textual library options",
+    "Create implementation plan after spec approval"
+  ],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "personas-identified",
+    "requirements-testable",
+    "risks-documented"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  },
+  "keyDecisions": {
+    "pane-layout": "Vertical split - left input (30%), right output (70%)",
+    "background-syntax": "Remove & suffix - all tasks inherently async",
+    "fallback-mode": "Single-pane mode for terminals < 80 columns",
+    "library-recommendation": "blessed (cross-platform curses) as primary option"
+  }
+}

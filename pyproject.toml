@@ -9,6 +9,7 @@ dependencies = [
   "python-frontmatter>=1.0.0",
   "rich>=13.0.0",
   "github-copilot-sdk==0.1.16",
+  "textual>=0.47.0",
 ]
 
 [dependency-groups]
@@ -18,6 +19,7 @@ dev = [
   "pytest-cov>=4.1.0",
   "pytest-mock>=3.12.0",
   "pytest-asyncio>=0.23.0",
+  "textual[dev]>=0.47.0",
 ]
 
 [project.scripts]
