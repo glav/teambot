@@ -5,6 +5,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Optional
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -45,10 +46,11 @@ class TeamBotApp(App):
 
     CSS_PATH = Path(__file__).parent / "styles.css"
 
-    def __init__(self, executor=None, router=None, **kwargs):
+    def __init__(self, executor=None, router=None, sdk_client=None, **kwargs):
         super().__init__(**kwargs)
         self._executor = executor
         self._router = router
+        self._sdk_client = sdk_client
         self._commands = SystemCommands()
         self._pending_tasks: set[asyncio.Task] = set()
         # Track which agents have running tasks: {agent_id: task_content}
@@ -84,14 +86,14 @@ class TeamBotApp(App):
             self._pending_tasks.add(task)
             task.add_done_callback(self._pending_tasks.discard)
         elif command.type == CommandType.SYSTEM:
-            self._handle_system_command(command, output)
+            await self._handle_system_command(command, output)
         else:
             output.write_info("Tip: Use @agent for tasks or /help for commands")
 
         event.input.clear()
 
     async def _handle_agent_command(self, command, output):
-        """Route agent command to executor and display result."""
+        """Route agent command to executor and display streaming result."""
         if not self._executor:
             output.write_info("No executor available")
             return
@@ -102,21 +104,51 @@ class TeamBotApp(App):
         # Track this agent as running
         self._running_agents[agent_id] = content[:40] + "..." if len(content) > 40 else content
 
+        # Start streaming indicator
+        output.write_streaming_start(agent_id)
+
         try:
-            result = await self._executor.execute(command)
-            if result.background:
-                output.write_info(result.output)
-            elif result.success:
-                output.write_task_complete(agent_id, result.output)
+            # Check if we can use direct streaming with SDK client
+            if (
+                self._sdk_client
+                and hasattr(self._sdk_client, "execute_streaming")
+                and not command.is_pipeline
+                and len(command.agent_ids) == 1
+            ):
+                # Direct streaming for simple commands
+                def on_chunk(chunk: str):
+                    output.write_streaming_chunk(agent_id, chunk)
+
+                try:
+                    result_content = await self._sdk_client.execute_streaming(
+                        agent_id, content, on_chunk
+                    )
+                    output.finish_streaming(agent_id, success=True)
+                except Exception as e:
+                    output.finish_streaming(agent_id, success=False)
+                    output.write_task_error(agent_id, str(e))
             else:
-                output.write_task_error(agent_id, result.error or "Failed")
+                # Use executor for complex commands (pipelines, multi-agent)
+                result = await self._executor.execute(command)
+                if result.background:
+                    output.finish_streaming(agent_id)
+                    output.write_info(result.output)
+                elif result.success:
+                    # Show the result since we didn't stream it
+                    output.finish_streaming(agent_id, success=True)
+                    if result.output:
+                        output.write_task_complete(agent_id, result.output)
+                else:
+                    output.finish_streaming(agent_id, success=False)
+                    output.write_task_error(agent_id, result.error or "Failed")
         except Exception as e:
+            output.finish_streaming(agent_id, success=False)
             output.write_task_error(agent_id or "agent", str(e))
         finally:
             # Remove from running agents
             self._running_agents.pop(agent_id, None)
 
-    def _handle_system_command(self, command, output):
+    async def _handle_system_command(self, command, output):
         """Route system command to SystemCommands and display result."""
         if command.command == "clear":
             output.clear()
@@ -127,8 +159,13 @@ class TeamBotApp(App):
             return
 
         if command.command == "status":
-            # Custom status that shows running tasks
-            output.write_system(self._get_status())
+            # Custom status that shows running tasks and streaming
+            output.write_system(self._get_status(output))
+            return
+
+        if command.command == "cancel":
+            # Handle cancel command
+            await self._handle_cancel_command(command.args or [], output)
             return
 
         # Use SystemCommands.dispatch for other commands
@@ -138,13 +175,71 @@ class TeamBotApp(App):
         if result.should_exit:
             self.exit()
 
-    def _get_status(self) -> str:
-        """Get agent status including running tasks."""
+    async def _handle_cancel_command(self, args: list[str], output) -> None:
+        """Handle /cancel command to stop streaming tasks.
+
+        Args:
+            args: Command arguments (optional agent_id or task_id).
+            output: OutputPane for displaying results.
+        """
+        if not args:
+            # Cancel all streaming agents
+            streaming_agents = output.get_streaming_agents()
+            if not streaming_agents:
+                output.write_info("No active streaming tasks to cancel")
+                return
+
+            cancelled = 0
+            for agent_id in streaming_agents:
+                if await self._cancel_agent(agent_id, output):
+                    cancelled += 1
+
+            output.write_info(f"Cancelled {cancelled} streaming task(s)")
+        else:
+            # Cancel specific agent
+            agent_id = args[0]
+            if await self._cancel_agent(agent_id, output):
+                output.write_info(f"Cancelled @{agent_id}")
+            else:
+                output.write_info(f"Could not cancel @{agent_id} (not streaming)")
+
+    async def _cancel_agent(self, agent_id: str, output) -> bool:
+        """Cancel streaming for a specific agent.
+
+        Args:
+            agent_id: Agent to cancel.
+            output: OutputPane for finishing streaming.
+
+        Returns:
+            True if cancelled successfully.
+        """
+        if self._sdk_client and hasattr(self._sdk_client, "cancel_current_request"):
+            cancelled = await self._sdk_client.cancel_current_request(agent_id)
+            if cancelled:
+                output.finish_streaming(agent_id, success=False)
+                self._running_agents.pop(agent_id, None)
+                return True
+        return False
+
+    def _get_status(self, output: Optional[OutputPane] = None) -> str:
+        """Get agent status including running and streaming tasks.
+
+        Args:
+            output: Optional OutputPane to check streaming status.
+
+        Returns:
+            Formatted status string.
+        """
         agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
         lines = ["Agent Status:", ""]
 
+        streaming_agents = output.get_streaming_agents() if output else []
+
         for agent in agents:
-            if agent in self._running_agents:
+            if agent in streaming_agents:
+                task_info = self._running_agents.get(agent, "")
+                lines.append(f"  {agent:12} - [cyan]streaming[/cyan]: {task_info}")
+            elif agent in self._running_agents:
                 task_info = self._running_agents[agent]
                 lines.append(f"  {agent:12} - [yellow]running[/yellow]: {task_info}")
             else:

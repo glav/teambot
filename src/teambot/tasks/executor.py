@@ -48,6 +48,7 @@ class TaskExecutor:
         default_timeout: float = 120.0,
         on_task_complete: Optional[callable] = None,
         on_task_started: Optional[callable] = None,
+        on_streaming_chunk: Optional[callable] = None,
     ):
         """Initialize executor.
 
@@ -57,10 +58,12 @@ class TaskExecutor:
             default_timeout: Default task timeout in seconds.
             on_task_complete: Callback when task completes (for notifications).
             on_task_started: Callback when task starts (for overlay updates).
+            on_streaming_chunk: Callback for streaming chunks (agent_id, chunk).
         """
         self._sdk_client = sdk_client
         self._on_task_complete = on_task_complete
         self._on_task_started = on_task_started
+        self._on_streaming_chunk = on_streaming_chunk
 
         # Create manager with our executor function
         self._manager = TaskManager(
@@ -87,7 +90,16 @@ class TaskExecutor:
         Returns:
             Output from agent.
         """
-        return await self._sdk_client.execute(agent_id, prompt)
+        # Check if SDK client supports streaming
+        if hasattr(self._sdk_client, "execute_streaming") and self._on_streaming_chunk:
+            # Use streaming with callback
+            def on_chunk(chunk: str):
+                self._on_streaming_chunk(agent_id, chunk)
+
+            return await self._sdk_client.execute_streaming(agent_id, prompt, on_chunk)
+        else:
+            # Fall back to regular execute
+            return await self._sdk_client.execute(agent_id, prompt)
 
     async def execute(self, command: Command) -> ExecutionResult:
         """Execute a parsed command.

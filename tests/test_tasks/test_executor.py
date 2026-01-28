@@ -342,3 +342,99 @@ class TestTaskExecutorCallbacks:
         await asyncio.sleep(0.1)
 
         assert len(started_tasks) == 1
+
+
+class TestTaskExecutorStreaming:
+    """Tests for streaming callback support."""
+
+    @pytest.mark.asyncio
+    async def test_streaming_callback_passed_to_sdk(self):
+        """Test that streaming callback is passed to SDK client."""
+        chunks_received = []
+
+        def on_chunk(agent_id, chunk):
+            chunks_received.append((agent_id, chunk))
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute_streaming = AsyncMock(return_value="Streamed result")
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_streaming_chunk=on_chunk,
+        )
+
+        cmd = parse_command("@pm Test streaming")
+        result = await executor.execute(cmd)
+
+        # Verify execute_streaming was called
+        mock_sdk.execute_streaming.assert_called_once()
+        call_args = mock_sdk.execute_streaming.call_args
+        assert call_args[0][0] == "pm"  # agent_id
+        assert call_args[0][1] == "Test streaming"  # prompt
+        # Third arg is the on_chunk callback
+
+    @pytest.mark.asyncio
+    async def test_streaming_callback_receives_chunks(self):
+        """Test that streaming callback receives agent_id and chunk."""
+        chunks_received = []
+
+        def on_chunk(agent_id, chunk):
+            chunks_received.append((agent_id, chunk))
+
+        async def mock_execute_streaming(agent_id, prompt, callback):
+            callback("Chunk 1")
+            callback("Chunk 2")
+            return "Complete"
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute_streaming = mock_execute_streaming
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_streaming_chunk=on_chunk,
+        )
+
+        cmd = parse_command("@pm Test")
+        await executor.execute(cmd)
+
+        assert chunks_received == [("pm", "Chunk 1"), ("pm", "Chunk 2")]
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_execute_without_callback(self):
+        """Test fallback to execute() when no streaming callback provided."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Regular result")
+        mock_sdk.execute_streaming = AsyncMock(return_value="Streaming result")
+
+        # No on_streaming_chunk callback
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        cmd = parse_command("@pm Test")
+        result = await executor.execute(cmd)
+
+        # Should use regular execute, not execute_streaming
+        mock_sdk.execute.assert_called_once()
+        mock_sdk.execute_streaming.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_falls_back_when_sdk_lacks_streaming(self):
+        """Test fallback when SDK doesn't have execute_streaming."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Regular result")
+        # No execute_streaming method
+        del mock_sdk.execute_streaming
+
+        def on_chunk(agent_id, chunk):
+            pass
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_streaming_chunk=on_chunk,
+        )
+
+        cmd = parse_command("@pm Test")
+        result = await executor.execute(cmd)
+
+        # Should fall back to regular execute
+        mock_sdk.execute.assert_called_once()
+        assert result.output == "Regular result"

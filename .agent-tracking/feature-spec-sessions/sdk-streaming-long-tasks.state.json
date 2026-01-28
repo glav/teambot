@@ -1,0 +1,9 @@
+{
+  "feature_name": "sdk-streaming-long-tasks",
+  "spec_path": "docs/feature-specs/sdk-streaming-long-tasks.md",
+  "created_at": "2026-01-28T02:50:00Z",
+  "status": "draft",
+  "current_step": "sdd.1-create-feature-spec",
+  "steps_completed": ["sdd.1-create-feature-spec"],
+  "steps_remaining": ["sdd.2-review-spec", "sdd.3-research-feature", "sdd.4-determine-test-strategy", "sdd.5-task-planner-for-feature", "sdd.6-review-plan", "sdd.7-task-implementer-for-feature", "sdd.8-post-implementation-review"]
+}

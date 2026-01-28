@@ -94,3 +94,91 @@ def mock_sdk_client(mock_sdk_session):
     client.list_sessions = MagicMock(return_value=[])
     client.delete_session = MagicMock()
     return client
+
+
+# ============================================================================
+# SDK Streaming Fixtures
+# ============================================================================
+
+
+class MockStreamingSession:
+    """Mock session that supports streaming events."""
+
+    def __init__(self):
+        self._handlers: list = []
+        self.send = AsyncMock(return_value="msg-123")
+        self.send_and_wait = AsyncMock()
+        self.abort = AsyncMock()
+        self.destroy = AsyncMock()
+        self.session_id = "test-streaming-session"
+
+    def on(self, handler):
+        """Register event handler and return unsubscribe function."""
+        self._handlers.append(handler)
+
+        def unsubscribe():
+            if handler in self._handlers:
+                self._handlers.remove(handler)
+
+        return unsubscribe
+
+    def fire_event(self, event_type, data=None):
+        """Fire an event to all registered handlers."""
+        from types import SimpleNamespace
+
+        event = SimpleNamespace(type=event_type, data=data)
+        for handler in self._handlers:
+            handler(event)
+
+
+class MockEventTypes:
+    """Mock SessionEventType enum values."""
+
+    ASSISTANT_MESSAGE_DELTA = "ASSISTANT_MESSAGE_DELTA"
+    ASSISTANT_MESSAGE = "ASSISTANT_MESSAGE"
+    SESSION_IDLE = "SESSION_IDLE"
+    SESSION_ERROR = "SESSION_ERROR"
+    ABORT = "ABORT"
+
+
+class MockEventData:
+    """Factory for creating mock event data."""
+
+    @staticmethod
+    def delta(content: str, message_id: str = "msg-123"):
+        """Create delta event data."""
+        from types import SimpleNamespace
+
+        return SimpleNamespace(delta_content=content, message_id=message_id)
+
+    @staticmethod
+    def error(error_type: str = "error", message: str = "Error occurred"):
+        """Create error event data."""
+        from types import SimpleNamespace
+
+        return SimpleNamespace(error_type=error_type, message=message, stack="")
+
+    @staticmethod
+    def final(content: str):
+        """Create final message event data."""
+        from types import SimpleNamespace
+
+        return SimpleNamespace(content=content)
+
+
+@pytest.fixture
+def mock_streaming_session():
+    """Mock session that supports streaming events."""
+    return MockStreamingSession()
+
+
+@pytest.fixture
+def mock_event_types():
+    """Mock SessionEventType enum."""
+    return MockEventTypes()
+
+
+@pytest.fixture
+def mock_event_data():
+    """Factory for mock event data."""
+    return MockEventData()

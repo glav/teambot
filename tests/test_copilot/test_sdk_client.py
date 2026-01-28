@@ -89,28 +89,65 @@ class TestCopilotSDKClient:
             assert mock_sdk_client.create_session.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_execute_sends_prompt(self, mock_sdk_client, mock_sdk_session):
+    async def test_execute_sends_prompt(self, mock_streaming_session, mock_event_types, mock_event_data):
         """Test that execute() sends prompt to session."""
+        import asyncio
         from teambot.copilot.sdk_client import CopilotSDKClient
 
-        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.create_session = AsyncMock(return_value=mock_streaming_session)
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+            MockClient.return_value = mock_client
+
             client = CopilotSDKClient()
             await client.start()
+
+            async def fire_events():
+                await asyncio.sleep(0.01)
+                mock_streaming_session.fire_event(
+                    mock_event_types.ASSISTANT_MESSAGE_DELTA,
+                    mock_event_data.delta("Done"),
+                )
+                mock_streaming_session.fire_event(mock_event_types.SESSION_IDLE, None)
+
+            asyncio.create_task(fire_events())
 
             await client.execute("pm", "Create a project plan")
 
-            mock_sdk_session.send_and_wait.assert_called_once()
-            call_args = mock_sdk_session.send_and_wait.call_args
+            # Verify send was called (streaming mode)
+            mock_streaming_session.send.assert_called_once()
+            call_args = mock_streaming_session.send.call_args
             assert "Create a project plan" in str(call_args)
 
     @pytest.mark.asyncio
-    async def test_execute_returns_response(self, mock_sdk_client, mock_sdk_session):
+    async def test_execute_returns_response(self, mock_streaming_session, mock_event_types, mock_event_data):
         """Test that execute() returns the response content."""
+        import asyncio
         from teambot.copilot.sdk_client import CopilotSDKClient
 
-        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.create_session = AsyncMock(return_value=mock_streaming_session)
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+            MockClient.return_value = mock_client
+
             client = CopilotSDKClient()
             await client.start()
+
+            async def fire_events():
+                await asyncio.sleep(0.01)
+                mock_streaming_session.fire_event(
+                    mock_event_types.ASSISTANT_MESSAGE_DELTA,
+                    mock_event_data.delta("Task completed"),
+                )
+                mock_streaming_session.fire_event(mock_event_types.SESSION_IDLE, None)
+
+            asyncio.create_task(fire_events())
 
             result = await client.execute("pm", "Hello")
 
