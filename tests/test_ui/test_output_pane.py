@@ -1,6 +1,7 @@
 """Tests for OutputPane widget."""
 
-from unittest.mock import MagicMock, patch
+import pytest
+from unittest.mock import patch
 from datetime import datetime
 
 
