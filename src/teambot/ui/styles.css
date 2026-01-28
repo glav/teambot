@@ -1,0 +1,32 @@
+/* Split-pane layout styles for TeamBot */
+
+Screen {
+    layout: horizontal;
+}
+
+Horizontal {
+    height: 100%;
+}
+
+#input-pane {
+    width: 30%;
+    min-width: 25;
+    border: solid $primary;
+    padding: 1;
+}
+
+#header {
+    dock: top;
+    height: 1;
+    padding: 0 1;
+}
+
+#prompt {
+    dock: bottom;
+}
+
+#output {
+    width: 70%;
+    border: solid $secondary;
+    padding: 0 1;
+}
