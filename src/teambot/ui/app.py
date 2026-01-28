@@ -51,6 +51,8 @@ class TeamBotApp(App):
         self._router = router
         self._commands = SystemCommands()
         self._pending_tasks: set[asyncio.Task] = set()
+        # Track which agents have running tasks: {agent_id: task_content}
+        self._running_agents: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         """Create the split-pane layout."""
@@ -94,16 +96,25 @@ class TeamBotApp(App):
             output.write_info("No executor available")
             return
 
+        agent_id = command.agent_id
+        content = command.content or ""
+
+        # Track this agent as running
+        self._running_agents[agent_id] = content[:40] + "..." if len(content) > 40 else content
+
         try:
             result = await self._executor.execute(command)
             if result.background:
                 output.write_info(result.output)
             elif result.success:
-                output.write_task_complete(command.agent_id, result.output)
+                output.write_task_complete(agent_id, result.output)
             else:
-                output.write_task_error(command.agent_id, result.error or "Failed")
+                output.write_task_error(agent_id, result.error or "Failed")
         except Exception as e:
-            output.write_task_error(command.agent_id or "agent", str(e))
+            output.write_task_error(agent_id or "agent", str(e))
+        finally:
+            # Remove from running agents
+            self._running_agents.pop(agent_id, None)
 
     def _handle_system_command(self, command, output):
         """Route system command to SystemCommands and display result."""
@@ -115,9 +126,28 @@ class TeamBotApp(App):
             self.exit()
             return
 
+        if command.command == "status":
+            # Custom status that shows running tasks
+            output.write_system(self._get_status())
+            return
+
         # Use SystemCommands.dispatch for other commands
         result = self._commands.dispatch(command.command, command.args or [])
         output.write_system(result.output)
 
         if result.should_exit:
             self.exit()
+
+    def _get_status(self) -> str:
+        """Get agent status including running tasks."""
+        agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
+        lines = ["Agent Status:", ""]
+
+        for agent in agents:
+            if agent in self._running_agents:
+                task_info = self._running_agents[agent]
+                lines.append(f"  {agent:12} - [yellow]running[/yellow]: {task_info}")
+            else:
+                lines.append(f"  {agent:12} - [dim]idle[/dim]")
+
+        return "\n".join(lines)
