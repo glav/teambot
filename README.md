@@ -5,8 +5,8 @@
 TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-464%20passing-green.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-87%25-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-517%20passing-green.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-84%25-green.svg)]()
 
 ## Features
 
@@ -16,6 +16,7 @@ TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com
 - 🔄 **Autonomous Operation** - Define objectives in markdown, let the team execute
 - 📁 **Shared Context** - Agents collaborate via `.teambot/` directory with history files
 - 🎨 **Rich Console UI** - Colorful status display with progress tracking
+- 🖥️ **Split-Pane Interface** - Separate input and output panes for stable, uninterrupted interaction
 - 💾 **State Persistence** - Resume workflows across restarts
 
 ---
@@ -296,6 +297,22 @@ teambot: /tasks
 | `/overlay` | Show overlay status | `/overlay` |
 | `/overlay on\|off` | Toggle overlay | `/overlay off` |
 | `/overlay position <pos>` | Move overlay | `/overlay position bottom-left` |
+
+### Split-Pane Interface
+
+TeamBot features a split-pane terminal interface (powered by [Textual](https://textual.textualize.io/)) that separates input from output:
+
+- **Left pane**: Your command input, always stable and accessible
+- **Right pane**: Agent output, displays asynchronously without interrupting input
+
+This design means all agent tasks run asynchronously by default—no need for the `&` suffix for background execution.
+
+**Fallback to Legacy Mode:**
+
+The split-pane interface automatically falls back to legacy (single-pane) mode when:
+- `TEAMBOT_LEGACY_MODE=true` environment variable is set
+- Terminal width is less than 80 columns
+- stdout is not a TTY
 
 ### Status Overlay
 
@@ -774,6 +791,8 @@ To share context explicitly, agents write to `.teambot/` and other agents read t
 |---------|---------|---------|
 | `python-frontmatter` | ≥1.0.0 | YAML frontmatter parsing for history files |
 | `rich` | ≥13.0.0 | Console UI, tables, colors, and progress bars |
+| `textual` | ≥0.47.0 | Split-pane terminal interface |
+| `github-copilot-sdk` | 0.1.16 | GitHub Copilot SDK integration |
 
 ### Development Dependencies
 
@@ -782,7 +801,9 @@ To share context explicitly, agents write to `.teambot/` and other agents read t
 | `pytest` | ≥7.4.0 | Testing framework |
 | `pytest-cov` | ≥4.1.0 | Coverage reporting |
 | `pytest-mock` | ≥3.12.0 | Mocking utilities |
-| `ruff` | ≥0.4.0 | Linting and formatting |
+| `pytest-asyncio` | ≥0.23.0 | Async test support |
+| `ruff` | ≥0.8.0 | Linting and formatting |
+| `textual[dev]` | ≥0.47.0 | Textual development tools |
 
 ### External Dependencies
 
@@ -846,16 +867,21 @@ teambot/
 │   │   └── router.py         # Message routing
 │   ├── prompts/
 │   │   └── templates.py      # Persona prompt templates
+│   ├── ui/
+│   │   ├── app.py            # Split-pane Textual app
+│   │   ├── styles.css        # UI styles
+│   │   └── widgets/          # Input/Output pane widgets
 │   ├── visualization/
 │   │   └── console.py        # Rich console display
 │   └── workflow/
 │       ├── stages.py         # Workflow stage enum
 │       └── state_machine.py  # Workflow state management
-├── tests/                    # Test suite (464 tests)
+├── tests/                    # Test suite (517 tests)
 │   ├── test_cli.py
 │   ├── test_orchestrator.py
 │   ├── test_agent_runner.py
 │   ├── test_copilot/
+│   ├── test_ui/              # Split-pane UI tests
 │   ├── test_workflow/
 │   └── ...
 ├── docs/
@@ -891,7 +917,7 @@ uv run pytest --cov=src/teambot --cov-report=html
 
 ### Test Coverage
 
-Current coverage: **86%** with **404 tests**
+Current coverage: **84%** with **517 tests**
 
 | Module | Coverage |
 |--------|----------|
@@ -900,6 +926,8 @@ Current coverage: **86%** with **404 tests**
 | `prompts/templates.py` | 100% |
 | `history/manager.py` | 100% |
 | `messaging/router.py` | 100% |
+| `ui/widgets/input_pane.py` | 94% |
+| `ui/widgets/output_pane.py` | 98% |
 | `config/loader.py` | 96% |
 
 ---
@@ -1035,6 +1063,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - Built on [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/)
 - Uses [Rich](https://github.com/Textualize/rich) for beautiful console output
+- Uses [Textual](https://textual.textualize.io/) for the split-pane terminal interface
 - Package management by [uv](https://github.com/astral-sh/uv)
 - Developed using the Spec-Driven Development (SDD) workflow
 
