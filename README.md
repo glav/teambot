@@ -2,7 +2,7 @@
 
 **Autonomous AI Agent Teams for Software Development**
 
-TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
+TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://img.shields.io/badge/tests-650%20passing-green.svg)]()
@@ -45,7 +45,7 @@ TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com
 
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv) package manager
-- [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) (the standalone `copilot` command)
+- GitHub Copilot access (SDK authenticates via GitHub CLI)
 
 ### Installation
 
@@ -558,14 +558,15 @@ Current: **83% coverage** with **650 tests**
 
 ## Troubleshooting
 
-### Copilot CLI Not Found
+### Copilot SDK Not Available
 
+```
+Error: Copilot SDK not available - install github-copilot-sdk
+```
+
+The SDK should be installed automatically with `uv sync`. If missing:
 ```bash
-# Verify Copilot CLI installation
-copilot --version
-
-# If not installed, follow instructions at:
-# https://githubnext.com/projects/copilot-cli/
+uv add github-copilot-sdk
 ```
 
 ### Configuration Already Exists
@@ -606,17 +607,17 @@ teambot run objectives/my-task.md
 
 | Package | Purpose |
 |---------|---------|
+| `github-copilot-sdk` | GitHub Copilot SDK for AI agent execution |
 | `python-frontmatter` | YAML frontmatter parsing |
 | `rich` | Console UI and formatting |
 | `textual` | Split-pane terminal interface |
-| `github-copilot-sdk` | Copilot SDK integration |
 
 ### External
 
 | Tool | Purpose |
 |------|---------|
-| [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) | AI task execution |
 | [uv](https://github.com/astral-sh/uv) | Package management |
+| [GitHub CLI](https://cli.github.com/) | Authentication (optional, SDK handles auth) |
 
 ---
 
