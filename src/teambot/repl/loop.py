@@ -231,13 +231,14 @@ class REPLLoop:
                     "or set GITHUB_TOKEN env var.[/dim]"
                 )
 
-            # Initialize task executor
-            self._executor = TaskExecutor(
-                sdk_client=self._sdk_client,
-                on_task_complete=self._on_task_complete,
-                on_task_started=self._on_task_started,
-            )
-            self._commands.set_executor(self._executor)
+        # Initialize task executor (always, even if SDK not connected)
+        # This allows /tasks command to work for viewing task history
+        self._executor = TaskExecutor(
+            sdk_client=self._sdk_client,
+            on_task_complete=self._on_task_complete,
+            on_task_started=self._on_task_started,
+        )
+        self._commands.set_executor(self._executor)
 
         # Start overlay if supported
         if self._overlay.is_supported:
