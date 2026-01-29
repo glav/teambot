@@ -132,7 +132,7 @@ class TestResumeAfterCancellation:
         assert state_file.exists()
 
         state = json.loads(state_file.read_text())
-        assert state["status"] == "paused"
+        assert state["status"] == "cancelled"
 
 
 class TestParallelBuilderExecution:
