@@ -137,7 +137,7 @@ class TestParallelExecutor:
         events = [c[0] for c in progress_calls]
         assert "agent_running" in events
         assert "agent_complete" in events
-        
+
         # Verify data structure
         running_event = next(c for c in progress_calls if c[0] == "agent_running")
         assert running_event[1]["agent_id"] == "builder-1"
