@@ -239,7 +239,7 @@ class TestReviewIterator:
         ]
         progress_calls = []
 
-        result = await iterator.execute(
+        _ = await iterator.execute(
             stage=WorkflowStage.SPEC_REVIEW,
             work_agent="ba",
             review_agent="reviewer",
