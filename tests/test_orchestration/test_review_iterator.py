@@ -182,6 +182,10 @@ class TestReviewIterator:
             context="Create feature",
         )
 
+        # Verify the review was approved on second iteration
+        assert result.status == ReviewStatus.APPROVED
+        assert result.iterations_used == 2
+
         # Check that the second work call included feedback context
         calls = mock_sdk_client.execute_streaming.call_args_list
         assert len(calls) == 4
