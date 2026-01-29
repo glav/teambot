@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
+
+import pytest
 
 from teambot.orchestration.review_iterator import (
+    IterationResult,
     ReviewIterator,
     ReviewResult,
     ReviewStatus,
-    IterationResult,
 )
 from teambot.workflow.stages import WorkflowStage
 
