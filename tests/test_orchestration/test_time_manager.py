@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-import pytest
 
 from teambot.orchestration.time_manager import TimeManager
 
