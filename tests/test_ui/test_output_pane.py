@@ -1,8 +1,6 @@
 """Tests for OutputPane widget."""
 
-import pytest
 from unittest.mock import patch
-from datetime import datetime
 
 
 class TestOutputPane:
@@ -131,9 +129,9 @@ class TestOutputPane:
                     method(*args)
 
                     call_arg = mock_write.call_args[0][0]
-                    assert re.search(
-                        timestamp_pattern, call_arg
-                    ), f"{method_name} should include timestamp"
+                    assert re.search(timestamp_pattern, call_arg), (
+                        f"{method_name} should include timestamp"
+                    )
 
 
 class TestOutputPaneStreaming:

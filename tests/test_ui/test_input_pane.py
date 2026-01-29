@@ -1,7 +1,6 @@
 """Tests for InputPane widget."""
 
 import pytest
-from unittest.mock import MagicMock
 
 
 class TestInputPane:

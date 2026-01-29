@@ -5,9 +5,9 @@ Tests will fail until implementation is complete.
 """
 
 import os
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 
 class TestFallbackMode:
