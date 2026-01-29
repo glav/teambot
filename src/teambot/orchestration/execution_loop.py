@@ -121,12 +121,12 @@ class ExecutionLoop:
             while self.current_stage != WorkflowStage.COMPLETE:
                 # Check cancellation
                 if self.cancelled:
-                    self._save_state()
+                    self._save_state(ExecutionResult.CANCELLED)
                     return ExecutionResult.CANCELLED
 
                 # Check timeout
                 if self.time_manager.is_expired():
-                    self._save_state()
+                    self._save_state(ExecutionResult.TIMEOUT)
                     return ExecutionResult.TIMEOUT
 
                 stage = self.current_stage
@@ -138,7 +138,7 @@ class ExecutionLoop:
                 if stage in REVIEW_STAGES:
                     result = await self._execute_review_stage(stage, on_progress)
                     if result == ReviewStatus.FAILED:
-                        self._save_state()
+                        self._save_state(ExecutionResult.REVIEW_FAILED)
                         return ExecutionResult.REVIEW_FAILED
                 else:
                     await self._execute_work_stage(stage, on_progress)
@@ -146,11 +146,11 @@ class ExecutionLoop:
                 # Advance to next stage
                 self.current_stage = self._get_next_stage(stage)
 
-            self._save_state()
+            self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
         except Exception:
-            self._save_state()
+            self._save_state(ExecutionResult.ERROR)
             raise
 
     def cancel(self) -> None:
@@ -282,18 +282,31 @@ class ExecutionLoop:
             pass
         return WorkflowStage.COMPLETE
 
-    def _save_state(self) -> None:
-        """Save orchestration state to workflow state file."""
+    def _save_state(self, result: ExecutionResult | None = None) -> None:
+        """Save orchestration state to workflow state file.
+
+        Args:
+            result: The execution result that caused this save. If None,
+                    status is inferred from self.cancelled.
+        """
         state_file = self.teambot_dir / "orchestration_state.json"
 
         import json
+
+        # Determine status from execution result
+        if result is not None:
+            status = result.value
+        elif self.cancelled:
+            status = "cancelled"
+        else:
+            status = "complete"
 
         state = {
             "objective_file": str(self.objective_path),
             "current_stage": self.current_stage.name,
             "elapsed_seconds": self.time_manager.elapsed_seconds,
             "max_seconds": self.time_manager.max_seconds,
-            "status": "paused" if self.cancelled else "complete",
+            "status": status,
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
         }
 
