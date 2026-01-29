@@ -630,7 +630,42 @@ The Copilot CLI client can be configured with:
 
 ## Objective Files
 
-Define your day's work in a markdown file:
+Define your day's work in a markdown file. TeamBot provides a comprehensive template for structured, spec-driven development workflows.
+
+### SDD Objective Template
+
+For complex features requiring the full 13-stage workflow, use the **Spec-Driven Development (SDD) template** located at [`docs/sdd-objective-template.md`](docs/sdd-objective-template.md).
+
+**How to use:**
+
+1. Copy the template to your objectives directory:
+   ```bash
+   cp docs/sdd-objective-template.md objectives/my-feature.md
+   ```
+
+2. Fill in the template sections:
+   - **Objective**: Goal, problem statement, and success criteria
+   - **Technical Context**: Target codebase, language/framework, testing preference, constraints
+
+3. Run TeamBot with your objective:
+   ```bash
+   uv run teambot run objectives/my-feature.md
+   ```
+
+The SDD template includes detailed documentation of all 13 workflow stages, iteration protocols, artifact locations, and agent coordination—providing a comprehensive guide for autonomous development.
+
+> **Note:** Create the `objectives/` directory first if it doesn't exist: `mkdir -p objectives`
+
+### Choosing the Right Format
+
+| Use Case | Format |
+|----------|--------|
+| Complex features, new modules, significant changes | SDD Template |
+| Bug fixes, small enhancements, quick tasks | Basic Format |
+
+### Basic Objective Format
+
+For simpler tasks, define your work in a basic markdown file:
 
 ```markdown
 # Objective: Build Chatbot SPA
