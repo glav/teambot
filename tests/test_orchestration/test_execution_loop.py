@@ -6,7 +6,7 @@ import asyncio
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from teambot.orchestration.execution_loop import (
     ExecutionLoop,
