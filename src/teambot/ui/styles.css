@@ -21,6 +21,14 @@ Horizontal {
     padding: 0 1;
 }
 
+#status-panel {
+    height: 1fr;
+    overflow-y: hidden;
+    text-overflow: ellipsis;
+    text-wrap: nowrap;
+    padding: 0 1;
+}
+
 #prompt {
     dock: bottom;
 }

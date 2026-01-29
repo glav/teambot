@@ -5,7 +5,6 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Optional
 
 from textual import on
 from textual.app import App, ComposeResult
@@ -14,7 +13,8 @@ from textual.widgets import Static
 
 from teambot.repl.commands import SystemCommands
 from teambot.repl.parser import CommandType, parse_command
-from teambot.ui.widgets import InputPane, OutputPane
+from teambot.ui.agent_state import AgentState, AgentStatusManager
+from teambot.ui.widgets import InputPane, OutputPane, StatusPanel
 
 
 def should_use_split_pane() -> bool:
@@ -53,7 +53,9 @@ class TeamBotApp(App):
         self._sdk_client = sdk_client
         self._commands = SystemCommands()
         self._pending_tasks: set[asyncio.Task] = set()
-        # Track which agents have running tasks: {agent_id: task_content}
+        # Centralized agent status manager
+        self._agent_status = AgentStatusManager()
+        # Legacy: Track which agents have running tasks (kept for backward compat)
         self._running_agents: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
@@ -61,6 +63,7 @@ class TeamBotApp(App):
         with Horizontal():
             with Vertical(id="input-pane"):
                 yield Static("[bold green]TeamBot[/bold green]", id="header")
+                yield StatusPanel(self._agent_status, id="status-panel")
                 yield InputPane(placeholder="@agent task or /command", id="prompt")
             yield OutputPane(id="output", highlight=True, markup=True)
 
@@ -101,7 +104,9 @@ class TeamBotApp(App):
         agent_id = command.agent_id
         content = command.content or ""
 
-        # Track this agent as running
+        # Update centralized state: agent is now running
+        self._agent_status.set_running(agent_id, content)
+        # Legacy compatibility
         self._running_agents[agent_id] = content[:40] + "..." if len(content) > 40 else content
 
         # Start streaming indicator
@@ -115,16 +120,19 @@ class TeamBotApp(App):
                 and not command.is_pipeline
                 and len(command.agent_ids) == 1
             ):
+                # Mark as streaming in centralized state
+                self._agent_status.set_streaming(agent_id)
+
                 # Direct streaming for simple commands
                 def on_chunk(chunk: str):
                     output.write_streaming_chunk(agent_id, chunk)
 
                 try:
-                    result_content = await self._sdk_client.execute_streaming(
-                        agent_id, content, on_chunk
-                    )
+                    await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
+                    self._agent_status.set_completed(agent_id)
                     output.finish_streaming(agent_id, success=True)
                 except Exception as e:
+                    self._agent_status.set_failed(agent_id)
                     output.finish_streaming(agent_id, success=False)
                     output.write_task_error(agent_id, str(e))
             else:
@@ -134,18 +142,23 @@ class TeamBotApp(App):
                     output.finish_streaming(agent_id)
                     output.write_info(result.output)
                 elif result.success:
+                    self._agent_status.set_completed(agent_id)
                     # Show the result since we didn't stream it
                     output.finish_streaming(agent_id, success=True)
                     if result.output:
                         output.write_task_complete(agent_id, result.output)
                 else:
+                    self._agent_status.set_failed(agent_id)
                     output.finish_streaming(agent_id, success=False)
                     output.write_task_error(agent_id, result.error or "Failed")
         except Exception as e:
+            self._agent_status.set_failed(agent_id)
             output.finish_streaming(agent_id, success=False)
             output.write_task_error(agent_id or "agent", str(e))
         finally:
-            # Remove from running agents
+            # Return to idle state
+            self._agent_status.set_idle(agent_id)
+            # Legacy compatibility
             self._running_agents.pop(agent_id, None)
 
     async def _handle_system_command(self, command, output):
@@ -216,33 +229,35 @@ class TeamBotApp(App):
         if self._sdk_client and hasattr(self._sdk_client, "cancel_current_request"):
             cancelled = await self._sdk_client.cancel_current_request(agent_id)
             if cancelled:
+                self._agent_status.set_idle(agent_id)
                 output.finish_streaming(agent_id, success=False)
                 self._running_agents.pop(agent_id, None)
                 return True
         return False
 
-    def _get_status(self, output: Optional[OutputPane] = None) -> str:
+    def _get_status(self, output: OutputPane | None = None) -> str:
         """Get agent status including running and streaming tasks.
 
         Args:
-            output: Optional OutputPane to check streaming status.
+            output: Optional OutputPane (unused, kept for compatibility).
 
         Returns:
             Formatted status string.
         """
-        agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
         lines = ["Agent Status:", ""]
 
-        streaming_agents = output.get_streaming_agents() if output else []
-
-        for agent in agents:
-            if agent in streaming_agents:
-                task_info = self._running_agents.get(agent, "")
-                lines.append(f"  {agent:12} - [cyan]streaming[/cyan]: {task_info}")
-            elif agent in self._running_agents:
-                task_info = self._running_agents[agent]
-                lines.append(f"  {agent:12} - [yellow]running[/yellow]: {task_info}")
+        for agent_id, status in self._agent_status.get_all().items():
+            if status.state == AgentState.STREAMING:
+                task_info = status.task or ""
+                lines.append(f"  {agent_id:12} - [cyan]streaming[/cyan]: {task_info}")
+            elif status.state == AgentState.RUNNING:
+                task_info = status.task or ""
+                lines.append(f"  {agent_id:12} - [yellow]running[/yellow]: {task_info}")
+            elif status.state == AgentState.COMPLETED:
+                lines.append(f"  {agent_id:12} - [green]completed[/green]")
+            elif status.state == AgentState.FAILED:
+                lines.append(f"  {agent_id:12} - [red]failed[/red]")
             else:
-                lines.append(f"  {agent:12} - [dim]idle[/dim]")
+                lines.append(f"  {agent_id:12} - [dim]idle[/dim]")
 
         return "\n".join(lines)

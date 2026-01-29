@@ -2,5 +2,6 @@
 
 from teambot.ui.widgets.input_pane import InputPane
 from teambot.ui.widgets.output_pane import OutputPane
+from teambot.ui.widgets.status_panel import StatusPanel
 
-__all__ = ["InputPane", "OutputPane"]
+__all__ = ["InputPane", "OutputPane", "StatusPanel"]

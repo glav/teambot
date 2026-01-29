@@ -1,7 +1,8 @@
 """Textual test fixtures for UI tests."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 @pytest.fixture

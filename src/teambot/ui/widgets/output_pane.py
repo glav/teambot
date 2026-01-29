@@ -1,7 +1,6 @@
 """Output pane widget for displaying agent responses."""
 
 from datetime import datetime
-from typing import Optional
 
 from textual.widgets import RichLog
 
@@ -55,8 +54,11 @@ class OutputPane(RichLog):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self._streaming_buffers[agent_id] = []
         self._streaming_starts[agent_id] = timestamp
-        # Write initial streaming indicator (note: RichLog doesn't support 'end=' so this is a full line)
-        self.write(f"[dim]{timestamp}[/dim] [yellow]⟳[/yellow] @{agent_id}: [dim]streaming...[/dim]")
+        # Write initial streaming indicator
+        # Note: RichLog doesn't support 'end=' so this is a full line
+        self.write(
+            f"[dim]{timestamp}[/dim] [yellow]⟳[/yellow] @{agent_id}: [dim]streaming...[/dim]"
+        )
         self.scroll_end()
 
     def write_streaming_chunk(self, agent_id: str, chunk: str) -> None:
@@ -111,7 +113,7 @@ class OutputPane(RichLog):
 
         self.scroll_end()
 
-    def is_streaming(self, agent_id: Optional[str] = None) -> bool:
+    def is_streaming(self, agent_id: str | None = None) -> bool:
         """Check if an agent (or any agent) is currently streaming.
 
         Args:
