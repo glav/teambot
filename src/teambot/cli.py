@@ -10,7 +10,6 @@ from pathlib import Path
 
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
-from teambot.orchestrator import Orchestrator
 from teambot.visualization.console import ConsoleDisplay
 
 
@@ -45,6 +44,12 @@ def create_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("objective", nargs="?", help="Path to objective markdown file")
     run_parser.add_argument(
         "-c", "--config", default="teambot.json", help="Configuration file path"
+    )
+    run_parser.add_argument(
+        "--resume", action="store_true", help="Resume interrupted orchestration"
+    )
+    run_parser.add_argument(
+        "--max-hours", type=float, default=8.0, help="Maximum execution hours (default: 8)"
     )
 
     # status command
@@ -88,6 +93,7 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Run TeamBot with an objective."""
     config_path = Path(args.config)
+    teambot_dir = Path(".teambot")
 
     if not config_path.exists():
         display.print_error(f"Configuration not found: {config_path}")
@@ -101,8 +107,13 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         display.print_error(f"Configuration error: {e}")
         return 1
 
+    # Resume mode
+    if getattr(args, "resume", False):
+        return _run_orchestration_resume(config, teambot_dir, display)
+
     # Load objective if provided
     objective = None
+    objective_path = None
     if args.objective:
         objective_path = Path(args.objective)
         if not objective_path.exists():
@@ -120,15 +131,12 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             agent_config.get("display_name"),
         )
 
-    # Create orchestrator (unused for now - full orchestration not implemented)
-    _ = Orchestrator(config)
-
     display.print_status()
 
-    if objective:
-        display.print_success("Objective loaded")
-        display.print_warning("File-based orchestration not yet implemented")
-        return 0
+    if objective and objective_path:
+        return _run_orchestration(
+            objective_path, config, teambot_dir, getattr(args, "max_hours", 8.0), display
+        )
 
     # No objective - run interactive mode
     display.print_success("Starting interactive mode")
@@ -141,6 +149,142 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         display.print_warning("Interrupted")
 
     return 0
+
+
+def _run_orchestration(
+    objective_path: Path,
+    config: dict,
+    teambot_dir: Path,
+    max_hours: float,
+    display: ConsoleDisplay,
+) -> int:
+    """Run file-based orchestration."""
+    import signal
+
+    from teambot.copilot.sdk_client import CopilotSDKClient
+    from teambot.orchestration import ExecutionLoop, ExecutionResult
+
+    # Ensure teambot dir exists
+    teambot_dir.mkdir(exist_ok=True)
+
+    display.print_success(f"Running objective: {objective_path}")
+    display.print_success(f"Max execution time: {max_hours} hours")
+
+    try:
+        sdk_client = CopilotSDKClient()
+    except Exception as e:
+        display.print_error(f"Failed to initialize Copilot client: {e}")
+        return 1
+
+    try:
+        loop = ExecutionLoop(
+            objective_path=objective_path,
+            config=config,
+            teambot_dir=teambot_dir,
+            max_hours=max_hours,
+        )
+    except FileNotFoundError as e:
+        display.print_error(str(e))
+        return 1
+
+    # Setup signal handler for cancellation
+    def handle_interrupt(sig: int, frame: object) -> None:
+        display.print_warning("Cancellation requested, saving state...")
+        loop.cancel()
+
+    signal.signal(signal.SIGINT, handle_interrupt)
+
+    def on_progress(event_type: str, data: dict) -> None:
+        if event_type == "stage_changed":
+            display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+        elif event_type == "agent_running":
+            display.print_success(f"Agent {data.get('agent_id')} running")
+        elif event_type == "agent_complete":
+            display.print_success(f"Agent {data.get('agent_id')} complete")
+        elif event_type == "review_progress":
+            display.print_success(data.get("message", ""))
+
+    try:
+        result = asyncio.run(loop.run(sdk_client=sdk_client, on_progress=on_progress))
+
+        if result == ExecutionResult.COMPLETE:
+            display.print_success("Objective completed!")
+            return 0
+        elif result == ExecutionResult.CANCELLED:
+            display.print_warning("Cancelled. Resume with: teambot run --resume")
+            return 130
+        elif result == ExecutionResult.TIMEOUT:
+            display.print_warning("Time limit reached. Resume with: teambot run --resume")
+            return 1
+        elif result == ExecutionResult.REVIEW_FAILED:
+            display.print_error("Review failed after 4 iterations. See .teambot/failures/")
+            return 1
+        else:
+            display.print_error(f"Execution ended with: {result.value}")
+            return 1
+
+    except Exception as e:
+        display.print_error(f"Execution error: {e}")
+        return 1
+
+
+def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleDisplay) -> int:
+    """Resume interrupted orchestration."""
+    import signal
+
+    from teambot.copilot.sdk_client import CopilotSDKClient
+    from teambot.orchestration import ExecutionLoop, ExecutionResult
+
+    display.print_header("TeamBot Resuming")
+
+    try:
+        sdk_client = CopilotSDKClient()
+    except Exception as e:
+        display.print_error(f"Failed to initialize Copilot client: {e}")
+        return 1
+
+    try:
+        loop = ExecutionLoop.resume(teambot_dir, config)
+    except ValueError as e:
+        display.print_error(str(e))
+        display.print_warning("No interrupted session to resume")
+        return 1
+
+    display.print_success(f"Resuming from stage: {loop.current_stage.name}")
+    display.print_success(f"Prior elapsed: {loop.time_manager.format_elapsed()}")
+
+    # Setup signal handler for cancellation
+    def handle_interrupt(sig: int, frame: object) -> None:
+        display.print_warning("Cancellation requested, saving state...")
+        loop.cancel()
+
+    signal.signal(signal.SIGINT, handle_interrupt)
+
+    def on_progress(event_type: str, data: dict) -> None:
+        if event_type == "stage_changed":
+            display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+
+    try:
+        result = asyncio.run(loop.run(sdk_client=sdk_client, on_progress=on_progress))
+
+        if result == ExecutionResult.COMPLETE:
+            display.print_success("Objective completed!")
+            return 0
+        elif result == ExecutionResult.CANCELLED:
+            display.print_warning("Cancelled. Resume with: teambot run --resume")
+            return 130
+        elif result == ExecutionResult.TIMEOUT:
+            display.print_warning("Time limit reached. Resume with: teambot run --resume")
+            return 1
+        elif result == ExecutionResult.REVIEW_FAILED:
+            display.print_error("Review failed after 4 iterations. See .teambot/failures/")
+            return 1
+        else:
+            return 1
+
+    except Exception as e:
+        display.print_error(f"Execution error: {e}")
+        return 1
 
 
 def cmd_status(args: argparse.Namespace, display: ConsoleDisplay) -> int:

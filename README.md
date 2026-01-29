@@ -632,6 +632,44 @@ The Copilot CLI client can be configured with:
 
 Define your day's work in a markdown file. TeamBot provides a comprehensive template for structured, spec-driven development workflows.
 
+### File-Based Orchestration
+
+Run autonomous objectives with the 13-stage workflow:
+
+```bash
+# Run an objective file
+uv run teambot run objectives/my-task.md
+
+# Resume interrupted execution
+uv run teambot run --resume
+
+# Set custom time limit (default: 8 hours)
+uv run teambot run objectives/task.md --max-hours 4
+```
+
+**Features:**
+- 🔄 **Review Iteration**: Automatic review cycles (max 4 iterations per review stage)
+- ⚡ **Parallel Builders**: builder-1 and builder-2 execute concurrently during IMPLEMENTATION
+- ⏱️ **Time Limits**: Configurable execution timeout (default 8 hours)
+- 💾 **State Persistence**: Resume interrupted work with `--resume`
+- 📊 **Progress Display**: Real-time stage and agent status updates
+
+**Execution Flow:**
+1. Parse objective file (goals, success criteria, constraints)
+2. Progress through 13 workflow stages
+3. For review stages: iterate until approval or 4 failures
+4. Save state on completion, cancellation, or timeout
+
+**Cancellation:**
+- Press `Ctrl+C` to gracefully cancel
+- State is saved automatically
+- Resume later with `uv run teambot run --resume`
+
+**Review Failure:**
+- If review fails after 4 iterations, execution stops
+- Failure report saved to `.teambot/failures/`
+- Contains all iteration feedback and suggestions
+
 ### SDD Objective Template
 
 For complex features requiring the full 13-stage workflow, use the **Spec-Driven Development (SDD) template** located at [`docs/sdd-objective-template.md`](docs/sdd-objective-template.md).
