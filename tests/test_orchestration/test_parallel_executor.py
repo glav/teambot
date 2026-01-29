@@ -124,19 +124,24 @@ class TestParallelExecutor:
         self, executor: ParallelExecutor, mock_sdk_client: AsyncMock
     ) -> None:
         """Progress callback is called for each event."""
-        progress_calls: list[tuple[str, str, str]] = []
+        progress_calls: list[tuple[str, dict]] = []
 
-        def on_progress(agent_id: str, event: str, data: str) -> None:
-            progress_calls.append((agent_id, event, data))
+        def on_progress(event_type: str, data: dict) -> None:
+            progress_calls.append((event_type, data))
 
         tasks = [AgentTask(agent_id="builder-1", prompt="Task", description="Test")]
 
         await executor.execute_parallel(tasks, on_progress=on_progress)
 
-        # Should have "running" and "complete" events
-        events = [c[1] for c in progress_calls]
-        assert "running" in events
-        assert "complete" in events
+        # Should have "agent_running" and "agent_complete" events
+        events = [c[0] for c in progress_calls]
+        assert "agent_running" in events
+        assert "agent_complete" in events
+
+        # Verify data structure
+        running_event = next(c for c in progress_calls if c[0] == "agent_running")
+        assert running_event[1]["agent_id"] == "builder-1"
+        assert running_event[1]["task"] == "Test"
 
     @pytest.mark.asyncio
     async def test_execute_parallel_cancellation_handled(
@@ -144,10 +149,10 @@ class TestParallelExecutor:
     ) -> None:
         """Cancellation is handled - returns empty result for cancelled tasks."""
         executor = ParallelExecutor(mock_sdk_client, max_concurrent=2)
-        progress_calls: list[tuple[str, str, str]] = []
+        progress_calls: list[tuple[str, dict]] = []
 
-        def on_progress(agent_id: str, event: str, data: str) -> None:
-            progress_calls.append((agent_id, event, data))
+        def on_progress(event_type: str, data: dict) -> None:
+            progress_calls.append((event_type, data))
 
         async def cancel_after_delay(*args: object, **kwargs: object) -> str:
             await asyncio.sleep(0.01)
@@ -162,9 +167,9 @@ class TestParallelExecutor:
             await executor.execute_parallel(tasks, on_progress=on_progress)
 
         # Progress callback should have been called
-        events = [c[1] for c in progress_calls]
-        assert "running" in events
-        assert "cancelled" in events
+        events = [c[0] for c in progress_calls]
+        assert "agent_running" in events
+        assert "agent_cancelled" in events
 
 
 class TestPartitionTasks:

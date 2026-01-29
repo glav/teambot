@@ -33,6 +33,8 @@ def create_progress_callback(
             status_manager.set_completed(data["agent_id"])
         elif event_type == "agent_failed":
             status_manager.set_failed(data["agent_id"])
+        elif event_type == "agent_cancelled":
+            status_manager.set_idle(data["agent_id"])
         elif event_type == "agent_idle":
             status_manager.set_idle(data["agent_id"])
         elif event_type == "stage_changed":
