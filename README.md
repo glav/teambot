@@ -2,37 +2,38 @@
 
 **Autonomous AI Agent Teams for Software Development**
 
-TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
+TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-517%20passing-green.svg)]()
-[![Coverage](https://img.shields.io/badge/coverage-84%25-green.svg)]()
+[![Tests](https://img.shields.io/badge/tests-650%20passing-green.svg)]()
+[![Coverage](https://img.shields.io/badge/coverage-83%25-green.svg)]()
 
 ## Features
 
-- 🤖 **Multi-Agent Orchestration** - 6 specialized agent personas working in parallel or sequentially
-- ⚡ **Parallel Task Execution** - Run multiple agents simultaneously with `&`, `,`, and `->` operators
+- 🤖 **Multi-Agent Orchestration** - 6 specialized agent personas working together
 - 📋 **Prescriptive Workflow** - 13-stage workflow from Setup to Post-Implementation Review
 - 🔄 **Autonomous Operation** - Define objectives in markdown, let the team execute
-- 📁 **Shared Context** - Agents collaborate via `.teambot/` directory with history files
-- 🎨 **Rich Console UI** - Colorful status display with progress tracking
-- 🖥️ **Split-Pane Interface** - Separate input and output panes for stable, uninterrupted interaction
-- 💾 **State Persistence** - Resume workflows across restarts
+- ⚡ **Parallel Builders** - builder-1 and builder-2 execute concurrently during implementation
+- 🔁 **Review Iteration** - Automatic review cycles with max 4 iterations per stage
+- ➡️ **Pipeline Operator** - Chain tasks with `->` to pass output between agents
+- 💾 **State Persistence** - Resume interrupted workflows with `--resume`
+- ⏱️ **Time Limits** - Configurable execution timeout (default 8 hours)
+- 📁 **Shared Context** - Agents collaborate via `.teambot/` directory
+- 🖥️ **Split-Pane Interface** - Separate input and output panes for interactive mode
 
 ---
 
 ## Table of Contents
 
 - [Quick Start](#quick-start)
-- [Interactive Mode Examples](#interactive-mode-examples)
+- [File-Based Orchestration](#file-based-orchestration)
+- [Interactive Mode](#interactive-mode)
 - [CLI Commands](#cli-commands)
 - [Agent Personas](#agent-personas)
 - [Prescriptive Workflow](#prescriptive-workflow)
 - [Configuration](#configuration)
-- [Objective Files](#objective-files)
+- [Objective File Format](#objective-file-format)
 - [Shared Workspace](#shared-workspace)
-- [Inter-Agent Communication](#inter-agent-communication)
-- [Dependencies](#dependencies)
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
 
@@ -44,7 +45,7 @@ TeamBot is a CLI tool that wraps the [GitHub Copilot CLI](https://githubnext.com
 
 - Python 3.12+
 - [uv](https://github.com/astral-sh/uv) package manager
-- [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) (the standalone `copilot` command)
+- GitHub Copilot access (SDK authenticates via GitHub CLI)
 
 ### Installation
 
@@ -71,30 +72,17 @@ uv run teambot init
 # - .teambot/ (shared workspace directory)
 ```
 
-**Output:**
-```
-✓ Created configuration: teambot.json
-✓ Created directory: .teambot
-┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
-┃ Agent               ┃ Persona          ┃ Status ┃
-┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
-│ Project Manager     │ project_manager  │ idle   │
-│ Business Analyst    │ business_analyst │ idle   │
-│ Technical Writer    │ technical_writer │ idle   │
-│ Builder (Primary)   │ builder          │ idle   │
-│ Builder (Secondary) │ builder          │ idle   │
-│ Reviewer            │ reviewer         │ idle   │
-└─────────────────────┴──────────────────┴────────┘
-```
-
 ### Run TeamBot
 
 ```bash
+# Run with an objective file (autonomous mode)
+uv run teambot run objectives/my-feature.md
+
+# Resume interrupted execution
+uv run teambot run --resume
+
 # Interactive mode (no objective file)
 uv run teambot run
-
-# With an objective file
-uv run teambot run objectives/build-chatbot.md
 
 # Check status
 uv run teambot status
@@ -102,60 +90,74 @@ uv run teambot status
 
 ---
 
-## Interactive Mode Examples
+## File-Based Orchestration
 
-TeamBot's interactive mode supports parallel task execution, pipelines, and background tasks. Here are practical examples:
+The primary way to use TeamBot is with objective files. Define your goals in markdown, and TeamBot autonomously executes the 13-stage workflow.
 
-### Basic Agent Commands
+### Running an Objective
 
 ```bash
-# Send a task to a single agent (waits for response)
+# Run an objective file
+uv run teambot run objectives/my-task.md
+
+# Set custom time limit (default: 8 hours)
+uv run teambot run objectives/task.md --max-hours 4
+
+# Resume interrupted execution
+uv run teambot run --resume
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Review Iteration** | Each review stage iterates up to 4 times until approval |
+| **Parallel Builders** | builder-1 and builder-2 execute concurrently during IMPLEMENTATION |
+| **Time Limits** | Configurable timeout prevents runaway execution (default: 8 hours) |
+| **State Persistence** | State saved on completion, cancellation, or timeout |
+| **Progress Display** | Real-time stage and agent status updates |
+
+### Execution Flow
+
+1. Parse objective file (goals, success criteria, constraints)
+2. Progress through 13 workflow stages
+3. For review stages: iterate until approval or 4 failures
+4. Save state on completion, cancellation, or timeout
+
+### Cancellation & Resume
+
+- Press `Ctrl+C` to gracefully cancel execution
+- State is saved automatically to `.teambot/orchestration_state.json`
+- Resume later with `uv run teambot run --resume`
+
+### Review Failure Handling
+
+If a review stage fails after 4 iterations:
+- Execution stops with error message
+- Detailed failure report saved to `.teambot/failures/`
+- Report contains all iteration feedback and suggestions
+
+---
+
+## Interactive Mode
+
+For ad-hoc tasks without an objective file, TeamBot provides an interactive REPL:
+
+```bash
+uv run teambot run
+```
+
+### Basic Commands
+
+```bash
+# Send a task to an agent
 teambot: @pm Create a project plan for the new feature
+
+# Check agent status
+teambot: /status
 
 # Get help
 teambot: /help
-teambot: /help parallel
-```
-
-### Background Tasks (Fire and Forget)
-
-Use `&` to run tasks in the background without waiting:
-
-```bash
-# Start a task in the background
-teambot: @pm Create a detailed project timeline &
-Task #1 started in background
-
-# Start another while the first is still running
-teambot: @ba Gather user requirements &
-Task #2 started in background
-
-# Check status of all tasks
-teambot: /tasks
-  🔄 #1    @pm           RUNNING    Create a detailed project timeline
-  🔄 #2    @ba           RUNNING    Gather user requirements
-
-# View a specific task's result when complete
-teambot: /task 1
-```
-
-### Multi-Agent Parallel (Same Prompt)
-
-Use `,` to send the same prompt to multiple agents simultaneously:
-
-```bash
-# Ask multiple agents to analyze the same thing
-teambot: @pm,ba,writer Analyze the requirements for the login feature
-
-# All three agents work in parallel and results are combined:
-# === @pm ===
-# From a project management perspective...
-#
-# === @ba ===
-# The business requirements include...
-#
-# === @writer ===
-# Documentation needs for this feature...
 ```
 
 ### Pipelines with Dependencies
@@ -168,170 +170,92 @@ teambot: @pm Create a plan for user authentication -> @builder-1 Implement based
 
 # Three-stage pipeline: requirements -> implementation -> review
 teambot: @ba Write requirements for the API -> @builder-1 Implement this API -> @reviewer Review the implementation
-
-# The output from each stage is automatically injected into the next:
-# === @ba ===
-# Requirements: 1. REST API endpoint...
-#
-# === @builder-1 ===
-# [Receives: "=== Output from @ba ===\n{requirements}\n\n=== Your Task ===\nImplement this API"]
-# Implementation complete...
-#
-# === @reviewer ===
-# [Receives output from @builder-1]
-# Code review feedback...
 ```
 
-### Parallel Groups with Dependencies
+The output from each stage is automatically injected into the next agent's context:
+
+```
+# Stage 1: @ba produces requirements
+=== @ba ===
+Requirements: 1. REST API endpoint...
+
+# Stage 2: @builder-1 receives @ba's output
+[Context: "=== Output from @ba ===\n{requirements}\n\n=== Your Task ===\nImplement this API"]
+Implementation complete...
+
+# Stage 3: @reviewer receives @builder-1's output
+[Context includes implementation from @builder-1]
+Code review feedback...
+```
+
+### Multi-Agent Same Prompt
+
+Use `,` to send the same prompt to multiple agents simultaneously:
+
+```bash
+# Ask multiple agents to analyze the same thing
+teambot: @pm,ba,writer Analyze the requirements for the login feature
+```
+
+All agents work in parallel and results are combined:
+
+```
+=== @pm ===
+From a project management perspective...
+
+=== @ba ===
+The business requirements include...
+
+=== @writer ===
+Documentation needs for this feature...
+```
+
+### Combined Syntax
 
 Combine `,` and `->` for complex workflows:
 
 ```bash
-# Multiple analysts work in parallel, then multiple builders implement
-teambot: @pm,ba Analyze the feature requirements -> @builder-1,builder-2 Implement based on analysis
-
-# Stage 1: @pm and @ba work in parallel
-# Stage 2: Their combined output goes to both builders who also work in parallel
+# Multiple analysts work in parallel, then results go to builder
+teambot: @pm,ba Analyze the feature -> @builder-1 Implement based on analysis
 ```
 
-### Background Pipelines
-
-Add `&` to run entire pipelines in the background:
-
-```bash
-# Start a multi-stage pipeline without waiting
-teambot: @pm Create plan -> @builder-1 Implement -> @reviewer Review &
-Pipeline started in background (3 stages)
-
-# Continue working while it runs
-teambot: @writer Update the README
-
-# Check pipeline progress
-teambot: /tasks
-  ✅ #1    @pm           COMPLETED  Create plan
-  🔄 #2    @builder-1    RUNNING    Implement
-  ⏳ #3    @reviewer     PENDING    Review
-```
-
-### Running Multiple Independent Tasks
-
-For different prompts to different agents in parallel, use separate background commands:
-
-```bash
-# Start multiple independent tasks
-teambot: @pm Create project timeline &
-Task #1 started in background
-teambot: @ba Write user stories &
-Task #2 started in background
-teambot: @writer Draft API documentation &
-Task #3 started in background
-
-# All three run concurrently (up to max_concurrent limit of 3)
-teambot: /tasks
-  🔄 #1    @pm           RUNNING    Create project timeline
-  🔄 #2    @ba           RUNNING    Write user stories
-  🔄 #3    @writer       RUNNING    Draft API documentation
-```
-
-### Task Management Commands
+### Task Management
 
 ```bash
 # List all tasks
 teambot: /tasks
 
-# Filter by status
-teambot: /tasks running
-teambot: /tasks completed
-teambot: /tasks failed
-
-# View task details and output
+# View task details
 teambot: /task 1
 
-# Cancel a pending task
-teambot: /cancel 3
-Cancelled task #3
-```
-
-### Real-World Workflow Example
-
-Here's a complete example of a feature development workflow:
-
-```bash
-# 1. Start with parallel analysis (background)
-teambot: @pm,ba Analyze requirements for user dashboard feature &
-Pipeline started in background
-
-# 2. While that runs, have writer start on docs
-teambot: @writer Create documentation outline for dashboard &
-Task #4 started in background
-
-# 3. Check progress
-teambot: /tasks
-  ✅ #1    @pm           COMPLETED  Analyze requirements...
-  ✅ #2    @ba           COMPLETED  Analyze requirements...
-  🔄 #4    @writer       RUNNING    Create documentation outline...
-
-# 4. Now create implementation pipeline using analysis results
-teambot: @builder-1 Implement dashboard frontend based on: [paste from /task 1] -> @reviewer Review frontend &
-
-# 5. Parallel backend work
-teambot: @builder-2 Implement dashboard API endpoints &
-
-# 6. Monitor everything
-teambot: /tasks
+# Cancel a task
+teambot: /cancel 1
 ```
 
 ### Syntax Quick Reference
 
 | Syntax | Description | Example |
 |--------|-------------|---------|
-| `@agent task` | Single agent, wait for response | `@pm Create a plan` |
-| `@agent task &` | Single agent, background | `@pm Create a plan &` |
+| `@agent task` | Single agent task | `@pm Create a plan` |
 | `@a,b,c task` | Multi-agent parallel, same prompt | `@pm,ba,writer Analyze feature` |
 | `@a task -> @b task` | Pipeline with dependency | `@pm Plan -> @builder-1 Implement` |
-| `@a,b t1 -> @c,d t2` | Parallel groups with dependency | `@pm,ba Analyze -> @builder-1,builder-2 Build` |
-| `... &` | Any command in background | `@pm Plan -> @builder-1 Build &` |
-| `/tasks` | List all tasks | `/tasks` or `/tasks running` |
+| `@a,b t1 -> @c t2` | Parallel then pipeline | `@pm,ba Analyze -> @builder-1 Build` |
+| `/tasks` | List all tasks | |
 | `/task <id>` | View task details | `/task 1` |
-| `/cancel <id>` | Cancel pending task | `/cancel 3` |
-| `/overlay` | Show overlay status | `/overlay` |
-| `/overlay on\|off` | Toggle overlay | `/overlay off` |
-| `/overlay position <pos>` | Move overlay | `/overlay position bottom-left` |
+| `/cancel <id>` | Cancel task | `/cancel 3` |
+| `/status` | Show agent status | |
 
 ### Split-Pane Interface
 
-TeamBot features a split-pane terminal interface (powered by [Textual](https://textual.textualize.io/)) that separates input from output:
+TeamBot features a split-pane terminal interface (powered by [Textual](https://textual.textualize.io/)):
 
-- **Left pane**: Your command input, always stable and accessible
-- **Right pane**: Agent output, displays asynchronously without interrupting input
+- **Left pane**: Command input with live agent status display
+- **Right pane**: Agent output displayed asynchronously
 
-This design means all agent tasks run asynchronously by default—no need for the `&` suffix for background execution.
-
-**Fallback to Legacy Mode:**
-
-The split-pane interface automatically falls back to legacy (single-pane) mode when:
+The interface automatically falls back to legacy (single-pane) mode when:
 - `TEAMBOT_LEGACY_MODE=true` environment variable is set
 - Terminal width is less than 80 columns
 - stdout is not a TTY
-
-### Status Overlay
-
-TeamBot displays a persistent status overlay in the terminal corner showing:
-- Active agents with spinner animation
-- Task counts (running, pending, completed)
-
-The overlay updates in real-time as tasks start and complete. Configure in `teambot.json`:
-
-```json
-{
-  "overlay": {
-    "enabled": true,
-    "position": "top-right"
-  }
-}
-```
-
-Valid positions: `top-right`, `top-left`, `bottom-right`, `bottom-left`
 
 ---
 
@@ -349,52 +273,27 @@ teambot init [--force]
 |--------|-------------|
 | `--force` | Overwrite existing configuration |
 
-**Creates:**
-- `teambot.json` - Agent and workflow configuration
-- `.teambot/` - Shared workspace directory
-
 ### `teambot run`
 
 Run TeamBot with an optional objective file.
 
 ```bash
-teambot run [objective] [-c CONFIG]
+teambot run [objective] [-c CONFIG] [--resume] [--max-hours HOURS]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `objective` | Path to objective markdown file (optional) |
 | `-c, --config` | Configuration file path (default: `teambot.json`) |
-
-**Examples:**
-```bash
-# Interactive mode
-teambot run
-
-# With objective
-teambot run today.md
-
-# Custom config
-teambot run -c custom-team.json objectives/feature.md
-```
+| `--resume` | Resume interrupted orchestration |
+| `--max-hours` | Maximum execution hours (default: 8) |
 
 ### `teambot status`
 
-Display current TeamBot status including agents and workflow progress.
+Display current TeamBot status.
 
 ```bash
 teambot status
-```
-
-**Output:**
-```
-╭──────────────────────────────────────────────────╮
-│ TeamBot Status                                   │
-╰──────────────────────────────────────────────────╯
-✓ History files: 5
-✓ Configuration: teambot.json
-✓ Current stage: IMPLEMENTATION
-✓ Progress: 58.3%
 ```
 
 ### Global Options
@@ -408,157 +307,76 @@ teambot status
 
 ## Agent Personas
 
-TeamBot includes 6 specialized agent personas, each with distinct roles and capabilities:
+TeamBot includes 6 specialized agent personas:
 
-| Agent | Persona | Role | Parallel |
-|-------|---------|------|----------|
-| `pm` | Project Manager | Planning, coordination, task assignment | No |
-| `ba` | Business Analyst | Requirements, problem definition, specs | No |
-| `writer` | Technical Writer | Documentation, guides, API docs | No |
-| `builder-1` | Builder (Primary) | Implementation, coding, testing | Yes |
-| `builder-2` | Builder (Secondary) | Implementation, coding, testing | Yes |
-| `reviewer` | Reviewer | Code review, quality assurance | No |
+| Agent | Persona | Role |
+|-------|---------|------|
+| `pm` | Project Manager | Planning, coordination, task assignment |
+| `ba` | Business Analyst | Requirements, problem definition, specs |
+| `writer` | Technical Writer | Documentation, guides, API docs |
+| `builder-1` | Builder (Primary) | Implementation, coding, testing |
+| `builder-2` | Builder (Secondary) | Implementation, coding, testing |
+| `reviewer` | Reviewer | Code review, quality assurance |
 
-### Persona Details
+### Persona Capabilities
 
-#### Project Manager (`project_manager`, `pm`)
+**Project Manager (`pm`)**: Creates project plans, breaks down features, coordinates team members, tracks progress.
 
-**Capabilities:**
-- Create and maintain project plans
-- Break down features into tasks
-- Assign tasks to appropriate team members
-- Track progress and identify blockers
-- Coordinate between team members
+**Business Analyst (`ba`)**: Gathers requirements, defines business problems, creates user stories and acceptance criteria.
 
-**Constraints:**
-- Does NOT implement code directly - delegates to builders
-- Focus on planning and coordination
-- Ensure all work has clear acceptance criteria
+**Technical Writer (`writer`)**: Writes documentation, API docs, user guides, architecture decision records.
 
-#### Business Analyst (`business_analyst`, `ba`)
+**Builder (`builder-1`, `builder-2`)**: Implements features, writes tests, debugs issues. Both builders can execute concurrently during implementation.
 
-**Capabilities:**
-- Gather and document requirements
-- Define business problems clearly
-- Create user stories and acceptance criteria
-- Validate solutions against requirements
-
-**Constraints:**
-- Focus on the "what" not the "how"
-- Ensure requirements are testable
-- Document assumptions and dependencies
-
-#### Technical Writer (`technical_writer`, `writer`)
-
-**Capabilities:**
-- Write clear technical documentation
-- Create API documentation
-- Write user guides and tutorials
-- Document architecture decisions
-
-**Constraints:**
-- Use clear, concise language
-- Include code examples where appropriate
-- Keep documentation up to date
-
-#### Builder (`builder`, `developer`)
-
-**Capabilities:**
-- Write clean, maintainable code
-- Implement features according to specifications
-- Write unit and integration tests
-- Debug and fix issues
-
-**Constraints:**
-- Follow project coding standards
-- Write tests for new functionality
-- Create history files for all changes
-
-#### Reviewer (`reviewer`)
-
-**Capabilities:**
-- Review code for quality and correctness
-- Review documentation for accuracy
-- Identify bugs, security issues, and improvements
-- Verify adherence to standards
-
-**Constraints:**
-- Be thorough but constructive
-- Focus on significant issues, not style nitpicks
-- Explain reasoning behind feedback
+**Reviewer (`reviewer`)**: Reviews code and documentation for quality, identifies bugs and improvements, verifies standards compliance.
 
 ---
 
 ## Prescriptive Workflow
 
-TeamBot enforces a 13-stage workflow to ensure quality and determinism:
+TeamBot enforces a 13-stage workflow:
 
 ```
-┌─────────┐    ┌──────────────────┐    ┌──────┐    ┌─────────────┐
-│  SETUP  │───▶│ BUSINESS_PROBLEM │───▶│ SPEC │───▶│ SPEC_REVIEW │
-└─────────┘    └──────────────────┘    └──────┘    └─────────────┘
-                    (optional)                            │
-                                                          ▼
-┌─────────────┐    ┌───────────────┐    ┌──────┐    ┌──────────┐
-│ PLAN_REVIEW │◀───│     PLAN      │◀───│ TEST │◀───│ RESEARCH │
-└─────────────┘    └───────────────┘    │STRAT │    └──────────┘
-       │                                └──────┘
-       ▼
-┌────────────────┐    ┌─────────────────────┐    ┌──────┐
-│ IMPLEMENTATION │───▶│ IMPLEMENTATION_     │───▶│ TEST │
-└────────────────┘    │ REVIEW              │    └──────┘
-                      └─────────────────────┘         │
-                                                      ▼
-                      ┌──────────┐    ┌───────────────┐
-                      │ COMPLETE │◀───│  POST_REVIEW  │
-                      └──────────┘    └───────────────┘
+SETUP → BUSINESS_PROBLEM → SPEC → SPEC_REVIEW → RESEARCH →
+TEST_STRATEGY → PLAN → PLAN_REVIEW → IMPLEMENTATION →
+IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
 ```
 
 ### Stage Details
 
-| Stage | Description | Allowed Personas | Optional |
-|-------|-------------|------------------|----------|
-| `SETUP` | Initialize project and configuration | PM | No |
-| `BUSINESS_PROBLEM` | Define business problem and goals | BA, PM | **Yes** |
-| `SPEC` | Create feature specification | BA, Writer | No |
-| `SPEC_REVIEW` | Review and approve spec | Reviewer, PM | No |
-| `RESEARCH` | Research technical approaches | Builder, Writer | No |
-| `TEST_STRATEGY` | Define testing approach | Builder, Reviewer | No |
-| `PLAN` | Create implementation plan | PM, Builder | No |
-| `PLAN_REVIEW` | Review and approve plan | Reviewer, PM | No |
-| `IMPLEMENTATION` | Execute the plan | Builder | No |
-| `IMPLEMENTATION_REVIEW` | Review changes | Reviewer | No |
-| `TEST` | Execute tests and validate | Builder, Reviewer | No |
-| `POST_REVIEW` | Final review and retrospective | PM, Reviewer | No |
-| `COMPLETE` | Workflow complete | - | No |
+| Stage | Description | Allowed Personas |
+|-------|-------------|------------------|
+| `SETUP` | Initialize project and configuration | PM |
+| `BUSINESS_PROBLEM` | Define business problem and goals (optional) | BA, PM |
+| `SPEC` | Create feature specification | BA, Writer |
+| `SPEC_REVIEW` | Review and approve spec | Reviewer, PM |
+| `RESEARCH` | Research technical approaches | Builder, Writer |
+| `TEST_STRATEGY` | Define testing approach | Builder, Reviewer |
+| `PLAN` | Create implementation plan | PM, Builder |
+| `PLAN_REVIEW` | Review and approve plan | Reviewer, PM |
+| `IMPLEMENTATION` | Execute the plan | Builder (parallel) |
+| `IMPLEMENTATION_REVIEW` | Review changes | Reviewer |
+| `TEST` | Execute tests and validate | Builder, Reviewer |
+| `POST_REVIEW` | Final review and retrospective | PM, Reviewer |
+| `COMPLETE` | Workflow complete | - |
 
-### Workflow State Persistence
+### Review Stages
 
-Workflow state is persisted to `.teambot/workflow_state.json`:
+Four stages require review approval:
+- `SPEC_REVIEW`, `PLAN_REVIEW`, `IMPLEMENTATION_REVIEW`, `POST_REVIEW`
 
-```json
-{
-  "current_stage": "IMPLEMENTATION",
-  "started_at": "2026-01-22T08:00:00",
-  "objective": "Build chatbot SPA",
-  "history": [
-    {
-      "stage": "SETUP",
-      "started_at": "2026-01-22T08:00:00",
-      "completed_at": "2026-01-22T08:05:00",
-      "artifacts": ["teambot.json"]
-    }
-  ]
-}
-```
+Each review stage iterates up to 4 times:
+1. Work agent produces output
+2. Review agent evaluates
+3. If rejected: feedback incorporated, repeat
+4. If approved: advance to next stage
+5. After 4 rejections: stop with failure report
 
 ---
 
 ## Configuration
 
 ### teambot.json
-
-The configuration file defines agents and workflow settings:
 
 ```json
 {
@@ -567,153 +385,90 @@ The configuration file defines agents and workflow settings:
     {
       "id": "pm",
       "persona": "project_manager",
-      "display_name": "Project Manager",
-      "parallel_capable": false,
-      "workflow_stages": ["setup", "planning", "coordination"]
+      "display_name": "Project Manager"
     },
     {
       "id": "builder-1",
       "persona": "builder",
-      "display_name": "Builder (Primary)",
-      "parallel_capable": true,
-      "workflow_stages": ["implementation", "testing"]
+      "display_name": "Builder (Primary)"
     },
     {
       "id": "builder-2",
       "persona": "builder",
-      "display_name": "Builder (Secondary)",
-      "parallel_capable": true,
-      "workflow_stages": ["implementation", "testing"]
+      "display_name": "Builder (Secondary)"
     }
-  ],
-  "workflow": {
-    "stages": [
-      "setup",
-      "business_problem",
-      "spec",
-      "review",
-      "research",
-      "test_strategy",
-      "plan",
-      "implementation",
-      "test",
-      "post_review"
-    ],
-    "parallel_stages": ["implementation"]
-  }
+  ]
 }
 ```
 
-### Agent Configuration Options
+### Agent Configuration
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | string | Unique agent identifier |
-| `persona` | string | Persona type (`project_manager`, `business_analyst`, `technical_writer`, `builder`, `reviewer`) |
-| `display_name` | string | Human-readable name for UI display |
-| `parallel_capable` | boolean | Whether agent can run in parallel with others |
-| `workflow_stages` | array | Stages this agent participates in |
-
-### Copilot CLI Configuration
-
-The Copilot CLI client can be configured with:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `allow_all_tools` | `true` | Enable all tools for autonomous operation |
-| `allow_all_paths` | `false` | Allow access to any file path |
-| `additional_dirs` | `[]` | Extra directories to allow access |
-| `model` | `null` | Specific model to use (e.g., `gpt-5`) |
-| `timeout` | `300` | Execution timeout in seconds |
+| `persona` | string | Persona type |
+| `display_name` | string | Human-readable name for UI |
 
 ---
 
-## Objective Files
+## Objective File Format
 
-Define your day's work in a markdown file. TeamBot provides a comprehensive template for structured, spec-driven development workflows.
-
-### SDD Objective Template
-
-For complex features requiring the full 13-stage workflow, use the **Spec-Driven Development (SDD) template** located at [`docs/sdd-objective-template.md`](docs/sdd-objective-template.md).
-
-**How to use:**
-
-1. Copy the template to your objectives directory:
-   ```bash
-   cp docs/sdd-objective-template.md objectives/my-feature.md
-   ```
-
-2. Fill in the template sections:
-   - **Objective**: Goal, problem statement, and success criteria
-   - **Technical Context**: Target codebase, language/framework, testing preference, constraints
-
-3. Run TeamBot with your objective:
-   ```bash
-   uv run teambot run objectives/my-feature.md
-   ```
-
-The SDD template includes detailed documentation of all 13 workflow stages, iteration protocols, artifact locations, and agent coordination—providing a comprehensive guide for autonomous development.
-
-> **Note:** Create the `objectives/` directory first if it doesn't exist: `mkdir -p objectives`
-
-### Choosing the Right Format
-
-| Use Case | Format |
-|----------|--------|
-| Complex features, new modules, significant changes | SDD Template |
-| Bug fixes, small enhancements, quick tasks | Basic Format |
-
-### Basic Objective Format
-
-For simpler tasks, define your work in a basic markdown file:
+### Basic Format
 
 ```markdown
-# Objective: Build Chatbot SPA
+# Objective: Build User Dashboard
 
-## Description
-Build a basic chatbot single-page application that integrates 
-with a FastAPI backend.
-
-## Definition of Done
-- [ ] Frontend SPA with React
-- [ ] FastAPI backend with /chat endpoint
-- [ ] WebSocket support for real-time messages
-- [ ] Basic conversation history
+## Goals
+1. Create user profile page
+2. Add settings management
+3. Implement notification preferences
 
 ## Success Criteria
-- User can send messages and receive responses
-- Conversation persists during session
-- Response time < 2 seconds
+- [ ] Profile page displays user information
+- [ ] Users can edit their profile
+- [ ] Notification settings are persisted
 
-## Implementation Specifics
-- Use React 18 with TypeScript
-- FastAPI with Python 3.12
-- SQLite for development database
+## Constraints
+- Must work with existing authentication
+- Use existing UI component library
+
+## Context
+The application uses React for frontend and Express for backend.
 ```
 
-### Objective Schema
+### Schema
 
 | Section | Required | Description |
 |---------|----------|-------------|
-| `Description` | Yes | What you're building |
-| `Definition of Done` | Yes | Checklist of deliverables |
-| `Success Criteria` | Yes | How to measure success |
-| `Implementation Specifics` | No | Technical constraints/preferences |
+| `# Objective:` | Yes | Title/goal of the work |
+| `## Goals` | Yes | Numbered list of goals |
+| `## Success Criteria` | Yes | Checklist with `- [ ]` items |
+| `## Constraints` | No | Technical or business constraints |
+| `## Context` | No | Additional context for agents |
+
+### SDD Template
+
+For complex features, use the Spec-Driven Development template:
+
+```bash
+cp docs/sdd-objective-template.md objectives/my-feature.md
+```
 
 ---
 
 ## Shared Workspace
 
-All agents share the `.teambot/` directory for collaboration:
+All agents share the `.teambot/` directory:
 
 ```
 .teambot/
-├── workflow_state.json     # Current workflow state
-├── history/                # Agent action history
-│   ├── 2026-01-22-083000-task-complete.md
-│   ├── 2026-01-22-084500-review-complete.md
-│   └── 2026-01-22-090000-spec-created.md
-└── artifacts/              # Generated artifacts
+├── orchestration_state.json  # Current execution state
+├── workflow_state.json       # Workflow progress
+├── history/                  # Agent action history
+│   └── *.md                  # Timestamped history files
+├── failures/                 # Review failure reports
+│   └── *.md                  # Detailed failure analysis
+└── artifacts/                # Generated artifacts
     ├── spec.md
     ├── plan.md
     └── test-strategy.md
@@ -726,151 +481,34 @@ Each agent action creates a history file with YAML frontmatter:
 ```markdown
 ---
 title: Implemented user authentication
-description: Builder-1 completed auth module implementation
 timestamp: 2026-01-22T08:30:00
 agent_id: builder-1
 action_type: task-complete
 files_affected:
   - src/auth/login.py
-  - tests/test_auth.py
 ---
 
 ## Task
-Implement user authentication module with JWT tokens.
+Implement user authentication module.
 
 ## Output
-Created login endpoint with password hashing and JWT generation.
-
-### Files Created
-- `src/auth/login.py` - Login endpoint with JWT generation
-- `src/auth/hash.py` - Password hashing utilities
-
-### Tests Added
-- `tests/test_auth.py` - 12 tests for auth module
+Created login endpoint with JWT generation.
 ```
-
-### History File Naming
-
-Files are named with timestamp and action type:
-```
-YYYY-MM-DD-HHMMSS-<action-type>.md
-```
-
-Examples:
-- `2026-01-22-083000-task-complete.md`
-- `2026-01-22-090000-spec-created.md`
-- `2026-01-22-100000-review-approved.md`
-
-### Context Management
-
-Agents automatically load relevant history based on frontmatter metadata. When files approach context limits (80% of 150k tokens), TeamBot offers compaction options:
-
-| Level | Description |
-|-------|-------------|
-| **Little** | Light summarization, preserves most detail |
-| **Medium** | Moderate compression, keeps key information |
-| **High** | Aggressive summarization, essentials only |
-
----
-
-## Inter-Agent Communication
-
-Agents communicate via multiprocessing queues managed by the orchestrator:
-
-```
-┌─────────────┐
-│ Orchestrator│
-│  (Parent)   │
-└──────┬──────┘
-       │
-   ┌───┴───┐
-   │ Main  │
-   │ Queue │
-   └───┬───┘
-       │
-┌──────┼──────┬──────┬──────┬──────┐
-│      │      │      │      │      │
-▼      ▼      ▼      ▼      ▼      ▼
-┌──┐  ┌──┐  ┌──┐  ┌──┐  ┌──┐  ┌──┐
-│PM│  │BA│  │WR│  │B1│  │B2│  │RV│
-└──┘  └──┘  └──┘  └──┘  └──┘  └──┘
-```
-
-### Message Types
-
-| Type | Direction | Description |
-|------|-----------|-------------|
-| `TASK_ASSIGN` | Orchestrator → Agent | Assign task to an agent |
-| `TASK_COMPLETE` | Agent → Orchestrator | Agent completed task |
-| `TASK_FAILED` | Agent → Orchestrator | Agent failed task |
-| `STATUS_UPDATE` | Agent → Orchestrator | Agent status change |
-| `CONTEXT_SHARE` | Agent → Agent | Share context between agents |
-| `SHUTDOWN` | Orchestrator → All | Graceful shutdown signal |
-
-### Session Isolation
-
-By default, each agent operates in an isolated session:
-- Separate Copilot CLI invocation per agent
-- No shared context unless explicitly configured
-- Independent working memory
-
-To share context explicitly, agents write to `.teambot/` and other agents read the history files based on frontmatter relevance.
-
----
-
-## Dependencies
-
-### Runtime Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `python-frontmatter` | ≥1.0.0 | YAML frontmatter parsing for history files |
-| `rich` | ≥13.0.0 | Console UI, tables, colors, and progress bars |
-| `textual` | ≥0.47.0 | Split-pane terminal interface |
-| `github-copilot-sdk` | 0.1.16 | GitHub Copilot SDK integration |
-
-### Development Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `pytest` | ≥7.4.0 | Testing framework |
-| `pytest-cov` | ≥4.1.0 | Coverage reporting |
-| `pytest-mock` | ≥3.12.0 | Mocking utilities |
-| `pytest-asyncio` | ≥0.23.0 | Async test support |
-| `ruff` | ≥0.8.0 | Linting and formatting |
-| `textual[dev]` | ≥0.47.0 | Textual development tools |
-
-### External Dependencies
-
-| Tool | Required | Purpose |
-|------|----------|---------|
-| [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/) | Yes | AI task execution (`copilot` command) |
-| [uv](https://github.com/astral-sh/uv) | Yes | Python package management |
-
-### Installing External Dependencies
-
-**uv (package manager):**
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-**GitHub Copilot CLI:**
-Follow instructions at https://githubnext.com/projects/copilot-cli/
 
 ---
 
 ## Development
 
-### Setup Development Environment
+### Setup
 
 ```bash
-# Install all dependencies including dev
+# Install all dependencies
 uv sync --group dev
 
 # Run tests
 uv run pytest
 
-# Run tests with coverage
+# Run with coverage
 uv run pytest --cov=src/teambot --cov-report=term-missing
 
 # Lint and format
@@ -883,196 +521,103 @@ uv run ruff format .
 ```
 teambot/
 ├── src/teambot/
-│   ├── __init__.py           # Package version (0.1.0)
-│   ├── cli.py                # CLI entry point (init/run/status)
+│   ├── cli.py                # CLI entry point
 │   ├── orchestrator.py       # Agent lifecycle management
-│   ├── agent_runner.py       # Individual agent process
-│   ├── window_manager.py     # Cross-platform window spawning
-│   ├── config/
-│   │   ├── loader.py         # JSON config loading
-│   │   └── schema.py         # Config validation
-│   ├── copilot/
-│   │   └── client.py         # Copilot CLI wrapper
-│   ├── history/
-│   │   ├── frontmatter.py    # YAML frontmatter parsing
-│   │   ├── manager.py        # History file management
-│   │   └── compactor.py      # Context compaction
-│   ├── messaging/
-│   │   ├── protocol.py       # Message types and format
-│   │   └── router.py         # Message routing
-│   ├── prompts/
-│   │   └── templates.py      # Persona prompt templates
-│   ├── ui/
-│   │   ├── app.py            # Split-pane Textual app
-│   │   ├── styles.css        # UI styles
-│   │   └── widgets/          # Input/Output pane widgets
-│   ├── visualization/
-│   │   └── console.py        # Rich console display
-│   └── workflow/
-│       ├── stages.py         # Workflow stage enum
-│       └── state_machine.py  # Workflow state management
-├── tests/                    # Test suite (517 tests)
-│   ├── test_cli.py
-│   ├── test_orchestrator.py
-│   ├── test_agent_runner.py
-│   ├── test_copilot/
-│   ├── test_ui/              # Split-pane UI tests
-│   ├── test_workflow/
-│   └── ...
-├── docs/
-│   └── feature-specs/
-│       └── teambot.md        # Feature specification
-├── .agent-tracking/          # SDD workflow artifacts
-├── teambot.json              # Default configuration
-├── pyproject.toml            # Project metadata
-└── README.md                 # This file
-```
-
-### Running Tests
-
-```bash
-# All tests
-uv run pytest
-
-# Specific module
-uv run pytest tests/test_workflow/
-
-# Specific test
-uv run pytest tests/test_cli.py::test_init_command
-
-# With verbose output
-uv run pytest -v
-
-# Stop on first failure
-uv run pytest -x
-
-# With coverage report
-uv run pytest --cov=src/teambot --cov-report=html
+│   ├── orchestration/        # File-based orchestration
+│   │   ├── objective_parser.py
+│   │   ├── execution_loop.py
+│   │   ├── review_iterator.py
+│   │   ├── parallel_executor.py
+│   │   └── time_manager.py
+│   ├── config/               # Configuration loading
+│   ├── copilot/              # Copilot CLI wrapper
+│   ├── history/              # History file management
+│   ├── messaging/            # Inter-agent messaging
+│   ├── prompts/              # Persona templates
+│   ├── ui/                   # Split-pane interface
+│   └── workflow/             # Workflow state machine
+├── tests/                    # Test suite (650 tests)
+└── docs/                     # Documentation
 ```
 
 ### Test Coverage
 
-Current coverage: **84%** with **517 tests**
+Current: **83% coverage** with **650 tests**
 
 | Module | Coverage |
 |--------|----------|
+| `orchestration/objective_parser.py` | 100% |
+| `orchestration/time_manager.py` | 100% |
+| `orchestration/review_iterator.py` | 95% |
+| `orchestration/execution_loop.py` | 94% |
+| `orchestration/parallel_executor.py` | 92% |
 | `workflow/stages.py` | 100% |
 | `workflow/state_machine.py` | 96% |
-| `prompts/templates.py` | 100% |
-| `history/manager.py` | 100% |
-| `messaging/router.py` | 100% |
-| `ui/widgets/input_pane.py` | 94% |
-| `ui/widgets/output_pane.py` | 98% |
-| `config/loader.py` | 96% |
 
 ---
 
 ## Troubleshooting
 
-### Copilot CLI Not Found
+### Copilot SDK Not Available
 
 ```
-Error: Copilot CLI not found in PATH
+Error: Copilot SDK not available - install github-copilot-sdk
 ```
 
-**Solution:** Install the GitHub Copilot CLI:
+The SDK should be installed automatically with `uv sync`. If missing:
 ```bash
-# Follow instructions at https://githubnext.com/projects/copilot-cli/
-# Verify installation:
-copilot --version
+uv add github-copilot-sdk
 ```
 
 ### Configuration Already Exists
 
-```
-Error: Configuration already exists: teambot.json
-```
-
-**Solution:** Use `--force` to overwrite:
 ```bash
+# Use --force to overwrite
 teambot init --force
 ```
 
-### Agent Persona Not Allowed
+### No State to Resume
 
 ```
-Error: Agent 'builder-1' (persona: builder) is not allowed in stage SETUP
+Error: No orchestration state to resume
 ```
 
-**Cause:** The current workflow stage doesn't permit this persona to work.
+Run a new objective first, then use `--resume` after cancellation.
 
-**Solution:** Check which personas are allowed:
-```bash
-teambot status
-```
+### Review Failed After 4 Iterations
 
-Or advance the workflow to an appropriate stage.
+Check `.teambot/failures/` for detailed failure reports with suggestions.
 
 ### Workflow State Corrupted
 
-If `.teambot/workflow_state.json` becomes corrupted:
-
 ```bash
-# Remove corrupted state (will restart workflow)
+# Remove corrupted state files
 rm .teambot/workflow_state.json
+rm .teambot/orchestration_state.json
 
 # Re-run
-teambot run
+teambot run objectives/my-task.md
 ```
-
-### Task Execution Timeout
-
-```
-Error: Timeout after 300 seconds
-```
-
-**Solution:** Increase the timeout in your code or break the task into smaller pieces.
-
-### Permission Denied on Files
-
-```
-Error: Permission denied: /some/path
-```
-
-**Solution:** Add the directory to allowed paths in the Copilot client configuration or use `--allow-all-paths` flag.
 
 ---
 
-## Architecture Overview
+## Dependencies
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                         TeamBot CLI                         │
-│                     (teambot command)                       │
-└─────────────────────────┬──────────────────────────────────┘
-                          │
-┌─────────────────────────▼──────────────────────────────────┐
-│                      Orchestrator                           │
-│  • Agent lifecycle management                               │
-│  • Workflow state machine                                   │
-│  • Message routing                                          │
-└─────────────────────────┬──────────────────────────────────┘
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-┌───────▼───────┐ ┌───────▼───────┐ ┌───────▼───────┐
-│  AgentRunner  │ │  AgentRunner  │ │  AgentRunner  │
-│     (PM)      │ │  (Builder-1)  │ │  (Reviewer)   │
-└───────┬───────┘ └───────┬───────┘ └───────┬───────┘
-        │                 │                 │
-┌───────▼───────┐ ┌───────▼───────┐ ┌───────▼───────┐
-│ CopilotClient │ │ CopilotClient │ │ CopilotClient │
-│               │ │               │ │               │
-└───────┬───────┘ └───────┬───────┘ └───────┬───────┘
-        │                 │                 │
-        └─────────────────┼─────────────────┘
-                          │
-                          ▼
-                  ┌───────────────┐
-                  │  Copilot CLI  │
-                  │  (copilot -p) │
-                  └───────────────┘
-```
+### Runtime
+
+| Package | Purpose |
+|---------|---------|
+| `github-copilot-sdk` | GitHub Copilot SDK for AI agent execution |
+| `python-frontmatter` | YAML frontmatter parsing |
+| `rich` | Console UI and formatting |
+| `textual` | Split-pane terminal interface |
+
+### External
+
+| Tool | Purpose |
+|------|---------|
+| [uv](https://github.com/astral-sh/uv) | Package management |
+| [GitHub CLI](https://cli.github.com/) | Authentication (optional, SDK handles auth) |
 
 ---
 
@@ -1083,24 +628,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create a feature branch
 3. Make changes with tests
-4. Run tests and linting:
-   ```bash
-   uv run pytest
-   uv run ruff check .
-   ```
-5. Commit changes (`git commit -m 'Add amazing feature'`)
-6. Push to branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-## Acknowledgments
-
-- Built on [GitHub Copilot CLI](https://githubnext.com/projects/copilot-cli/)
-- Uses [Rich](https://github.com/Textualize/rich) for beautiful console output
-- Uses [Textual](https://textual.textualize.io/) for the split-pane terminal interface
-- Package management by [uv](https://github.com/astral-sh/uv)
-- Developed using the Spec-Driven Development (SDD) workflow
+4. Run `uv run pytest` and `uv run ruff check .`
+5. Open a Pull Request
 
 ---
 
