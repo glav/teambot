@@ -13,7 +13,6 @@ from teambot.orchestration.execution_loop import (
     STAGE_ORDER,
     REVIEW_STAGES,
 )
-from teambot.orchestration.review_iterator import ReviewStatus
 from teambot.workflow.stages import WorkflowStage
 
 
