@@ -236,6 +236,106 @@ class TestExecutionLoopStatePersistence:
         assert WorkflowStage.SPEC in loop.stage_outputs
         assert "Feature specification" in loop.stage_outputs[WorkflowStage.SPEC]
 
+    @pytest.mark.asyncio
+    async def test_save_state_status_cancelled(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Saved state has status 'cancelled' when execution is cancelled."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        loop.cancel()
+        result = await loop.run(mock_sdk_client)
+
+        assert result == ExecutionResult.CANCELLED
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        assert state["status"] == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_save_state_status_timeout(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Saved state has status 'timeout' when execution times out."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=0,  # Immediately expired
+        )
+
+        result = await loop.run(mock_sdk_client)
+
+        assert result == ExecutionResult.TIMEOUT
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        assert state["status"] == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_save_state_status_review_failed(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Saved state has status 'review_failed' when review fails."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create a client that always rejects
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "REJECTED: Not good enough."
+
+        result = await loop.run(mock_client)
+
+        assert result == ExecutionResult.REVIEW_FAILED
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        assert state["status"] == "review_failed"
+
+    @pytest.mark.asyncio
+    async def test_save_state_status_complete(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Saved state has status 'complete' when execution completes."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        result = await loop.run(mock_sdk_client)
+
+        assert result == ExecutionResult.COMPLETE
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        assert state["status"] == "complete"
+
+    @pytest.mark.asyncio
+    async def test_save_state_status_error(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Saved state has status 'error' when execution raises an exception."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create a client that raises an exception
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.side_effect = RuntimeError("Test error")
+
+        with pytest.raises(RuntimeError, match="Test error"):
+            await loop.run(mock_client)
+
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        assert state["status"] == "error"
+
 
 class TestExecutionLoopStageProgression:
     """Tests for stage progression logic."""
