@@ -51,7 +51,7 @@ class TeamBotApp(App):
         self._executor = executor
         self._router = router
         self._sdk_client = sdk_client
-        self._commands = SystemCommands()
+        self._commands = SystemCommands(executor=executor)
         self._pending_tasks: set[asyncio.Task] = set()
         # Centralized agent status manager
         self._agent_status = AgentStatusManager()
@@ -101,8 +101,19 @@ class TeamBotApp(App):
             output.write_info("No executor available")
             return
 
-        agent_id = command.agent_id
         content = command.content or ""
+
+        # Handle multi-agent commands with parallel streaming
+        if (
+            self._sdk_client
+            and hasattr(self._sdk_client, "execute_streaming")
+            and not command.is_pipeline
+            and len(command.agent_ids) > 1
+        ):
+            await self._handle_multiagent_streaming(command, output)
+            return
+
+        agent_id = command.agent_id
 
         # Update centralized state: agent is now running
         self._agent_status.set_running(agent_id, content)
@@ -113,7 +124,8 @@ class TeamBotApp(App):
         output.write_streaming_start(agent_id)
 
         try:
-            # Check if we can use direct streaming with SDK client
+            # For simple single-agent commands, use direct SDK streaming for better UX
+            # but still track the task via executor's manager
             if (
                 self._sdk_client
                 and hasattr(self._sdk_client, "execute_streaming")
@@ -123,28 +135,40 @@ class TeamBotApp(App):
                 # Mark as streaming in centralized state
                 self._agent_status.set_streaming(agent_id)
 
-                # Direct streaming for simple commands
+                # Create task for tracking (but don't execute via manager)
+                task = self._executor._manager.create_task(
+                    agent_id=agent_id,
+                    prompt=content,
+                    background=False,
+                )
+                task.mark_running()
+
+                # Direct streaming for responsive output
                 def on_chunk(chunk: str):
                     output.write_streaming_chunk(agent_id, chunk)
 
                 try:
-                    await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
+                    result_text = await self._sdk_client.execute_streaming(
+                        agent_id, content, on_chunk
+                    )
+                    task.mark_completed(result_text)
                     self._agent_status.set_completed(agent_id)
                     output.finish_streaming(agent_id, success=True)
                 except Exception as e:
+                    task.mark_failed(str(e))
                     self._agent_status.set_failed(agent_id)
                     output.finish_streaming(agent_id, success=False)
                     output.write_task_error(agent_id, str(e))
             else:
-                # Use executor for complex commands (pipelines, multi-agent)
+                # Use executor for pipelines (no streaming, show combined results)
                 result = await self._executor.execute(command)
                 if result.background:
                     output.finish_streaming(agent_id)
                     output.write_info(result.output)
                 elif result.success:
                     self._agent_status.set_completed(agent_id)
-                    # Show the result since we didn't stream it
                     output.finish_streaming(agent_id, success=True)
+                    # Show the result since we didn't stream it
                     if result.output:
                         output.write_task_complete(agent_id, result.output)
                 else:
@@ -160,6 +184,58 @@ class TeamBotApp(App):
             self._agent_status.set_idle(agent_id)
             # Legacy compatibility
             self._running_agents.pop(agent_id, None)
+
+    async def _handle_multiagent_streaming(self, command, output):
+        """Handle multi-agent commands with parallel streaming.
+
+        Args:
+            command: Parsed command with multiple agents.
+            output: OutputPane for displaying results.
+        """
+        content = command.content or ""
+        agent_ids = command.agent_ids
+
+        # Set up all agents as running
+        for agent_id in agent_ids:
+            self._agent_status.set_running(agent_id, content)
+            self._running_agents[agent_id] = content[:40] + "..." if len(content) > 40 else content
+            output.write_streaming_start(agent_id)
+            self._agent_status.set_streaming(agent_id)
+
+        async def stream_agent(agent_id: str):
+            """Stream a single agent's response."""
+            # Create task for tracking
+            task = self._executor._manager.create_task(
+                agent_id=agent_id,
+                prompt=content,
+                background=False,
+            )
+            task.mark_running()
+
+            def on_chunk(chunk: str):
+                output.write_streaming_chunk(agent_id, chunk)
+
+            try:
+                result_text = await self._sdk_client.execute_streaming(
+                    agent_id, content, on_chunk
+                )
+                task.mark_completed(result_text)
+                self._agent_status.set_completed(agent_id)
+                output.finish_streaming(agent_id, success=True)
+            except Exception as e:
+                task.mark_failed(str(e))
+                self._agent_status.set_failed(agent_id)
+                output.finish_streaming(agent_id, success=False)
+                output.write_task_error(agent_id, str(e))
+            finally:
+                self._agent_status.set_idle(agent_id)
+                self._running_agents.pop(agent_id, None)
+
+        # Run all agents in parallel
+        await asyncio.gather(
+            *[stream_agent(agent_id) for agent_id in agent_ids],
+            return_exceptions=True,
+        )
 
     async def _handle_system_command(self, command, output):
         """Route system command to SystemCommands and display result."""
