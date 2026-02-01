@@ -94,6 +94,40 @@ class TestREPLHandlers:
 
         assert "not connected" in result.lower()
 
+    @pytest.mark.asyncio
+    async def test_advanced_command_not_connected(self):
+        """Test advanced command handler when SDK not connected."""
+        from teambot.repl.parser import Command
+        from teambot.tasks.executor import TaskExecutor
+
+        mock_console = MagicMock()
+        mock_sdk = AsyncMock()
+        repl = REPLLoop(console=mock_console, sdk_client=mock_sdk)
+        repl._sdk_connected = False
+
+        # Initialize executor (as done in run() method)
+        repl._executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_complete=repl._on_task_complete,
+            on_task_started=repl._on_task_started,
+        )
+
+        # Create a mock command for multi-agent execution
+        command = Command(
+            type=CommandType.AGENT,
+            agent_id="pm",
+            agent_ids=["pm", "ba"],
+            content="Analyze feature",
+            command="",
+            args=None,
+            background=False,
+            is_pipeline=False,
+            pipeline=None,
+        )
+
+        result = await repl._handle_advanced_command(command)
+        assert "not connected" in result.lower()
+
 
 class TestREPLSignalHandling:
     """Tests for signal handling."""
