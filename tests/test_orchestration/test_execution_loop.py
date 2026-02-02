@@ -483,3 +483,123 @@ class TestExecutionLoopReviewOutputs:
         # Check all review stages are stored
         for review_stage in REVIEW_STAGES:
             assert review_stage.name in stage_outputs, f"Missing output for {review_stage.name}"
+
+
+class TestPromptTemplateLoading:
+    """Tests for prompt template loading functionality."""
+
+    def test_load_prompt_template_when_file_exists(
+        self, objective_file: Path, teambot_dir: Path, tmp_path: Path
+    ) -> None:
+        """Prompt template content is loaded when file exists."""
+        # Create a prompt template file
+        prompt_dir = tmp_path / ".agent" / "commands" / "sdd"
+        prompt_dir.mkdir(parents=True)
+        prompt_file = prompt_dir / "sdd.1-create-feature-spec.prompt.md"
+        prompt_file.write_text("# Create Feature Spec\n\nYou are creating a spec...")
+
+        # Create stages.yaml pointing to this prompt
+        stages_yaml = tmp_path / "stages.yaml"
+        stages_yaml.write_text("""
+stages:
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+    include_objective: true
+stage_order:
+  - SPEC
+work_to_review_mapping: {}
+""")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"stages_config": str(stages_yaml)},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "# Create Feature Spec" in context
+        assert "You are creating a spec..." in context
+
+    def test_context_excludes_objective_when_include_objective_false(
+        self, objective_file: Path, teambot_dir: Path, tmp_path: Path
+    ) -> None:
+        """Objective is not included when include_objective is false."""
+        stages_yaml = tmp_path / "stages.yaml"
+        stages_yaml.write_text("""
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize project
+    work_agent: pm
+    review_agent: null
+    prompt_template: null
+    include_objective: false
+stage_order:
+  - SETUP
+work_to_review_mapping: {}
+""")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"stages_config": str(stages_yaml)},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SETUP)
+
+        # Objective should not be in context
+        assert "# Objective:" not in context
+        assert "Implement User Authentication" not in context
+        # But stage info should still be there
+        assert "Setup" in context
+
+    def test_context_includes_objective_by_default(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Objective is included when include_objective is not specified (default True)."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "# Objective:" in context
+        assert "Implement User Authentication" in context
+
+    def test_load_prompt_template_returns_none_when_file_missing(
+        self, objective_file: Path, teambot_dir: Path, tmp_path: Path
+    ) -> None:
+        """Returns None when prompt template file doesn't exist."""
+        stages_yaml = tmp_path / "stages.yaml"
+        stages_yaml.write_text("""
+stages:
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    prompt_template: nonexistent/prompt.md
+    include_objective: true
+stage_order:
+  - SPEC
+work_to_review_mapping: {}
+""")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"stages_config": str(stages_yaml)},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        # Should not have the nonexistent prompt, but should have objective
+        assert "nonexistent/prompt.md" not in context
+        assert "# Objective:" in context

@@ -465,7 +465,42 @@ work_to_review_mapping:
 | `optional` | bool | Whether the stage can be skipped (default: false) |
 | `is_review_stage` | bool | Whether this is a review gate stage (default: false) |
 | `parallel_agents` | list | Agents that can run in parallel (e.g., for IMPLEMENTATION) |
-| `prompt_template` | string \| null | Path to custom prompt template (optional) |
+| `prompt_template` | string \| null | Path to SDD prompt template (relative to project root) |
+| `include_objective` | bool | Whether to include objective content in context (default: true) |
+
+#### Prompt Templates
+
+The `prompt_template` field allows stages to use specialized prompt files from the `.agent/commands/sdd/` directory. These prompts provide stage-specific instructions to the AI agent.
+
+**Available SDD Prompts:**
+
+| Stage | Prompt File | Description |
+|-------|-------------|-------------|
+| SETUP | `sdd.0-initialize.prompt.md` | Project initialization |
+| SPEC | `sdd.1-create-feature-spec.prompt.md` | Feature specification creation |
+| SPEC_REVIEW | `sdd.2-review-spec.prompt.md` | Specification review |
+| RESEARCH | `sdd.3-research-feature.prompt.md` | Technical research |
+| TEST_STRATEGY | `sdd.4-determine-test-strategy.prompt.md` | Test approach planning |
+| PLAN | `sdd.5-task-planner-for-feature.prompt.md` | Task breakdown |
+| PLAN_REVIEW | `sdd.6-review-plan.prompt.md` | Plan review |
+| IMPLEMENTATION | `sdd.7-task-implementer-for-feature.prompt.md` | Code implementation |
+| POST_REVIEW | `sdd.8-post-implementation-review.prompt.md` | Final review |
+
+**The `include_objective` Flag:**
+
+Set `include_objective: false` for stages that don't need the objective document in their context (e.g., generic initialization). This keeps the agent prompt focused and reduces token usage.
+
+```yaml
+SETUP:
+  name: Setup
+  prompt_template: .agent/commands/sdd/sdd.0-initialize.prompt.md
+  include_objective: false  # Generic setup doesn't need objective
+  
+SPEC:
+  name: Specification  
+  prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+  include_objective: true   # Needs objective to create spec
+```
 
 #### Customizing the Workflow
 

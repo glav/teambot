@@ -254,27 +254,39 @@ class ExecutionLoop:
         Returns:
             Complete context string with objective and stage information
         """
-        parts = [
-            f"# Objective: {self.objective.title}",
-            "",
-            "## Goals",
-        ]
+        stage_config = self.stages_config.stages.get(stage)
+        parts: list[str] = []
 
-        for goal in self.objective.goals:
-            parts.append(f"- {goal}")
+        # Load and include prompt template if specified
+        prompt_content = self._load_prompt_template(stage_config)
+        if prompt_content:
+            parts.append(prompt_content)
+            parts.append("")
 
-        parts.extend(["", "## Success Criteria"])
-        for criterion in self.objective.success_criteria:
-            check = "x" if criterion.completed else " "
-            parts.append(f"- [{check}] {criterion.description}")
+        # Conditionally include objective content based on include_objective flag
+        include_objective = stage_config.include_objective if stage_config else True
+        if include_objective:
+            parts.extend([
+                f"# Objective: {self.objective.title}",
+                "",
+                "## Goals",
+            ])
 
-        if self.objective.constraints:
-            parts.extend(["", "## Constraints"])
-            for constraint in self.objective.constraints:
-                parts.append(f"- {constraint}")
+            for goal in self.objective.goals:
+                parts.append(f"- {goal}")
 
-        if self.objective.context:
-            parts.extend(["", "## Context", self.objective.context])
+            parts.extend(["", "## Success Criteria"])
+            for criterion in self.objective.success_criteria:
+                check = "x" if criterion.completed else " "
+                parts.append(f"- [{check}] {criterion.description}")
+
+            if self.objective.constraints:
+                parts.extend(["", "## Constraints"])
+                for constraint in self.objective.constraints:
+                    parts.append(f"- {constraint}")
+
+            if self.objective.context:
+                parts.extend(["", "## Context", self.objective.context])
 
         # Add working directory information
         parts.extend([
@@ -354,6 +366,33 @@ class ExecutionLoop:
             ],
         }
         return fallback_outputs.get(stage, [])
+
+    def _load_prompt_template(self, stage_config: Any) -> str | None:
+        """Load prompt template content from file if specified.
+
+        Args:
+            stage_config: The stage configuration containing prompt_template path
+
+        Returns:
+            The prompt template content, or None if not specified or not found
+        """
+        if not stage_config or not stage_config.prompt_template:
+            return None
+
+        # Resolve path relative to project root (where stages.yaml lives)
+        # Find project root by looking for common markers
+        project_root = self.teambot_dir.parent  # .teambot parent is project root
+        if self.stages_config.source != "built-in-defaults":
+            # Use the directory containing stages.yaml as reference
+            project_root = Path(self.stages_config.source).parent
+
+        template_path = project_root / stage_config.prompt_template
+        if template_path.exists():
+            try:
+                return template_path.read_text()
+            except OSError:
+                return None
+        return None
 
     def _get_work_stage_for_review(self, review_stage: WorkflowStage) -> WorkflowStage | None:
         """Get the work stage that corresponds to a review stage."""

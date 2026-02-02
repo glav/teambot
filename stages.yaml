@@ -1,5 +1,5 @@
 # TeamBot Stage Configuration
-# 
+#
 # This file defines the 13-stage prescriptive workflow for TeamBot orchestration.
 # Each stage specifies which agents run, what artifacts are produced, and exit criteria.
 #
@@ -20,7 +20,8 @@ stages:
       - Environment ready
       - Configuration validated
     optional: false
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.0-initialize.prompt.md
+    include_objective: false  # Generic initialization, no objective needed
 
   BUSINESS_PROBLEM:
     name: Business Problem
@@ -37,7 +38,8 @@ stages:
     exit_criteria:
       - Clear problem definition with measurable goals
     optional: true  # May be skipped for small changes
-    prompt_template: null
+    prompt_template: null  # No SDD prompt for this stage
+    include_objective: true
 
   SPEC:
     name: Specification
@@ -54,7 +56,8 @@ stages:
     exit_criteria:
       - Complete specification with all required sections
     optional: false
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+    include_objective: true
 
   SPEC_REVIEW:
     name: Spec Review
@@ -71,7 +74,8 @@ stages:
       - Specification approved or revision feedback provided
     optional: false
     is_review_stage: true
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.2-review-spec.prompt.md
+    include_objective: true
 
   RESEARCH:
     name: Research
@@ -88,7 +92,8 @@ stages:
     exit_criteria:
       - Research document with implementation recommendations
     optional: false
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.3-research-feature.prompt.md
+    include_objective: true
 
   TEST_STRATEGY:
     name: Test Strategy
@@ -104,7 +109,8 @@ stages:
     exit_criteria:
       - Test strategy document with approach per component
     optional: false
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.4-determine-test-strategy.prompt.md
+    include_objective: true
 
   PLAN:
     name: Plan
@@ -121,7 +127,8 @@ stages:
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.5-task-planner-for-feature.prompt.md
+    include_objective: true
 
   PLAN_REVIEW:
     name: Plan Review
@@ -138,7 +145,8 @@ stages:
       - Plan approved or revision feedback provided
     optional: false
     is_review_stage: true
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.6-review-plan.prompt.md
+    include_objective: true
 
   IMPLEMENTATION:
     name: Implementation
@@ -156,7 +164,8 @@ stages:
     parallel_agents:
       - builder-1
       - builder-2
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.7-task-implementer-for-feature.prompt.md
+    include_objective: true
 
   IMPLEMENTATION_REVIEW:
     name: Implementation Review
@@ -171,13 +180,14 @@ stages:
       - Implementation approved or revision feedback provided
     optional: false
     is_review_stage: true
-    prompt_template: null
+    prompt_template: null  # Uses general review approach
+    include_objective: true
 
   TEST:
     name: Test
     description: >
-      Execute tests and validate implementation meets requirements. 
-      New tests should be introduced to ensure new functionality is covered 
+      Execute tests and validate implementation meets requirements.
+      New tests should be introduced to ensure new functionality is covered
       and tests pass before continuing.
     work_agent: builder-1
     review_agent: null
@@ -191,7 +201,8 @@ stages:
       - All tests passing
       - Coverage targets met
     optional: false
-    prompt_template: null
+    prompt_template: null  # Uses general test execution
+    include_objective: true
 
   POST_REVIEW:
     name: Post Implementation Review
@@ -209,7 +220,8 @@ stages:
       - Final approval granted
     optional: false
     is_review_stage: true
-    prompt_template: null
+    prompt_template: .agent/commands/sdd/sdd.8-post-implementation-review.prompt.md
+    include_objective: true
 
   COMPLETE:
     name: Complete
@@ -223,6 +235,7 @@ stages:
       - Documentation complete
     optional: false
     prompt_template: null
+    include_objective: false
 
 # Stage execution order
 stage_order:

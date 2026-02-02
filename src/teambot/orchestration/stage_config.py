@@ -29,6 +29,7 @@ class StageConfig:
     is_review_stage: bool = False
     parallel_agents: list[str] | None = None
     prompt_template: str | None = None
+    include_objective: bool = True  # Whether to include objective content in context
 
 
 @dataclass
@@ -132,6 +133,7 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             is_review_stage=stage_data.get("is_review_stage", False),
             parallel_agents=stage_data.get("parallel_agents"),
             prompt_template=stage_data.get("prompt_template"),
+            include_objective=stage_data.get("include_objective", True),
         )
         stages[workflow_stage] = config
 
