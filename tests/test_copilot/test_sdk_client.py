@@ -1,6 +1,7 @@
 """Tests for Copilot SDK client wrapper."""
 
 import pytest
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -256,3 +257,186 @@ class TestCopilotSDKClientSessionPersistence:
             # This would need actual import failure handling
             # For now, test that it doesn't crash
             assert client is not None
+
+
+class TestCopilotSDKClientPersonaInjection:
+    """Tests for persona injection functionality."""
+
+    @pytest.mark.asyncio
+    async def test_session_includes_custom_agents_when_definition_exists(
+        self, mock_sdk_client, tmp_path: Path
+    ):
+        """Test that customAgents is included in session_config when agent definition exists."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+        from teambot.copilot.agent_loader import AgentLoader
+
+        # Create an agent definition file
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+        agent_file = agents_dir / "pm.agent.md"
+        agent_file.write_text("""---
+name: pm
+description: Project Manager Agent
+displayName: Project Manager
+---
+
+You are the Project Manager agent responsible for planning and coordination.""")
+
+        # Setup agent loader with the temp directory
+        loader = AgentLoader(repo_root=tmp_path)
+
+        captured_config = None
+
+        async def capture_config(config):
+            nonlocal captured_config
+            captured_config = config
+            session = MagicMock()
+            session.session_id = config.get("session_id")
+            return session
+
+        mock_sdk_client.create_session = AsyncMock(side_effect=capture_config)
+
+        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+            with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+                client = CopilotSDKClient()
+                await client.start()
+
+                await client.get_or_create_session("pm")
+
+                # Verify customAgents was included
+                assert captured_config is not None
+                assert "customAgents" in captured_config
+                assert len(captured_config["customAgents"]) == 1
+                
+                custom_agent = captured_config["customAgents"][0]
+                assert custom_agent["name"] == "pm"
+                assert custom_agent["displayName"] == "Project Manager"
+                assert custom_agent["description"] == "Project Manager Agent"
+                assert "Project Manager agent responsible" in custom_agent["prompt"]
+
+    @pytest.mark.asyncio
+    async def test_session_logs_warning_when_no_agent_definition(
+        self, mock_sdk_client, tmp_path: Path, caplog
+    ):
+        """Test that warning is logged when no agent definition exists."""
+        import logging
+        from teambot.copilot.sdk_client import CopilotSDKClient
+        from teambot.copilot.agent_loader import AgentLoader
+
+        # Create empty agents directory
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+
+        # Setup agent loader with the temp directory
+        loader = AgentLoader(repo_root=tmp_path)
+
+        captured_config = None
+
+        async def capture_config(config):
+            nonlocal captured_config
+            captured_config = config
+            session = MagicMock()
+            session.session_id = config.get("session_id")
+            return session
+
+        mock_sdk_client.create_session = AsyncMock(side_effect=capture_config)
+
+        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+            with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+                client = CopilotSDKClient()
+                await client.start()
+
+                with caplog.at_level(logging.WARNING):
+                    await client.get_or_create_session("nonexistent")
+
+                # Verify warning was logged
+                assert any("No agent definition found for 'nonexistent'" in record.message 
+                          for record in caplog.records)
+                
+                # Verify customAgents was NOT included
+                assert captured_config is not None
+                assert "customAgents" not in captured_config
+
+    def test_build_prompt_with_persona_prepends_context(self, tmp_path: Path):
+        """Test that _build_prompt_with_persona correctly prepends persona context."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+        from teambot.copilot.agent_loader import AgentLoader
+
+        # Create an agent definition file
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+        agent_file = agents_dir / "builder.agent.md"
+        agent_file.write_text("""---
+name: builder
+description: Builder Agent
+---
+
+You are a skilled builder agent focused on implementing features.""")
+
+        # Setup agent loader with the temp directory
+        loader = AgentLoader(repo_root=tmp_path)
+
+        with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+            client = CopilotSDKClient()
+            
+            result = client._build_prompt_with_persona("builder", "Implement feature X")
+
+            # Verify persona is prepended
+            assert "<persona>" in result
+            assert "</persona>" in result
+            assert "You are a skilled builder agent" in result
+            assert "User request: Implement feature X" in result
+            
+            # Verify structure
+            assert result.index("<persona>") < result.index("User request:")
+            assert result.index("</persona>") < result.index("User request:")
+
+    def test_build_prompt_with_persona_returns_original_when_no_definition(self, tmp_path: Path):
+        """Test that _build_prompt_with_persona returns original prompt when no agent definition."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+        from teambot.copilot.agent_loader import AgentLoader
+
+        # Create empty agents directory
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+
+        # Setup agent loader with the temp directory
+        loader = AgentLoader(repo_root=tmp_path)
+
+        with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+            client = CopilotSDKClient()
+            
+            original_prompt = "Create a plan"
+            result = client._build_prompt_with_persona("nonexistent", original_prompt)
+
+            # Should return original prompt unchanged
+            assert result == original_prompt
+            assert "<persona>" not in result
+
+    def test_build_prompt_with_persona_handles_empty_prompt(self, tmp_path: Path):
+        """Test that _build_prompt_with_persona handles agent with empty prompt."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+        from teambot.copilot.agent_loader import AgentLoader
+
+        # Create an agent definition file with empty prompt
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+        agent_file = agents_dir / "reviewer.agent.md"
+        agent_file.write_text("""---
+name: reviewer
+description: Reviewer Agent
+---
+""")
+
+        # Setup agent loader with the temp directory
+        loader = AgentLoader(repo_root=tmp_path)
+
+        with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+            client = CopilotSDKClient()
+            
+            original_prompt = "Review this code"
+            result = client._build_prompt_with_persona("reviewer", original_prompt)
+
+            # Should return original prompt since agent prompt is empty
+            assert result == original_prompt
+            assert "<persona>" not in result
