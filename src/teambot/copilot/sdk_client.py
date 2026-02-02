@@ -205,12 +205,10 @@ User request: {user_prompt}"""
         if not self._started:
             raise SDKClientError("Client not started - call start() first")
 
-        # Inject agent persona into the prompt
-        full_prompt = self._build_prompt_with_persona(agent_id, prompt)
-
         # Check if streaming is disabled via env var
         if os.environ.get("TEAMBOT_STREAMING", "").lower() == "false":
-            # Fallback to blocking mode
+            # Fallback to blocking mode - inject persona here
+            full_prompt = self._build_prompt_with_persona(agent_id, prompt)
             session = await self.get_or_create_session(agent_id)
             try:
                 response = await session.send_and_wait({"prompt": full_prompt, "timeout": timeout})
@@ -220,7 +218,7 @@ User request: {user_prompt}"""
             except Exception as e:
                 raise SDKClientError(f"SDK error: {e}")
 
-        # Use streaming (default)
+        # Use streaming (default) - persona injection happens in execute_streaming
         return await self.execute_streaming(agent_id, prompt, on_chunk=lambda _: None)
 
     async def execute_streaming(
