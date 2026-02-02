@@ -108,6 +108,10 @@ class REPLLoop:
         if not self._executor:
             return "[red]Task executor not available.[/red]"
 
+        # Check SDK connection before executing
+        if not self._sdk_connected:
+            return "[red]SDK not connected. Please rebuild the devcontainer.[/red]"
+
         # Execute via TaskExecutor
         result = await self._executor.execute(command)
 
