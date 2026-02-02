@@ -5,6 +5,8 @@ import logging
 import os
 from typing import Any, Callable, Optional
 
+from teambot.copilot.agent_loader import get_agent_loader
+
 try:
     from copilot import CopilotClient  # type: ignore
     from copilot.generated.session_events import SessionEventType  # type: ignore
@@ -107,6 +109,9 @@ class CopilotSDKClient:
     async def get_or_create_session(self, agent_id: str) -> Any:
         """Get an existing session or create a new one for an agent.
 
+        Configures the session with the agent's custom persona from
+        .github/agents/{agent_id}.agent.md if available.
+
         Args:
             agent_id: The agent identifier (e.g., 'pm', 'builder-1').
 
@@ -125,16 +130,59 @@ class CopilotSDKClient:
         if session_id in self._sessions:
             return self._sessions[session_id]
 
-        # Create new session with TeamBot prefix
-        session = await self._client.create_session(
-            {
-                "session_id": session_id,
-                "streaming": True,
-            }
-        )
+        # Load agent definition from .github/agents/
+        loader = get_agent_loader()
+        agent_def = loader.get_agent(agent_id)
+
+        # Build session config
+        session_config: dict[str, Any] = {
+            "session_id": session_id,
+            "streaming": True,
+        }
+
+        # Add custom agent definition if available
+        if agent_def:
+            session_config["customAgents"] = [{
+                "name": agent_id,
+                "displayName": agent_def.display_name,
+                "description": agent_def.description,
+                "prompt": agent_def.prompt,
+            }]
+            logger.info(f"Configured session with custom agent '{agent_id}'")
+        else:
+            logger.warning(f"No agent definition found for '{agent_id}', using defaults")
+
+        session = await self._client.create_session(session_config)
 
         self._sessions[session_id] = session
         return session
+
+    def _build_prompt_with_persona(self, agent_id: str, user_prompt: str) -> str:
+        """Build a prompt that includes the agent's persona context.
+
+        Since the SDK doesn't reliably use customAgents, we prepend
+        the agent's persona to every prompt to ensure the LLM knows
+        its identity and constraints.
+
+        Args:
+            agent_id: The agent identifier.
+            user_prompt: The user's original prompt.
+
+        Returns:
+            Combined prompt with persona context.
+        """
+        loader = get_agent_loader()
+        agent_def = loader.get_agent(agent_id)
+
+        if not agent_def or not agent_def.prompt:
+            return user_prompt
+
+        # Prepend persona as system-like context
+        return f"""<persona>
+{agent_def.prompt}
+</persona>
+
+User request: {user_prompt}"""
 
     async def execute(self, agent_id: str, prompt: str, timeout: float = 120.0) -> str:
         """Execute a prompt for a specific agent.
@@ -157,12 +205,15 @@ class CopilotSDKClient:
         if not self._started:
             raise SDKClientError("Client not started - call start() first")
 
+        # Inject agent persona into the prompt
+        full_prompt = self._build_prompt_with_persona(agent_id, prompt)
+
         # Check if streaming is disabled via env var
         if os.environ.get("TEAMBOT_STREAMING", "").lower() == "false":
             # Fallback to blocking mode
             session = await self.get_or_create_session(agent_id)
             try:
-                response = await session.send_and_wait({"prompt": prompt, "timeout": timeout})
+                response = await session.send_and_wait({"prompt": full_prompt, "timeout": timeout})
                 return response.data.content
             except asyncio.TimeoutError:
                 raise SDKClientError(f"Request timed out after {timeout}s")
@@ -198,6 +249,9 @@ class CopilotSDKClient:
             raise SDKClientError("Client not started - call start() first")
 
         session = await self.get_or_create_session(agent_id)
+
+        # Inject agent persona into the prompt
+        full_prompt = self._build_prompt_with_persona(agent_id, prompt)
 
         accumulated: list[str] = []
         done = asyncio.Event()
@@ -257,9 +311,9 @@ class CopilotSDKClient:
         unsubscribe = session.on(on_event)
 
         try:
-            # Send prompt (non-blocking)
+            # Send prompt with persona context (non-blocking)
             logger.debug(f"Sending prompt to {agent_id}: {prompt[:50]}...")
-            await session.send({"prompt": prompt})
+            await session.send({"prompt": full_prompt})
 
             # Wait for completion with a very long timeout (30 min)
             # This is a safety net - streaming should complete naturally
