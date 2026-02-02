@@ -6,11 +6,16 @@ import argparse
 import asyncio
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
 from teambot.visualization.console import ConsoleDisplay
+
+if TYPE_CHECKING:
+    from teambot.orchestration import ExecutionLoop, ExecutionResult
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -151,6 +156,26 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     return 0
 
 
+async def _run_orchestration_async(
+    loop: ExecutionLoop,
+    display: ConsoleDisplay,
+    on_progress: Callable[[str, dict], None],
+) -> ExecutionResult:
+    """Async implementation of orchestration run."""
+    from teambot.copilot.sdk_client import CopilotSDKClient
+
+    sdk_client = CopilotSDKClient()
+    if not sdk_client.is_available():
+        display.print_error("Copilot SDK not available - install github-copilot-sdk")
+        raise RuntimeError("SDK not available")
+
+    try:
+        await sdk_client.start()
+        return await loop.run(sdk_client=sdk_client, on_progress=on_progress)
+    finally:
+        await sdk_client.stop()
+
+
 def _run_orchestration(
     objective_path: Path,
     config: dict,
@@ -161,7 +186,6 @@ def _run_orchestration(
     """Run file-based orchestration."""
     import signal
 
-    from teambot.copilot.sdk_client import CopilotSDKClient
     from teambot.orchestration import ExecutionLoop, ExecutionResult
 
     # Ensure teambot dir exists
@@ -169,12 +193,6 @@ def _run_orchestration(
 
     display.print_success(f"Running objective: {objective_path}")
     display.print_success(f"Max execution time: {max_hours} hours")
-
-    try:
-        sdk_client = CopilotSDKClient()
-    except Exception as e:
-        display.print_error(f"Failed to initialize Copilot client: {e}")
-        return 1
 
     try:
         loop = ExecutionLoop(
@@ -188,9 +206,17 @@ def _run_orchestration(
         return 1
 
     # Setup signal handler for cancellation
+    cancel_count = [0]  # Use list to allow modification in nested function
+
     def handle_interrupt(sig: int, frame: object) -> None:
-        display.print_warning("Cancellation requested, saving state...")
-        loop.cancel()
+        cancel_count[0] += 1
+        if cancel_count[0] == 1:
+            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            loop.cancel()
+        else:
+            # Force exit on second Ctrl+C
+            display.print_warning("Force quit")
+            raise KeyboardInterrupt()
 
     signal.signal(signal.SIGINT, handle_interrupt)
 
@@ -205,7 +231,7 @@ def _run_orchestration(
             display.print_success(data.get("message", ""))
 
     try:
-        result = asyncio.run(loop.run(sdk_client=sdk_client, on_progress=on_progress))
+        result = asyncio.run(_run_orchestration_async(loop, display, on_progress))
 
         if result == ExecutionResult.COMPLETE:
             display.print_success("Objective completed!")
@@ -228,20 +254,33 @@ def _run_orchestration(
         return 1
 
 
+async def _run_orchestration_resume_async(
+    loop: ExecutionLoop,
+    display: ConsoleDisplay,
+    on_progress: Callable[[str, dict], None],
+) -> ExecutionResult:
+    """Async implementation of orchestration resume."""
+    from teambot.copilot.sdk_client import CopilotSDKClient
+
+    sdk_client = CopilotSDKClient()
+    if not sdk_client.is_available():
+        display.print_error("Copilot SDK not available - install github-copilot-sdk")
+        raise RuntimeError("SDK not available")
+
+    try:
+        await sdk_client.start()
+        return await loop.run(sdk_client=sdk_client, on_progress=on_progress)
+    finally:
+        await sdk_client.stop()
+
+
 def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleDisplay) -> int:
     """Resume interrupted orchestration."""
     import signal
 
-    from teambot.copilot.sdk_client import CopilotSDKClient
     from teambot.orchestration import ExecutionLoop, ExecutionResult
 
     display.print_header("TeamBot Resuming")
-
-    try:
-        sdk_client = CopilotSDKClient()
-    except Exception as e:
-        display.print_error(f"Failed to initialize Copilot client: {e}")
-        return 1
 
     try:
         loop = ExecutionLoop.resume(teambot_dir, config)
@@ -254,9 +293,17 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
     display.print_success(f"Prior elapsed: {loop.time_manager.format_elapsed()}")
 
     # Setup signal handler for cancellation
+    cancel_count = [0]  # Use list to allow modification in nested function
+
     def handle_interrupt(sig: int, frame: object) -> None:
-        display.print_warning("Cancellation requested, saving state...")
-        loop.cancel()
+        cancel_count[0] += 1
+        if cancel_count[0] == 1:
+            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            loop.cancel()
+        else:
+            # Force exit on second Ctrl+C
+            display.print_warning("Force quit")
+            raise KeyboardInterrupt()
 
     signal.signal(signal.SIGINT, handle_interrupt)
 
@@ -265,7 +312,7 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
 
     try:
-        result = asyncio.run(loop.run(sdk_client=sdk_client, on_progress=on_progress))
+        result = asyncio.run(_run_orchestration_resume_async(loop, display, on_progress))
 
         if result == ExecutionResult.COMPLETE:
             display.print_success("Objective completed!")

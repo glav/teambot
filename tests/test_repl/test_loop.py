@@ -56,7 +56,7 @@ class TestREPLHandlers:
 
     @pytest.mark.asyncio
     async def test_agent_handler_calls_sdk(self):
-        """Test agent handler calls SDK execute."""
+        """Test agent handler calls SDK execute with raw content."""
         mock_sdk = AsyncMock()
         mock_sdk.execute = AsyncMock(return_value="Response")
         mock_console = MagicMock()
@@ -65,6 +65,7 @@ class TestREPLHandlers:
         repl._sdk_connected = True  # Simulate connected SDK
         result = await repl._handle_agent_command("pm", "Create plan")
 
+        # SDK called with raw content - custom agents handle persona
         mock_sdk.execute.assert_called_once_with("pm", "Create plan")
         assert result == "Response"
 

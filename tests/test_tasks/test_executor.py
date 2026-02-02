@@ -366,11 +366,12 @@ class TestTaskExecutorStreaming:
         cmd = parse_command("@pm Test streaming")
         result = await executor.execute(cmd)
 
-        # Verify execute_streaming was called
+        # Verify execute_streaming was called with raw content
+        # Custom agents in .github/agents/ handle persona
         mock_sdk.execute_streaming.assert_called_once()
         call_args = mock_sdk.execute_streaming.call_args
         assert call_args[0][0] == "pm"  # agent_id
-        assert call_args[0][1] == "Test streaming"  # prompt
+        assert call_args[0][1] == "Test streaming"  # raw content
         # Third arg is the on_chunk callback
 
     @pytest.mark.asyncio
