@@ -85,7 +85,7 @@ class TaskExecutor:
 
         Args:
             agent_id: Agent to execute task.
-            prompt: Task prompt.
+            prompt: Task prompt (already includes persona context).
 
         Returns:
             Output from agent.
@@ -134,6 +134,7 @@ class TaskExecutor:
             ExecutionResult.
         """
         agent_id = command.agent_ids[0]
+        # Custom agents in .github/agents/ handle persona context
         task = self._manager.create_task(
             agent_id=agent_id,
             prompt=command.content,
@@ -178,6 +179,7 @@ class TaskExecutor:
         """
         tasks = []
         for agent_id in command.agent_ids:
+            # Custom agents in .github/agents/ handle persona context
             task = self._manager.create_task(
                 agent_id=agent_id,
                 prompt=command.content,
@@ -248,6 +250,7 @@ class TaskExecutor:
             stage_task_ids = []
 
             for agent_id in stage.agent_ids:
+                # Custom agents in .github/agents/ handle persona context
                 task = self._manager.create_task(
                     agent_id=agent_id,
                     prompt=stage.content,

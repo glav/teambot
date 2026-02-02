@@ -175,8 +175,8 @@ class ExecutionLoop:
         if on_progress:
             on_progress("agent_running", {"agent_id": work_agent, "task": stage.name})
 
-        # Build context from objective and prior stage outputs
-        context = self._build_stage_context(stage)
+        # Build context from objective, persona, and prior stage outputs
+        context = self._build_stage_context(stage, work_agent)
 
         # Execute the agent
         output = await self.sdk_client.execute_streaming(work_agent, context, None)
@@ -202,7 +202,7 @@ class ExecutionLoop:
         if not self.review_iterator:
             raise RuntimeError("ReviewIterator not initialized")
 
-        context = self._build_stage_context(stage)
+        context = self._build_stage_context(stage, review_agent)
 
         def review_progress(msg: str) -> None:
             if on_progress:
@@ -218,8 +218,19 @@ class ExecutionLoop:
 
         return result.status
 
-    def _build_stage_context(self, stage: WorkflowStage) -> str:
-        """Build context for a stage from objective and prior outputs."""
+    def _build_stage_context(self, stage: WorkflowStage, agent_id: str | None = None) -> str:
+        """Build context for a stage from objective and prior outputs.
+
+        Custom agents in .github/agents/ handle persona enforcement.
+        This method focuses on workflow stage context only.
+
+        Args:
+            stage: The current workflow stage
+            agent_id: The agent executing this stage (unused, kept for API compat)
+
+        Returns:
+            Complete context string with objective and stage information
+        """
         parts = [
             f"# Objective: {self.objective.title}",
             "",
@@ -253,6 +264,18 @@ class ExecutionLoop:
                 ]
             )
 
+            # Add required artifacts for this stage
+            if stage_meta.required_artifacts:
+                parts.extend(["", "## Required Artifacts for This Stage"])
+                for artifact in stage_meta.required_artifacts:
+                    parts.append(f"- {artifact}")
+
+        # Add stage output expectations
+        stage_outputs = self._get_stage_outputs(stage)
+        if stage_outputs:
+            parts.extend(["", "## Expected Output"])
+            parts.extend(stage_outputs)
+
         # Include relevant prior outputs
         if stage in REVIEW_STAGES:
             # For review, include the work that needs review
@@ -267,6 +290,55 @@ class ExecutionLoop:
                 )
 
         return "\n".join(parts)
+
+    def _get_stage_outputs(self, stage: WorkflowStage) -> list[str]:
+        """Get expected output description for a specific stage.
+
+        Args:
+            stage: The workflow stage
+
+        Returns:
+            List of output expectations
+        """
+        outputs: dict[WorkflowStage, list[str]] = {
+            WorkflowStage.SETUP: [
+                "- Confirmation that setup is complete",
+            ],
+            WorkflowStage.BUSINESS_PROBLEM: [
+                "- problem_statement.md document",
+            ],
+            WorkflowStage.SPEC: [
+                "- feature_spec.md document with detailed requirements",
+            ],
+            WorkflowStage.SPEC_REVIEW: [
+                "- spec_review.md with APPROVED or NEEDS_REVISION decision",
+            ],
+            WorkflowStage.RESEARCH: [
+                "- research.md document with technical analysis",
+            ],
+            WorkflowStage.TEST_STRATEGY: [
+                "- test_strategy.md document with testing approach",
+            ],
+            WorkflowStage.PLAN: [
+                "- implementation_plan.md with task breakdown",
+            ],
+            WorkflowStage.PLAN_REVIEW: [
+                "- plan_review.md with APPROVED or NEEDS_REVISION decision",
+            ],
+            WorkflowStage.IMPLEMENTATION: [
+                "- Implemented code and tests per the plan",
+            ],
+            WorkflowStage.IMPLEMENTATION_REVIEW: [
+                "- impl_review.md with APPROVED or NEEDS_REVISION decision",
+            ],
+            WorkflowStage.TEST: [
+                "- test_results.md with pass/fail status",
+            ],
+            WorkflowStage.POST_REVIEW: [
+                "- post_review.md with final decision",
+            ],
+        }
+        return outputs.get(stage, [])
 
     def _get_work_stage_for_review(self, review_stage: WorkflowStage) -> WorkflowStage | None:
         """Get the work stage that corresponds to a review stage."""

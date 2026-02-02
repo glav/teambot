@@ -111,7 +111,7 @@ class StatusPanel(Static):
             branch_display = self._git_branch
             if len(branch_display) > 15:
                 branch_display = branch_display[:12] + "..."
-            lines.append(f"[dim]Branch:[/dim] {branch_display}")
+            lines.append(f"[dim]Branch:[/dim] [white]{branch_display}[/white]")
             lines.append("")
 
         # Agent status list
