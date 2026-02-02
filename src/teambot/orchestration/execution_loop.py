@@ -216,6 +216,10 @@ class ExecutionLoop:
             on_progress=review_progress,
         )
 
+        # Store review output for this stage
+        if result.final_output:
+            self.stage_outputs[stage] = result.final_output
+
         return result.status
 
     def _build_stage_context(self, stage: WorkflowStage, agent_id: str | None = None) -> str:

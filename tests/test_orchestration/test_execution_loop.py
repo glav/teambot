@@ -419,3 +419,57 @@ class TestExecutionLoopContextBuilding:
 
         assert "Work to Review" in context
         assert "This is the spec content" in context
+
+
+class TestExecutionLoopReviewOutputs:
+    """Tests for review stage output storage."""
+
+    @pytest.mark.asyncio
+    async def test_review_stage_outputs_stored_in_state(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Review stage outputs are stored in orchestration_state.json."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Mock client that returns approval with output
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "APPROVED: Spec looks great!"
+
+        result = await loop.run(mock_client)
+
+        assert result == ExecutionResult.COMPLETE
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+
+        # Verify review stage outputs are in state
+        stage_outputs = state.get("stage_outputs", {})
+        assert "SPEC_REVIEW" in stage_outputs
+        assert "APPROVED" in stage_outputs["SPEC_REVIEW"]
+
+    @pytest.mark.asyncio
+    async def test_all_review_stages_stored(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """All review stages have their outputs stored."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "APPROVED: All good!"
+
+        await loop.run(mock_client)
+
+        state_file = teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        stage_outputs = state.get("stage_outputs", {})
+
+        # Check all review stages are stored
+        for review_stage in REVIEW_STAGES:
+            assert review_stage.name in stage_outputs, f"Missing output for {review_stage.name}"

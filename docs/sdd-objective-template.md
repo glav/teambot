@@ -46,6 +46,7 @@ When you run `teambot run`, the orchestrator guides agents through a **13-stage 
 - **Lead**: PM Agent
 - **Description**: Initialize project, configure agents, and establish working directory
 - **Exit Criteria**: Environment ready, configuration validated
+- **Prompt / Instructions**: `.agent/commands/sdd/sdd.0-initialize.prompt.md`
 
 ### Stage 2: BUSINESS_PROBLEM (Optional)
 - **Lead**: BA Agent, PM Agent
@@ -105,7 +106,7 @@ When you run `teambot run`, the orchestrator guides agents through a **13-stage 
 
 ### Stage 11: TEST
 - **Lead**: Builder Agents, Reviewer Agent
-- **Description**: Execute tests and validate implementation meets requirements
+- **Description**: Execute tests and validate implementation meets requirements. New tests should be introduced to ensure that any new functionality is exercised/covered, that the main functional goal is tested, and that the tests pass before continuing.
 - **Artifact**: `test_results.md`
 - **Exit Criteria**: All tests passing, coverage targets met
 
@@ -150,10 +151,10 @@ The workflow is complete when:
 
 ## Artifact Locations
 
-After completion, artifacts will be located in `.teambot/`:
+After completion, artifacts will be located in `.teambot/{feature-name}` where `{feature-name}` is a 1-3 word feature title with no spaces but dashes separating works (for example 'create-api'):
 
 ```
-.teambot/
+.teambot/{feature-name}
 ├── workflow_state.json          # Current workflow state
 ├── history/                     # Task history with frontmatter
 ├── problem_statement.md         # Business problem (if applicable)
@@ -192,12 +193,12 @@ TeamBot orchestrates 6 specialized agent personas:
 
 **Goal**: Add user authentication with OAuth2 support
 
-**Problem Statement**: Users currently have no way to securely log in. We need OAuth2 
+**Problem Statement**: Users currently have no way to securely log in. We need OAuth2
 authentication to enable single sign-on with GitHub and Google.
 
 **Success Criteria**:
 - [ ] Users can log in via GitHub OAuth
-- [ ] Users can log in via Google OAuth  
+- [ ] Users can log in via Google OAuth
 - [ ] Sessions persist with secure JWT tokens
 - [ ] 95% test coverage on auth module
 

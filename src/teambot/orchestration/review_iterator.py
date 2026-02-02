@@ -39,6 +39,7 @@ class ReviewResult:
 
     status: ReviewStatus
     iterations_used: int
+    final_output: str | None = None
     summary: str | None = None
     suggestions: list[str] = field(default_factory=list)
     report_path: Path | None = None
@@ -105,15 +106,19 @@ class ReviewIterator:
                     return ReviewResult(
                         status=ReviewStatus.APPROVED,
                         iterations_used=iteration,
+                        final_output=review_output,
                     )
 
                 # Incorporate feedback for next iteration
                 current_context = self._incorporate_feedback(current_context, feedback, work_output)
 
             except asyncio.CancelledError:
+                # Get last review output if available
+                last_output = iteration_history[-1].review_output if iteration_history else None
                 return ReviewResult(
                     status=ReviewStatus.CANCELLED,
                     iterations_used=iteration,
+                    final_output=last_output,
                 )
 
         # Max iterations reached - generate failure report
@@ -183,9 +188,13 @@ class ReviewIterator:
         suggestions = self._extract_suggestions(history)
         report_path = self._save_failure_report(stage, summary, suggestions, history)
 
+        # Get final review output from last iteration
+        final_output = history[-1].review_output if history else None
+
         return ReviewResult(
             status=ReviewStatus.FAILED,
             iterations_used=len(history),
+            final_output=final_output,
             summary=summary,
             suggestions=suggestions,
             report_path=report_path,
