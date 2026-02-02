@@ -99,6 +99,69 @@ Use the runSubagent tool for every research task.
 - MUST: Do not create any source code files are part of this process. Only create markdown specification files and JSON state files as described.
 - MUST: Follow all file path and naming conventions exactly as specified.
 
+## Entry Point Analysis (CRITICAL)
+
+Before diving into component-level research, you MUST trace ALL entry points where user input flows into the system and reaches the functionality being implemented. This prevents partial implementations that work in isolation but fail in real usage.
+
+### Entry Point Analysis Requirements
+
+You MUST document:
+
+1. **All Code Paths**: Identify every path where user input enters the system and could trigger the feature
+2. **Path Differences**: Document how different command types/inputs are handled differently
+3. **Coverage Verification**: For each entry point, explicitly state whether the proposed implementation covers it
+
+### Entry Point Analysis Template
+
+Include this section in every research document:
+
+```markdown
+## Entry Point Analysis
+
+### User Input Entry Points
+
+| Entry Point | Code Path | Reaches Feature? | Implementation Required? |
+|-------------|-----------|------------------|-------------------------|
+| {{input_type_1}} | {{file.py → function → ...}} | YES/NO | YES/NO |
+| {{input_type_2}} | {{file.py → function → ...}} | YES/NO | YES/NO |
+
+### Code Path Trace
+
+#### Entry Point 1: {{Description}}
+1. User enters: `{{example_input}}`
+2. Handled by: `{{file.py:function_name()}}` (lines X-Y)
+3. Routes to: `{{next_file.py:function()}}` (lines X-Y)
+4. Reaches: `{{feature_code}}` ✅ OR Does NOT reach feature ❌
+
+#### Entry Point 2: {{Description}}
+...
+
+### Coverage Gaps
+
+| Gap | Impact | Required Fix |
+|-----|--------|--------------|
+| {{entry_point}} not covered | {{what fails}} | {{what needs to change}} |
+
+### Implementation Scope Verification
+
+- [ ] All entry points from acceptance test scenarios are traced
+- [ ] All code paths that should trigger feature are identified
+- [ ] Coverage gaps are documented with required fixes
+```
+
+### Why Entry Point Analysis Matters
+
+**Example Failure**: The shared-context feature (`$pm` syntax) passed all unit tests but failed in real usage because:
+
+| Entry Point | Code Path | Implementation Status |
+|-------------|-----------|----------------------|
+| `@pm task &` (background) | loop.py → executor.py → manager.py | ✅ Implemented |
+| `@pm,@ba task` (multi-agent) | loop.py → executor.py → manager.py | ✅ Implemented |
+| `@pm -> @ba` (pipeline) | loop.py → executor.py → manager.py | ✅ Implemented |
+| `@pm task` (simple) | loop.py → **router.py** → sdk | ❌ **NOT IMPLEMENTED** |
+
+The simple command path (`loop.py → router.py`) never went through `executor.py` where the `$ref` functionality was implemented. This gap would have been caught with proper entry point analysis.
+
 ## Alternative Technical Scenario Analysis Framework
 
 For each scenario and approach:
@@ -347,6 +410,7 @@ Deep research is complete and documented.
 * Technical approach validated ✅
 * Code patterns documented ✅
 * Testing infrastructure researched ✅
+* Entry point analysis complete ✅
 * Implementation guidance ready ✅
 
 **➡️ Recommended Next Steps:**
@@ -364,6 +428,7 @@ Before completing research:
 - [ ] **All Placeholders Replaced**: No `{{placeholder}}` tokens remain in document
 - [ ] **Technical Approach Documented**: Clear recommendation with rationale
 - [ ] **Code Patterns Found**: At least 2-3 example patterns from codebase or external sources
+- [ ] **Entry Point Analysis Complete**: All user input paths traced and coverage verified (CRITICAL)
 - [ ] **Test Infrastructure Researched**: Framework, patterns, coverage tools identified
 - [ ] **Line References Valid**: All `(Lines X-Y)` references point to actual content
 - [ ] **Single Recommended Approach**: Only one approach remains (alternatives removed)
@@ -375,6 +440,7 @@ RESEARCH_VALIDATION: PASS | FAIL
 - Document: CREATED | MISSING
 - Placeholders: X remaining (list if any)
 - Technical Approach: DOCUMENTED | MISSING
+- Entry Points: X traced, Y covered | INCOMPLETE
 - Test Infrastructure: RESEARCHED | INCOMPLETE
 - Implementation Ready: YES | NO
 ```
