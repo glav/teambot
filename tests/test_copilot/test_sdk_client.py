@@ -307,7 +307,7 @@ You are the Project Manager agent responsible for planning and coordination.""")
                 assert captured_config is not None
                 assert "customAgents" in captured_config
                 assert len(captured_config["customAgents"]) == 1
-                
+
                 custom_agent = captured_config["customAgents"][0]
                 assert custom_agent["name"] == "pm"
                 assert custom_agent["displayName"] == "Project Manager"
@@ -350,9 +350,9 @@ You are the Project Manager agent responsible for planning and coordination.""")
                     await client.get_or_create_session("nonexistent")
 
                 # Verify warning was logged
-                assert any("No agent definition found for 'nonexistent'" in record.message 
+                assert any("No agent definition found for 'nonexistent'" in record.message
                           for record in caplog.records)
-                
+
                 # Verify customAgents was NOT included
                 assert captured_config is not None
                 assert "customAgents" not in captured_config
@@ -378,7 +378,7 @@ You are a skilled builder agent focused on implementing features.""")
 
         with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
             client = CopilotSDKClient()
-            
+
             result = client._build_prompt_with_persona("builder", "Implement feature X")
 
             # Verify persona is prepended
@@ -386,7 +386,7 @@ You are a skilled builder agent focused on implementing features.""")
             assert "</persona>" in result
             assert "You are a skilled builder agent" in result
             assert "User request: Implement feature X" in result
-            
+
             # Verify structure
             assert result.index("<persona>") < result.index("User request:")
             assert result.index("</persona>") < result.index("User request:")
@@ -405,7 +405,7 @@ You are a skilled builder agent focused on implementing features.""")
 
         with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
             client = CopilotSDKClient()
-            
+
             original_prompt = "Create a plan"
             result = client._build_prompt_with_persona("nonexistent", original_prompt)
 
@@ -433,7 +433,7 @@ description: Reviewer Agent
 
         with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
             client = CopilotSDKClient()
-            
+
             original_prompt = "Review this code"
             result = client._build_prompt_with_persona("reviewer", original_prompt)
 
