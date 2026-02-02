@@ -26,6 +26,15 @@ class ParsedObjective:
     context: str | None = None
     raw_content: str = ""
 
+    @property
+    def feature_name(self) -> str:
+        """Derive a short feature name from the title.
+
+        Returns a 1-3 word dash-separated name suitable for directory names.
+        Example: "Add User Authentication with OAuth2" -> "user-authentication"
+        """
+        return _derive_feature_name(self.title)
+
 
 def parse_objective_file(path: Path) -> ParsedObjective:
     """Parse a markdown objective file.
@@ -183,3 +192,52 @@ def _parse_criteria_section(content: str) -> list[SuccessCriterion]:
             description = match.group(2).strip()
             criteria.append(SuccessCriterion(description=description, completed=completed))
     return criteria
+
+
+# Common words to skip when deriving feature names
+_SKIP_WORDS = {
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
+    "be", "have", "has", "had", "do", "does", "did", "will", "would",
+    "could", "should", "may", "might", "must", "shall", "can", "need",
+    "add", "create", "implement", "build", "make", "update", "fix",
+    "new", "support", "enable", "allow",
+}
+
+
+def _derive_feature_name(title: str) -> str:
+    """Derive a short feature name from a title.
+
+    Takes a title like "Add User Authentication with OAuth2 Support"
+    and returns "user-authentication" (1-3 meaningful words, dash-separated).
+
+    Args:
+        title: The objective title
+
+    Returns:
+        A short, dash-separated feature name suitable for directory names
+    """
+    if not title or title == "Untitled":
+        return "feature"
+
+    # Remove common prefixes and clean up
+    cleaned = title.lower().strip()
+
+    # Remove "objective:" prefix if present
+    cleaned = re.sub(r"^objective:\s*", "", cleaned)
+
+    # Split into words, keeping only alphanumeric
+    words = re.findall(r"[a-z0-9]+", cleaned)
+
+    # Filter out common/skip words
+    meaningful = [w for w in words if w not in _SKIP_WORDS and len(w) > 1]
+
+    # Take first 1-3 meaningful words
+    if not meaningful:
+        # Fallback: take first 2 words from original
+        meaningful = words[:2] if words else ["feature"]
+
+    feature_words = meaningful[:3]
+
+    # Join with dashes
+    return "-".join(feature_words)

@@ -153,7 +153,7 @@ class TestExecutionLoopStatePersistence:
     async def test_save_state_creates_file(
         self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
     ) -> None:
-        """Save state creates orchestration_state.json."""
+        """Save state creates orchestration_state.json in feature directory."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
@@ -163,7 +163,8 @@ class TestExecutionLoopStatePersistence:
         loop.cancel()
         await loop.run(mock_sdk_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        # State file is in feature-specific subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
     @pytest.mark.asyncio
@@ -180,7 +181,8 @@ class TestExecutionLoopStatePersistence:
         loop.cancel()
         await loop.run(mock_sdk_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        # State file is in feature-specific subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
 
         assert "objective_file" in state
@@ -191,8 +193,12 @@ class TestExecutionLoopStatePersistence:
     def test_resume_loads_state(
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
-        """Resume loads state from file."""
-        # Create state file
+        """Resume loads state from file in feature directory."""
+        # Create feature subdirectory with state file
+        # The objective file has title "Implement User Authentication" -> "user-authentication"
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
         state = {
             "objective_file": str(objective_file),
             "current_stage": "RESEARCH",
@@ -201,10 +207,10 @@ class TestExecutionLoopStatePersistence:
             "status": "paused",
             "stage_outputs": {},
         }
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = feature_dir / "orchestration_state.json"
         state_file.write_text(json.dumps(state))
 
-        loop = ExecutionLoop.resume(teambot_dir, {})
+        loop = ExecutionLoop.resume(feature_dir, {})
 
         assert loop.current_stage == WorkflowStage.RESEARCH
         assert loop.time_manager._prior_elapsed == 100.0
@@ -218,6 +224,10 @@ class TestExecutionLoopStatePersistence:
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
         """Resume restores stage outputs."""
+        # Create feature subdirectory with state file
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
         state = {
             "objective_file": str(objective_file),
             "current_stage": "PLAN",
@@ -228,10 +238,10 @@ class TestExecutionLoopStatePersistence:
                 "SPEC": "Feature specification content",
             },
         }
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = feature_dir / "orchestration_state.json"
         state_file.write_text(json.dumps(state))
 
-        loop = ExecutionLoop.resume(teambot_dir, {})
+        loop = ExecutionLoop.resume(feature_dir, {})
 
         assert WorkflowStage.SPEC in loop.stage_outputs
         assert "Feature specification" in loop.stage_outputs[WorkflowStage.SPEC]
@@ -251,7 +261,7 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_sdk_client)
 
         assert result == ExecutionResult.CANCELLED
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "cancelled"
 
@@ -270,7 +280,7 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_sdk_client)
 
         assert result == ExecutionResult.TIMEOUT
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "timeout"
 
@@ -292,7 +302,7 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_client)
 
         assert result == ExecutionResult.REVIEW_FAILED
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "review_failed"
 
@@ -310,7 +320,7 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_sdk_client)
 
         assert result == ExecutionResult.COMPLETE
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "complete"
 
@@ -332,7 +342,7 @@ class TestExecutionLoopStatePersistence:
         with pytest.raises(RuntimeError, match="Test error"):
             await loop.run(mock_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "error"
 
@@ -442,7 +452,7 @@ class TestExecutionLoopReviewOutputs:
         result = await loop.run(mock_client)
 
         assert result == ExecutionResult.COMPLETE
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
 
         # Verify review stage outputs are in state
@@ -466,7 +476,7 @@ class TestExecutionLoopReviewOutputs:
 
         await loop.run(mock_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         stage_outputs = state.get("stage_outputs", {})
 

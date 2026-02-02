@@ -13,6 +13,11 @@ from teambot.orchestration.parallel_executor import (
     partition_tasks,
 )
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewResult, ReviewStatus
+from teambot.orchestration.stage_config import (
+    StageConfig,
+    StagesConfiguration,
+    load_stages_config,
+)
 from teambot.orchestration.time_manager import TimeManager
 
 __all__ = [
@@ -29,4 +34,7 @@ __all__ = [
     "AgentTask",
     "TaskResult",
     "partition_tasks",
+    "StageConfig",
+    "StagesConfiguration",
+    "load_stages_config",
 ]

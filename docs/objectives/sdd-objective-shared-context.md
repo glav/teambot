@@ -41,9 +41,9 @@ When you run `teambot run`, the orchestrator guides agents through a **13-stage 
 - feature specs: `docs/feature-specs/`
 
 ### Stage 1: SETUP
-- **Lead**: PM Agent
-- **Required**: NO - Already performed as part of previous step
-- **Description**: Initialize project, configure agents, and establish working directory
+- **Lead**: Builder Agents
+- **Required**: NO - May have already performed as part of previous step
+- **Description**: Initialize project, configure agents, and establish working directory. Do not create any plans or documents at this time.
 - **Exit Criteria**: Environment ready, configuration validated
 - **Prompt / Instructions**: `.agent/commands/sdd/sdd.0-initialize.prompt.md`
 - Can skip this step

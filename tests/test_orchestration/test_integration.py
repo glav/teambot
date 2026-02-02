@@ -127,8 +127,8 @@ class TestResumeAfterCancellation:
         loop.cancel()
         await loop.run(mock_sdk_client)
 
-        # Verify state file exists
-        state_file = teambot_dir / "orchestration_state.json"
+        # Verify state file exists in feature subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
         state = json.loads(state_file.read_text())
@@ -359,8 +359,8 @@ The application uses React for frontend and Express for backend.
         for stage in expected_stages:
             assert stage in stages_visited, f"Expected {stage} to be visited"
 
-        # Verify state was saved
-        state_file = teambot_dir / "orchestration_state.json"
+        # Verify state was saved in feature subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
     @pytest.mark.asyncio
@@ -395,8 +395,8 @@ The application uses React for frontend and Express for backend.
         # Verify failure
         assert result == ExecutionResult.REVIEW_FAILED
 
-        # Verify failure report was created
-        failures_dir = teambot_dir / "failures"
+        # Verify failure report was created in feature subdirectory
+        failures_dir = loop.teambot_dir / "failures"
         assert failures_dir.exists()
         failure_reports = list(failures_dir.glob("*.md"))
         assert len(failure_reports) > 0

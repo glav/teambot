@@ -9,6 +9,10 @@ from typing import Any
 
 from teambot.orchestration.objective_parser import parse_objective_file
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewStatus
+from teambot.orchestration.stage_config import (
+    StagesConfiguration,
+    load_stages_config,
+)
 from teambot.orchestration.time_manager import TimeManager
 from teambot.workflow.stages import STAGE_METADATA, WorkflowStage
 
@@ -23,7 +27,7 @@ class ExecutionResult(Enum):
     ERROR = "error"
 
 
-# Review stages that require iteration
+# Legacy constants for backward compatibility - prefer using StagesConfiguration
 REVIEW_STAGES = {
     WorkflowStage.SPEC_REVIEW,
     WorkflowStage.PLAN_REVIEW,
@@ -31,7 +35,6 @@ REVIEW_STAGES = {
     WorkflowStage.POST_REVIEW,
 }
 
-# Mapping of work stages to their review stages
 WORK_TO_REVIEW_MAPPING = {
     WorkflowStage.SPEC: WorkflowStage.SPEC_REVIEW,
     WorkflowStage.PLAN: WorkflowStage.PLAN_REVIEW,
@@ -39,7 +42,6 @@ WORK_TO_REVIEW_MAPPING = {
     WorkflowStage.TEST: WorkflowStage.POST_REVIEW,
 }
 
-# Agent assignments for work and review
 STAGE_AGENTS = {
     WorkflowStage.SETUP: {"work": "pm", "review": None},
     WorkflowStage.BUSINESS_PROBLEM: {"work": "ba", "review": None},
@@ -56,7 +58,6 @@ STAGE_AGENTS = {
     WorkflowStage.COMPLETE: {"work": None, "review": None},
 }
 
-# Workflow stage order
 STAGE_ORDER = [
     WorkflowStage.SETUP,
     WorkflowStage.BUSINESS_PROBLEM,
@@ -83,13 +84,28 @@ class ExecutionLoop:
         config: dict[str, Any],
         teambot_dir: Path,
         max_hours: float = 8.0,
+        stages_config: StagesConfiguration | None = None,
     ):
         self.objective = parse_objective_file(objective_path)
         self.objective_path = objective_path
         self.config = config
-        self.teambot_dir = teambot_dir
         self.time_manager = TimeManager(max_seconds=int(max_hours * 3600))
         self.cancelled = False
+
+        # Create feature-specific subdirectory
+        self.feature_name = self.objective.feature_name
+        self.teambot_dir = teambot_dir / self.feature_name
+        self.teambot_dir.mkdir(parents=True, exist_ok=True)
+
+        # Load stages configuration
+        if stages_config is not None:
+            self.stages_config = stages_config
+        else:
+            # Try to load from config path or use defaults
+            stages_path = config.get("stages_config")
+            self.stages_config = load_stages_config(
+                Path(stages_path) if stages_path else None
+            )
 
         # Current state
         self.current_stage = WorkflowStage.SETUP
@@ -134,8 +150,8 @@ class ExecutionLoop:
                 if on_progress:
                     on_progress("stage_changed", {"stage": stage.name})
 
-                # Execute stage
-                if stage in REVIEW_STAGES:
+                # Execute stage - check if it's a review stage via config
+                if stage in self.stages_config.review_stages:
                     result = await self._execute_review_stage(stage, on_progress)
                     if result == ReviewStatus.FAILED:
                         self._save_state(ExecutionResult.REVIEW_FAILED)
@@ -166,7 +182,7 @@ class ExecutionLoop:
         on_progress: Callable[[str, Any], None] | None,
     ) -> str:
         """Execute a non-review work stage."""
-        agents = STAGE_AGENTS.get(stage, {})
+        agents = self.stages_config.get_stage_agents(stage)
         work_agent = agents.get("work")
 
         if not work_agent:
@@ -195,9 +211,9 @@ class ExecutionLoop:
         on_progress: Callable[[str, Any], None] | None,
     ) -> ReviewStatus:
         """Execute a review stage with iteration."""
-        agents = STAGE_AGENTS.get(stage, {})
-        work_agent = agents.get("work", "builder-1")
-        review_agent = agents.get("review", "reviewer")
+        agents = self.stages_config.get_stage_agents(stage)
+        work_agent = agents.get("work") or "builder-1"
+        review_agent = agents.get("review") or "reviewer"
 
         if not self.review_iterator:
             raise RuntimeError("ReviewIterator not initialized")
@@ -268,11 +284,18 @@ class ExecutionLoop:
                 ]
             )
 
-            # Add required artifacts for this stage
-            if stage_meta.required_artifacts:
+            # Add required artifacts for this stage from config
+            stage_config = self.stages_config.stages.get(stage)
+            if stage_config and stage_config.artifacts:
                 parts.extend(["", "## Required Artifacts for This Stage"])
-                for artifact in stage_meta.required_artifacts:
+                for artifact in stage_config.artifacts:
                     parts.append(f"- {artifact}")
+
+            # Add exit criteria from config
+            if stage_config and stage_config.exit_criteria:
+                parts.extend(["", "## Exit Criteria"])
+                for criterion in stage_config.exit_criteria:
+                    parts.append(f"- {criterion}")
 
         # Add stage output expectations
         stage_outputs = self._get_stage_outputs(stage)
@@ -281,7 +304,7 @@ class ExecutionLoop:
             parts.extend(stage_outputs)
 
         # Include relevant prior outputs
-        if stage in REVIEW_STAGES:
+        if stage in self.stages_config.review_stages:
             # For review, include the work that needs review
             work_stage = self._get_work_stage_for_review(stage)
             if work_stage and work_stage in self.stage_outputs:
@@ -302,61 +325,38 @@ class ExecutionLoop:
             stage: The workflow stage
 
         Returns:
-            List of output expectations
+            List of output expectations based on stage artifacts
         """
-        outputs: dict[WorkflowStage, list[str]] = {
+        # Get artifacts from config
+        stage_config = self.stages_config.stages.get(stage)
+        if stage_config and stage_config.artifacts:
+            return [f"- {artifact}" for artifact in stage_config.artifacts]
+
+        # Fallback for stages without explicit artifacts
+        fallback_outputs: dict[WorkflowStage, list[str]] = {
             WorkflowStage.SETUP: [
                 "- Confirmation that setup is complete",
-            ],
-            WorkflowStage.BUSINESS_PROBLEM: [
-                "- problem_statement.md document",
-            ],
-            WorkflowStage.SPEC: [
-                "- feature_spec.md document with detailed requirements",
-            ],
-            WorkflowStage.SPEC_REVIEW: [
-                "- spec_review.md with APPROVED or NEEDS_REVISION decision",
-            ],
-            WorkflowStage.RESEARCH: [
-                "- research.md document with technical analysis",
-            ],
-            WorkflowStage.TEST_STRATEGY: [
-                "- test_strategy.md document with testing approach",
-            ],
-            WorkflowStage.PLAN: [
-                "- implementation_plan.md with task breakdown",
-            ],
-            WorkflowStage.PLAN_REVIEW: [
-                "- plan_review.md with APPROVED or NEEDS_REVISION decision",
             ],
             WorkflowStage.IMPLEMENTATION: [
                 "- Implemented code and tests per the plan",
             ],
-            WorkflowStage.IMPLEMENTATION_REVIEW: [
-                "- impl_review.md with APPROVED or NEEDS_REVISION decision",
-            ],
-            WorkflowStage.TEST: [
-                "- test_results.md with pass/fail status",
-            ],
-            WorkflowStage.POST_REVIEW: [
-                "- post_review.md with final decision",
-            ],
         }
-        return outputs.get(stage, [])
+        return fallback_outputs.get(stage, [])
 
     def _get_work_stage_for_review(self, review_stage: WorkflowStage) -> WorkflowStage | None:
         """Get the work stage that corresponds to a review stage."""
-        for work_stage, review in WORK_TO_REVIEW_MAPPING.items():
+        for work_stage, review in self.stages_config.work_to_review_mapping.items():
             if review == review_stage:
                 return work_stage
         return None
 
     def _get_next_stage(self, current: WorkflowStage) -> WorkflowStage:
         """Get the next stage in the workflow."""
+        stage_order = self.stages_config.stage_order
         try:
-            idx = STAGE_ORDER.index(current)
-            if idx + 1 < len(STAGE_ORDER):
-                return STAGE_ORDER[idx + 1]
+            idx = stage_order.index(current)
+            if idx + 1 < len(stage_order):
+                return stage_order[idx + 1]
         except ValueError:
             pass
         return WorkflowStage.COMPLETE
@@ -395,7 +395,15 @@ class ExecutionLoop:
 
     @classmethod
     def resume(cls, teambot_dir: Path, config: dict[str, Any]) -> ExecutionLoop:
-        """Resume from saved state."""
+        """Resume from saved state.
+
+        Args:
+            teambot_dir: The feature-specific teambot directory containing
+                        orchestration_state.json (e.g., .teambot/user-auth/)
+
+        Returns:
+            ExecutionLoop ready to continue execution
+        """
         import json
 
         state_file = teambot_dir / "orchestration_state.json"
@@ -406,10 +414,15 @@ class ExecutionLoop:
         state = json.loads(state_file.read_text())
 
         objective_path = Path(state["objective_file"])
+
+        # Get the parent teambot dir (feature dir's parent)
+        # since __init__ will append the feature name again
+        parent_teambot_dir = teambot_dir.parent
+
         loop = cls(
             objective_path=objective_path,
             config=config,
-            teambot_dir=teambot_dir,
+            teambot_dir=parent_teambot_dir,
             max_hours=state["max_seconds"] / 3600,
         )
 

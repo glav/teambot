@@ -381,6 +381,7 @@ Each review stage iterates up to 4 times:
 ```json
 {
   "teambot_dir": ".teambot",
+  "stages_config": "stages.yaml",
   "agents": [
     {
       "id": "pm",
@@ -408,6 +409,76 @@ Each review stage iterates up to 4 times:
 | `id` | string | Unique agent identifier |
 | `persona` | string | Persona type |
 | `display_name` | string | Human-readable name for UI |
+
+### Stage Configuration (stages.yaml)
+
+The workflow stages are configured in `stages.yaml`. This file defines which agents run at each stage, required artifacts, and exit criteria.
+
+```yaml
+stages:
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas:
+      - business_analyst
+      - ba
+    artifacts:
+      - feature_spec.md
+    exit_criteria:
+      - Complete specification with all required sections
+    optional: false
+
+  SPEC_REVIEW:
+    name: Spec Review
+    description: Review and approve the feature specification
+    work_agent: ba
+    review_agent: reviewer
+    is_review_stage: true
+    artifacts:
+      - spec_review.md
+
+stage_order:
+  - SETUP
+  - BUSINESS_PROBLEM
+  - SPEC
+  - SPEC_REVIEW
+  # ... remaining stages
+
+work_to_review_mapping:
+  SPEC: SPEC_REVIEW
+  PLAN: PLAN_REVIEW
+```
+
+#### Stage Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Display name for the stage |
+| `description` | string | Description of what the stage does |
+| `work_agent` | string | Agent ID for work tasks (e.g., `pm`, `ba`, `builder-1`) |
+| `review_agent` | string \| null | Agent ID for review tasks, or null if no review |
+| `allowed_personas` | list | Personas allowed to work on this stage |
+| `artifacts` | list | Files produced by this stage |
+| `exit_criteria` | list | Conditions that must be met to complete the stage |
+| `optional` | bool | Whether the stage can be skipped (default: false) |
+| `is_review_stage` | bool | Whether this is a review gate stage (default: false) |
+| `parallel_agents` | list | Agents that can run in parallel (e.g., for IMPLEMENTATION) |
+| `prompt_template` | string \| null | Path to custom prompt template (optional) |
+
+#### Customizing the Workflow
+
+1. Copy `stages.yaml` to your project
+2. Modify stages, agents, or add custom exit criteria
+3. Point to it in `teambot.json`:
+   ```json
+   {
+     "stages_config": "path/to/custom-stages.yaml"
+   }
+   ```
+
+If no `stages.yaml` exists, TeamBot uses built-in defaults.
 
 ---
 
