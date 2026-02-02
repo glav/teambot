@@ -1,6 +1,7 @@
 ## Objective
 
-<!-- Replace with your objective description -->
+- Be able to share or pass context and results between agents with teambot smart enough to detect dependencies on other agents and queue/wait accordingly.
+
 **Goal**: I would like to enhance the teambot solution so that when a user enters a prompt, they can reference another agents results or output for further processing or actions. It needs to be intuitive and easy to use.
 
 **Problem Statement**: Sometimes a user will enter a prompt without using any chaining syntax (ie. '->' ) and then realise that the output would be good to have another agent act on it. Rather than having to copy the output and paste in another prompt, it would be very beneficial to reference that easily as part of a new prompt. This also provides the flexibility of agent interaction ad hoc by the user.
