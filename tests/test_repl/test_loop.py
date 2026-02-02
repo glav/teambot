@@ -196,3 +196,37 @@ class TestREPLIntegration:
 
         # Should be visible in commands
         assert len(repl._commands._history) == 1
+
+    @pytest.mark.asyncio
+    async def test_executor_initialized_when_sdk_unavailable(self):
+        """Test executor is initialized even when SDK not available.
+        
+        This ensures /tasks command works for viewing task history
+        even when the SDK is not connected.
+        """
+        # Create mock SDK client that is not available
+        mock_sdk = AsyncMock()
+        mock_sdk.is_available = MagicMock(return_value=False)
+        mock_sdk.stop = AsyncMock()
+        mock_console = MagicMock()
+
+        # Create REPL with unavailable SDK
+        repl = REPLLoop(console=mock_console, sdk_client=mock_sdk)
+
+        # Stub _get_input to exit immediately
+        async def mock_get_input():
+            # Return /quit on first call to exit the loop
+            repl._running = False
+            return "/quit"
+
+        repl._get_input = mock_get_input
+
+        # Run the REPL (should initialize executor despite SDK being unavailable)
+        await repl.run()
+
+        # Verify executor was initialized
+        assert repl._executor is not None, "Executor should be initialized"
+        
+        # Verify executor was set on commands (so /tasks works)
+        assert repl._commands._executor is not None, "Commands should have executor"
+        assert repl._commands._executor is repl._executor, "Commands should have same executor instance"
