@@ -1,0 +1,8 @@
+{
+  "objective_file": "docs/sdd-objective-template.md",
+  "current_stage": "SETUP",
+  "elapsed_seconds": 0.00035986000148113817,
+  "max_seconds": 28800,
+  "status": "error",
+  "stage_outputs": {}
+}
