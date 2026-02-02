@@ -146,6 +146,9 @@ class ExecutionLoop:
                 # Advance to next stage
                 self.current_stage = self._get_next_stage(stage)
 
+                # Save state after each stage completion for resumability
+                self._save_state()
+
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
@@ -298,8 +301,10 @@ class ExecutionLoop:
             status = result.value
         elif self.cancelled:
             status = "cancelled"
-        else:
+        elif self.current_stage == WorkflowStage.COMPLETE:
             status = "complete"
+        else:
+            status = "in_progress"
 
         state = {
             "objective_file": str(self.objective_path),
