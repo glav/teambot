@@ -39,6 +39,7 @@ class StagesConfiguration:
     stage_order: list[WorkflowStage]
     work_to_review_mapping: dict[WorkflowStage, WorkflowStage]
     review_stages: set[WorkflowStage] = field(default_factory=set)
+    source: str = "built-in-defaults"  # Path to config file or "built-in-defaults"
 
     def get_stage_agents(self, stage: WorkflowStage) -> dict[str, str | None]:
         """Get work and review agents for a stage."""
@@ -95,7 +96,9 @@ def load_stages_config(config_path: Path | None = None) -> StagesConfiguration:
     content = yaml_path.read_text()
     data = yaml.safe_load(content)
 
-    return _parse_configuration(data)
+    config = _parse_configuration(data)
+    config.source = str(yaml_path.resolve())
+    return config
 
 
 def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:

@@ -97,6 +97,9 @@ class ExecutionLoop:
         self.teambot_dir = teambot_dir / self.feature_name
         self.teambot_dir.mkdir(parents=True, exist_ok=True)
 
+        # Create artifacts subdirectory
+        (self.teambot_dir / "artifacts").mkdir(exist_ok=True)
+
         # Load stages configuration
         if stages_config is not None:
             self.stages_config = stages_config
@@ -273,6 +276,15 @@ class ExecutionLoop:
         if self.objective.context:
             parts.extend(["", "## Context", self.objective.context])
 
+        # Add working directory information
+        parts.extend([
+            "",
+            "## Working Directory",
+            f"All artifacts for this objective should be saved to: `{self.teambot_dir}`",
+            f"- Artifacts directory: `{self.teambot_dir / 'artifacts'}`",
+            f"- Example: `{self.teambot_dir / 'artifacts' / 'feature_spec.md'}`",
+        ])
+
         # Add stage-specific instructions
         stage_meta = STAGE_METADATA.get(stage)
         if stage_meta:
@@ -289,7 +301,7 @@ class ExecutionLoop:
             if stage_config and stage_config.artifacts:
                 parts.extend(["", "## Required Artifacts for This Stage"])
                 for artifact in stage_config.artifacts:
-                    parts.append(f"- {artifact}")
+                    parts.append(f"- `{self.teambot_dir / 'artifacts' / artifact}`")
 
             # Add exit criteria from config
             if stage_config and stage_config.exit_criteria:
@@ -388,6 +400,8 @@ class ExecutionLoop:
             "elapsed_seconds": self.time_manager.elapsed_seconds,
             "max_seconds": self.time_manager.max_seconds,
             "status": status,
+            "stages_config_source": self.stages_config.source,
+            "feature_name": self.feature_name,
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
         }
 

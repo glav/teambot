@@ -25,15 +25,43 @@ class ParsedObjective:
     constraints: list[str] = field(default_factory=list)
     context: str | None = None
     raw_content: str = ""
+    source_filename: str = ""  # Original filename for feature name fallback
 
     @property
     def feature_name(self) -> str:
-        """Derive a short feature name from the title.
+        """Derive a short feature name from the title, filename, or first goal.
 
         Returns a 1-3 word dash-separated name suitable for directory names.
         Example: "Add User Authentication with OAuth2" -> "user-authentication"
+
+        Priority:
+        1. Title (if not generic like "Objective")
+        2. Source filename (e.g., "sdd-objective-shared-context.md" -> "shared-context")
+        3. First goal
+        4. Fallback to "feature"
         """
-        return _derive_feature_name(self.title)
+        # If title is meaningful, use it
+        if self.title.lower() not in ("objective", "untitled", ""):
+            return _derive_feature_name(self.title)
+
+        # Try to extract from filename (e.g., "sdd-objective-shared-context.md")
+        if self.source_filename:
+            # Remove common prefixes like "sdd-objective-" and extension
+            filename = self.source_filename.lower()
+            filename = re.sub(r"^(sdd-)?objective-?", "", filename)
+            filename = re.sub(r"\.md$", "", filename)
+            if filename and filename not in ("", "objective"):
+                name = _derive_feature_name(filename)
+                if name != "feature" and len(name) > 2:
+                    return name
+
+        # Try the first goal
+        if self.goals:
+            name = _derive_feature_name(self.goals[0])
+            if name != "feature" and len(name) > 3:
+                return name
+
+        return "feature"
 
 
 def parse_objective_file(path: Path) -> ParsedObjective:
@@ -87,6 +115,7 @@ def parse_objective_file(path: Path) -> ParsedObjective:
         constraints=constraints,
         context=context,
         raw_content=content,
+        source_filename=path.name,
     )
 
 
@@ -196,12 +225,20 @@ def _parse_criteria_section(content: str) -> list[SuccessCriterion]:
 
 # Common words to skip when deriving feature names
 _SKIP_WORDS = {
+    # Articles and conjunctions
     "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
     "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
+    # Modal verbs
     "be", "have", "has", "had", "do", "does", "did", "will", "would",
     "could", "should", "may", "might", "must", "shall", "can", "need",
+    # Common action verbs (generic)
     "add", "create", "implement", "build", "make", "update", "fix",
-    "new", "support", "enable", "allow",
+    "new", "support", "enable", "allow", "enhance", "improve", "change",
+    # Personal pronouns and common sentence starters
+    "i", "we", "you", "it", "this", "that", "these", "those",
+    "like", "want", "would", "so", "when", "if", "then", "also",
+    # Generic tech words
+    "solution", "system", "feature", "functionality", "ability",
 }
 
 
