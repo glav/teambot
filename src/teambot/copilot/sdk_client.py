@@ -176,7 +176,7 @@ class CopilotSDKClient:
         self,
         agent_id: str,
         prompt: str,
-        on_chunk: Callable[[str], None],
+        on_chunk: Callable[[str], None] | None = None,
     ) -> str:
         """Execute a prompt with streaming output.
 
@@ -186,7 +186,7 @@ class CopilotSDKClient:
         Args:
             agent_id: The agent identifier.
             prompt: The prompt to send.
-            on_chunk: Callback invoked for each streaming chunk.
+            on_chunk: Optional callback invoked for each streaming chunk.
 
         Returns:
             Complete accumulated response content.
@@ -230,7 +230,8 @@ class CopilotSDKClient:
 
                 if delta_content:  # Skip None or empty
                     accumulated.append(delta_content)
-                    on_chunk(delta_content)
+                    if on_chunk:
+                        on_chunk(delta_content)
                     logger.debug(f"Chunk received: {delta_content[:50]}...")
 
             # Check for completion events

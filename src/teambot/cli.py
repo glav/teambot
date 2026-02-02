@@ -206,9 +206,17 @@ def _run_orchestration(
         return 1
 
     # Setup signal handler for cancellation
+    cancel_count = [0]  # Use list to allow modification in nested function
+
     def handle_interrupt(sig: int, frame: object) -> None:
-        display.print_warning("Cancellation requested, saving state...")
-        loop.cancel()
+        cancel_count[0] += 1
+        if cancel_count[0] == 1:
+            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            loop.cancel()
+        else:
+            # Force exit on second Ctrl+C
+            display.print_warning("Force quit")
+            raise KeyboardInterrupt()
 
     signal.signal(signal.SIGINT, handle_interrupt)
 
@@ -285,9 +293,17 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
     display.print_success(f"Prior elapsed: {loop.time_manager.format_elapsed()}")
 
     # Setup signal handler for cancellation
+    cancel_count = [0]  # Use list to allow modification in nested function
+
     def handle_interrupt(sig: int, frame: object) -> None:
-        display.print_warning("Cancellation requested, saving state...")
-        loop.cancel()
+        cancel_count[0] += 1
+        if cancel_count[0] == 1:
+            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            loop.cancel()
+        else:
+            # Force exit on second Ctrl+C
+            display.print_warning("Force quit")
+            raise KeyboardInterrupt()
 
     signal.signal(signal.SIGINT, handle_interrupt)
 
