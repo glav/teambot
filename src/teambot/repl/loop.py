@@ -108,6 +108,10 @@ class REPLLoop:
         if not self._executor:
             return "[red]Task executor not available.[/red]"
 
+        # Check SDK connection before executing
+        if not self._sdk_connected:
+            return "[red]SDK not connected. Please rebuild the devcontainer.[/red]"
+
         # Execute via TaskExecutor
         result = await self._executor.execute(command)
 
@@ -231,13 +235,14 @@ class REPLLoop:
                     "or set GITHUB_TOKEN env var.[/dim]"
                 )
 
-            # Initialize task executor
-            self._executor = TaskExecutor(
-                sdk_client=self._sdk_client,
-                on_task_complete=self._on_task_complete,
-                on_task_started=self._on_task_started,
-            )
-            self._commands.set_executor(self._executor)
+        # Initialize task executor (always, even if SDK not connected)
+        # This allows /tasks command to work for viewing task history
+        self._executor = TaskExecutor(
+            sdk_client=self._sdk_client,
+            on_task_complete=self._on_task_complete,
+            on_task_started=self._on_task_started,
+        )
+        self._commands.set_executor(self._executor)
 
         # Start overlay if supported
         if self._overlay.is_supported:
