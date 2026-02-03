@@ -271,7 +271,7 @@ class ExecutionLoop:
                 "ERROR: No acceptance test scenarios found in the feature spec. "
                 "Acceptance tests are MANDATORY per the specification requirements.\n\n"
                 "Action Required:\n"
-                "1. Add an '## Acceptance Test Scenarios' section to the feature spec\n"
+                "1. Add an 'Acceptance Test Scenarios' section (heading: ## Acceptance Test Scenarios) to the feature spec\n"
                 "2. Include at least one test scenario with the format:\n"
                 "   ### Scenario AT-001: [Description]\n"
                 "   - Given: [preconditions]\n"
