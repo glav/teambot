@@ -124,6 +124,7 @@ class ExecutionLoop:
         self.acceptance_tests_passed: bool = False
         self.acceptance_test_result: AcceptanceTestResult | None = None
         self.acceptance_test_iterations: int = 0
+        self._acceptance_test_history: list[dict[str, Any]] = []
 
         # Will be set during run()
         self.sdk_client: Any = None
@@ -320,6 +321,12 @@ class ExecutionLoop:
         max_iterations = ReviewIterator.MAX_ITERATIONS
         self.acceptance_test_iterations = 0
 
+        # Track iteration history for state file
+        iteration_history: list[dict[str, Any]] = []
+
+        # Accumulated output for stage_outputs
+        accumulated_output: list[str] = []
+
         while self.acceptance_test_iterations < max_iterations:
             self.acceptance_test_iterations += 1
 
@@ -329,17 +336,39 @@ class ExecutionLoop:
                     "max_iterations": max_iterations,
                 })
 
-            # Run acceptance tests
+            # Run acceptance tests (don't let it overwrite stage_outputs)
             result = await self._execute_acceptance_test_stage(stage, on_progress)
+
+            # Record this iteration's test results
+            iteration_record: dict[str, Any] = {
+                "iteration": self.acceptance_test_iterations,
+                "passed": result.passed,
+                "failed": result.failed,
+                "total": result.total,
+                "all_passed": result.all_passed,
+            }
+
+            # Add test results to accumulated output
+            accumulated_output.append(
+                f"## Iteration {self.acceptance_test_iterations} - Test Results\n\n"
+                f"**Status**: {'✅ PASSED' if result.all_passed else '❌ FAILED'} "
+                f"({result.passed}/{result.total} passed)\n\n"
+                f"{generate_acceptance_test_report(result)}\n\n"
+                f"---\n\n"
+            )
 
             if result.all_passed:
                 # Tests passed - we're done
                 self.acceptance_tests_passed = True
-                return result
+                iteration_record["fix_applied"] = False
+                iteration_history.append(iteration_record)
+                break
 
             # Tests failed - if we have iterations left, try to fix
             if self.acceptance_test_iterations >= max_iterations:
                 # No more iterations - fail
+                iteration_record["fix_applied"] = False
+                iteration_history.append(iteration_record)
                 if on_progress:
                     on_progress("acceptance_test_max_iterations_reached", {
                         "iterations_used": self.acceptance_test_iterations,
@@ -358,24 +387,34 @@ class ExecutionLoop:
             # Ask builder to implement fix
             fix_output = await self._execute_acceptance_test_fix(fix_context, on_progress)
 
-            # Accumulate fix outputs for traceability
-            fix_record = (
-                f"## Iteration {self.acceptance_test_iterations} Fix Attempt\n\n"
+            # Record the fix
+            iteration_record["fix_applied"] = True
+            iteration_record["fix_summary"] = fix_output[:500] + "..." if len(fix_output) > 500 else fix_output
+            iteration_history.append(iteration_record)
+
+            # Add fix output to accumulated output
+            accumulated_output.append(
+                f"## Iteration {self.acceptance_test_iterations} - Fix Attempt\n\n"
                 f"{fix_output}\n\n"
                 f"---\n\n"
             )
-            if stage in self.stage_outputs:
-                self.stage_outputs[stage] += fix_record
-            else:
-                self.stage_outputs[stage] = fix_record
 
             if on_progress:
                 on_progress("acceptance_test_fix_complete", {
                     "iteration": self.acceptance_test_iterations,
+                    "fix_output_length": len(fix_output),
                 })
 
-        # All iterations exhausted - tests still failing
-        self.acceptance_tests_passed = False
+        # Store the complete history in stage_outputs
+        self.stage_outputs[stage] = "\n".join(accumulated_output)
+
+        # Store iteration history for state file
+        self._acceptance_test_history = iteration_history
+
+        # Set final pass/fail status
+        if self.acceptance_test_result and not self.acceptance_test_result.all_passed:
+            self.acceptance_tests_passed = False
+
         return self.acceptance_test_result
 
     def _build_acceptance_test_fix_context(
@@ -758,6 +797,7 @@ class ExecutionLoop:
             "feature_name": self.feature_name,
             "acceptance_tests_passed": self.acceptance_tests_passed,
             "acceptance_test_iterations": self.acceptance_test_iterations,
+            "acceptance_test_history": self._acceptance_test_history,
             "acceptance_test_summary": (
                 self.acceptance_test_result.summary
                 if self.acceptance_test_result
