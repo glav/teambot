@@ -271,13 +271,14 @@ class ExecutionLoop:
                 "ERROR: No acceptance test scenarios found in the feature spec. "
                 "Acceptance tests are MANDATORY per the specification requirements.\n\n"
                 "Action Required:\n"
-                "1. Add an 'Acceptance Test Scenarios' section (heading: ## Acceptance Test Scenarios) to the feature spec\n"
+                "1. Add an 'Acceptance Test Scenarios' section "
+                "(heading: ## Acceptance Test Scenarios) to the feature spec\n"
                 "2. Include at least one test scenario with the format:\n"
                 "   ### Scenario AT-001: [Description]\n"
                 "   - Given: [preconditions]\n"
                 "   - When: [action]\n"
                 "   - Then: [expected result]\n"
-                "3. Ensure scenarios test the complete user flow, not just unit functionality"
+                "3. Ensure scenarios test the complete user flow"
             )
             self.acceptance_tests_passed = False  # Block workflow - acceptance tests are mandatory
             return self.acceptance_test_result
@@ -461,7 +462,8 @@ class ExecutionLoop:
         parts = [
             "# Acceptance Test Fix Required",
             "",
-            "The acceptance tests have **FAILED**. Your task is to analyze the failures and implement a fix to make the tests pass.",
+            "The acceptance tests have **FAILED**. Your task is to analyze "
+            "the failures and implement a fix to make the tests pass.",
             "",
             "## Failed Test Results",
             "",
@@ -505,14 +507,24 @@ class ExecutionLoop:
 
         parts.extend([
             "",
-            "## Your Task",
+            "## Your Task - CRITICAL",
             "",
-            "1. **Analyze** the failed acceptance tests and validation output above",
-            "2. **Identify** the root cause of each failure from the pytest output",
-            "3. **Review** the current implementation code",
-            "4. **Fix** the code to make the tests pass",
-            "5. **Run** `uv run pytest` to verify your fix works",
-            "6. **Report** results in this format:",
+            "The feature DOES NOT WORK. You must fix the IMPLEMENTATION, not just",
+            "write tests that pass. The acceptance tests validate real user behavior.",
+            "",
+            "1. **Read** the failed test output to understand what's broken",
+            "2. **Find** the implementation code that handles this feature",
+            "3. **Fix** the actual implementation bug (not test expectations)",
+            "4. **Run** `uv run pytest tests/test_acceptance_validation.py -v`",
+            "5. **Show** the actual pytest output proving tests pass",
+            "",
+            "## Verification",
+            "",
+            "After fixing, you MUST include:",
+            "",
+            "1. The code changes you made (show the diff or key changes)",
+            "2. The actual pytest output (copy/paste the terminal output)",
+            "3. A results block:",
             "",
             "```acceptance-results",
         ])
@@ -523,8 +535,8 @@ class ExecutionLoop:
         parts.extend([
             "```",
             "",
-            "IMPORTANT: You must actually make code changes and run the tests.",
-            "Do not just describe what needs to be done - implement the fix.",
+            "WARNING: If you claim PASSED but the pytest output shows failures,",
+            "or if pytest output is missing, all scenarios will be marked FAILED.",
             "",
         ])
 

@@ -296,53 +296,84 @@ class AcceptanceTestExecutor:
 **Verification**: {scenario.verification}
 """)
 
-        return f"""# Acceptance Test Validation
+        return f"""# Acceptance Test Validation - STRICT MODE
 
-You must validate the implemented feature by writing and running pytest tests.
+You must validate each acceptance scenario by writing integration tests that
+exercise the REAL implementation code and running them with pytest.
 
-## Instructions
+## CRITICAL REQUIREMENTS
 
-1. For EACH acceptance scenario below, write a pytest test that validates the functionality
-2. Run the tests using `uv run pytest` with the specific test file
-3. Report the results in the EXACT format specified below
+1. Tests must call the REAL implementation code, not mocks
+2. You must show the ACTUAL pytest output (copy/paste it)
+3. Each scenario must have a corresponding test function named `test_at_XXX_*`
+4. If any test fails, analyze why and FIX THE IMPLEMENTATION CODE
 
 ## Acceptance Scenarios to Validate
 
 {"".join(scenario_text)}
 
-## Required Output Format
+## Step-by-Step Process
 
-After running the tests, you MUST output a results block in this EXACT format:
+### Step 1: Create Integration Test File
 
+Create `tests/test_acceptance_validation.py` with tests for each scenario.
+Each test MUST:
+- Import and use the real implementation classes/functions
+- NOT mock the core functionality being tested
+- Have a name starting with `test_at_XXX` where XXX is the scenario ID
+
+Example structure:
+```python
+import pytest
+from teambot.your_module import YourClass
+
+class TestAcceptanceScenarios:
+    def test_at_001_simple_reference(self):
+        # Call REAL implementation
+        result = YourClass().do_thing()
+        assert result == expected
+```
+
+### Step 2: Run Tests and Show Output
+
+Run: `uv run pytest tests/test_acceptance_validation.py -v`
+
+**YOU MUST COPY THE COMPLETE PYTEST OUTPUT HERE**
+
+### Step 3: If Tests Fail
+
+If any test fails:
+1. Analyze the failure from the pytest output
+2. Fix the implementation code (not just the test)
+3. Re-run and show the new output
+
+### Step 4: Final Results
+
+After all tests pass, output this block:
+
+```pytest-output
+<paste the actual pytest output showing all tests passing>
+```
+
+Then output:
 ```acceptance-results
 {chr(10).join(f"{s.id}: PASSED" for s in self.scenarios)}
 ```
 
-Replace PASSED with FAILED if a test fails, and add a failure reason:
-```
-AT-001: FAILED - Reason: assertion error on line 42
-```
+## IMPORTANT
 
-## Validation Process
+- I will verify your pytest output contains `test_at_XXX` for each scenario
+- I will verify the output shows tests actually passing (not just claimed)
+- If pytest output is missing or doesn't match, ALL scenarios marked FAILED
 
-1. First, examine the existing test files to understand the testing patterns
-2. Create or update test file(s) for these acceptance scenarios
-3. Run the tests: `uv run pytest tests/test_acceptance_<feature>.py -v`
-4. Parse the pytest output to determine pass/fail for each scenario
-5. Output the results block with the status of each scenario
-
-## Important
-
-- Tests must actually exercise the implemented code, not mock everything
-- Each acceptance scenario should map to at least one test function
-- If a scenario cannot be tested (e.g., missing implementation), mark it FAILED with reason
-- Include the actual pytest output so failures can be debugged
-
-Begin validation now.
+Begin validation now. Start by creating the test file.
 """
 
     def _parse_validation_results(self) -> AcceptanceTestResult:
         """Parse the builder's validation output to determine results.
+
+        This method is STRICT - it verifies actual pytest output exists
+        and shows tests passing, not just a self-reported results block.
 
         Returns:
             AcceptanceTestResult with parsed scenario statuses.
@@ -351,15 +382,33 @@ Begin validation now.
         failed = 0
         skipped = 0
 
-        # Look for the acceptance-results block
+        # STRICT: First verify actual pytest output exists
+        pytest_verified = self._verify_pytest_output()
+
+        if not pytest_verified:
+            # No valid pytest output found - all scenarios fail
+            for scenario in self.scenarios:
+                scenario.status = AcceptanceTestStatus.FAILED
+                scenario.failure_reason = "No valid pytest output found in response"
+            return AcceptanceTestResult(
+                total=len(self.scenarios),
+                passed=0,
+                failed=len(self.scenarios),
+                skipped=0,
+                scenarios=self.scenarios,
+            )
+
+        # Look for the acceptance-results block (but verify against pytest output)
         results_pattern = r"```acceptance-results\n(.*?)```"
         results_match = re.search(results_pattern, self.validation_output, re.DOTALL)
 
         if results_match:
             results_text = results_match.group(1)
             self._parse_results_block(results_text)
+            # Cross-verify claimed results against pytest output
+            self._verify_claimed_results()
         else:
-            # No structured results - try to infer from pytest output
+            # No structured results - infer from pytest output
             self._infer_results_from_output()
 
         # Count results
@@ -383,6 +432,60 @@ Begin validation now.
             skipped=skipped,
             scenarios=self.scenarios,
         )
+
+    def _verify_pytest_output(self) -> bool:
+        """Verify that actual pytest output exists in the validation output.
+
+        Returns:
+            True if valid pytest output found, False otherwise.
+        """
+        output = self.validation_output.lower()
+
+        # Look for pytest execution indicators
+        pytest_indicators = [
+            "passed",
+            "failed",
+            "test session starts",
+            "collecting",
+            "pytest",
+        ]
+
+        # Must have at least some pytest indicators
+        indicator_count = sum(1 for ind in pytest_indicators if ind in output)
+        if indicator_count < 2:
+            return False
+
+        # Look for test function names matching our pattern
+        # Pattern: test_at_001, test_at_002, etc.
+        test_pattern = r"test_at_\d+"
+        test_matches = re.findall(test_pattern, output, re.IGNORECASE)
+
+        # Should have at least one test per scenario (ideally)
+        # But be lenient - at least verify some tests were run
+        return len(test_matches) > 0 or "passed" in output
+
+    def _verify_claimed_results(self) -> None:
+        """Cross-verify claimed PASSED results against actual pytest output.
+
+        If a scenario is claimed as PASSED but we can't find evidence
+        of the corresponding test passing in pytest output, mark it as FAILED.
+        """
+        output_lower = self.validation_output.lower()
+
+        for scenario in self.scenarios:
+            if scenario.status == AcceptanceTestStatus.PASSED:
+                # Look for evidence this scenario's test actually passed
+                # Check if test_at_XXX appears in output and isn't marked as failed
+                test_pattern = f"test_at_{scenario.id[-3:]}"
+                if test_pattern.lower() not in output_lower:
+                    # No test found for this scenario
+                    # Check if there's a generic "all passed" indicator
+                    if "failed" in output_lower or "error" in output_lower:
+                        # There were failures, and we can't verify this test
+                        scenario.status = AcceptanceTestStatus.FAILED
+                        scenario.failure_reason = (
+                            f"Could not verify test for {scenario.id} passed"
+                        )
 
     def _parse_results_block(self, results_text: str) -> None:
         """Parse the structured results block.
