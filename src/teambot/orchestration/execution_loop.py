@@ -269,8 +269,15 @@ class ExecutionLoop:
             )
             self.stage_outputs[stage] = (
                 "ERROR: No acceptance test scenarios found in the feature spec. "
-                "Acceptance tests are MANDATORY per the specification requirements. "
-                "The spec must include an 'Acceptance Test Scenarios' section with at least one test scenario."
+                "Acceptance tests are MANDATORY per the specification requirements.\n\n"
+                "Action Required:\n"
+                "1. Add an '## Acceptance Test Scenarios' section to the feature spec\n"
+                "2. Include at least one test scenario with the format:\n"
+                "   ### Scenario AT-001: [Description]\n"
+                "   - Given: [preconditions]\n"
+                "   - When: [action]\n"
+                "   - Then: [expected result]\n"
+                "3. Ensure scenarios test the complete user flow, not just unit functionality"
             )
             self.acceptance_tests_passed = False  # Block workflow - acceptance tests are mandatory
             return self.acceptance_test_result
