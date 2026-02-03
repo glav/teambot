@@ -170,7 +170,7 @@ class ExecutionLoop:
 
                 if stage in self.stages_config.acceptance_test_stages:
                     # Execute acceptance test stage with retry loop
-                    result = await self._execute_acceptance_test_with_retry(
+                    await self._execute_acceptance_test_with_retry(
                         stage, on_progress
                     )
                     if not self.acceptance_tests_passed:
@@ -246,6 +246,7 @@ class ExecutionLoop:
             self.stage_outputs[stage] = (
                 "ERROR: Could not find feature specification to extract acceptance test scenarios."
             )
+            self.acceptance_tests_passed = False
             return self.acceptance_test_result
 
         # Create executor and run tests
@@ -258,7 +259,7 @@ class ExecutionLoop:
         executor.load_scenarios()
 
         if not executor.scenarios:
-            # No acceptance tests defined - this is a warning but not a failure
+            # No acceptance tests defined - this is an ERROR (acceptance tests are MANDATORY)
             self.acceptance_test_result = AcceptanceTestResult(
                 total=0,
                 passed=0,
@@ -267,9 +268,18 @@ class ExecutionLoop:
                 scenarios=[],
             )
             self.stage_outputs[stage] = (
-                "WARNING: No acceptance test scenarios found in the feature spec. Acceptance test validation skipped."
+                "ERROR: No acceptance test scenarios found in the feature spec. "
+                "Acceptance tests are MANDATORY per the specification requirements.\n\n"
+                "Action Required:\n"
+                "1. Add an 'Acceptance Test Scenarios' section (heading: ## Acceptance Test Scenarios) to the feature spec\n"
+                "2. Include at least one test scenario with the format:\n"
+                "   ### Scenario AT-001: [Description]\n"
+                "   - Given: [preconditions]\n"
+                "   - When: [action]\n"
+                "   - Then: [expected result]\n"
+                "3. Ensure scenarios test the complete user flow, not just unit functionality"
             )
-            self.acceptance_tests_passed = True  # Allow to proceed with warning
+            self.acceptance_tests_passed = False  # Block workflow - acceptance tests are mandatory
             return self.acceptance_test_result
 
         # Execute acceptance tests via code-level validation
@@ -340,7 +350,7 @@ class ExecutionLoop:
                     "max_iterations": max_iterations,
                 })
 
-            # Run acceptance tests (don't let it overwrite stage_outputs)
+            # Run acceptance tests (output will be accumulated separately)
             result = await self._execute_acceptance_test_stage(stage, on_progress)
 
             # Get the validation output for this iteration
@@ -419,8 +429,16 @@ class ExecutionLoop:
         # Store iteration history for state file
         self._acceptance_test_history = iteration_history
 
+        # Ensure we have a valid result before returning
+        # This should always be set by _execute_acceptance_test_stage in the loop above
+        if self.acceptance_test_result is None:
+            raise RuntimeError(
+                "Acceptance test result was not set after execution loop. "
+                "This indicates a programming error."
+            )
+
         # Set final pass/fail status
-        if self.acceptance_test_result and not self.acceptance_test_result.all_passed:
+        if not self.acceptance_test_result.all_passed:
             self.acceptance_tests_passed = False
 
         return self.acceptance_test_result
@@ -554,9 +572,12 @@ class ExecutionLoop:
         # Check docs/feature-specs/
         feature_specs_dir = self.teambot_dir.parent.parent / "docs" / "feature-specs"
         if feature_specs_dir.exists():
+            # Normalize feature name for case-insensitive matching
+            normalized_feature = self.feature_name.replace("-", "").lower()
             for spec_file in feature_specs_dir.glob("*.md"):
-                # Simple matching - could be improved
-                if self.feature_name.replace("-", "") in spec_file.stem.replace("-", ""):
+                # Case-insensitive matching with hyphens removed
+                normalized_spec = spec_file.stem.replace("-", "").lower()
+                if normalized_feature in normalized_spec:
                     return spec_file.read_text()
 
         return None

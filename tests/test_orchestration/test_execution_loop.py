@@ -605,3 +605,114 @@ work_to_review_mapping: {}
         # Should not have the nonexistent prompt, but should have objective
         assert "nonexistent/prompt.md" not in context
         assert "# Objective:" in context
+
+
+class TestFeatureSpecFinding:
+    """Tests for finding and loading feature specifications."""
+
+    def test_find_feature_spec_from_artifacts(
+        self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
+    ) -> None:
+        """Feature spec is loaded from artifacts directory."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create artifacts directory with feature spec
+        feature_dir = teambot_dir / loop.feature_name
+        feature_dir.mkdir(exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+        (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content)
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is not None
+        assert "User Authentication" in spec_content
+
+    def test_find_feature_spec_from_docs_case_insensitive(
+        self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
+    ) -> None:
+        """Feature spec is found with case-insensitive matching."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create docs/feature-specs directory with various case variations
+        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
+        docs_dir.mkdir(parents=True)
+
+        # Feature name is "user-authentication" from objective
+        # Test with uppercase variation
+        (docs_dir / "User-Authentication-Spec.md").write_text(sample_feature_spec_content)
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is not None
+        assert "User Authentication" in spec_content
+
+    def test_find_feature_spec_from_docs_hyphen_variations(
+        self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
+    ) -> None:
+        """Feature spec matching ignores hyphens."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create docs/feature-specs directory
+        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
+        docs_dir.mkdir(parents=True)
+
+        # Feature name is "user-authentication"
+        # Test with different hyphenation
+        (docs_dir / "userauthentication-spec.md").write_text(sample_feature_spec_content)
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is not None
+        assert "User Authentication" in spec_content
+
+    def test_find_feature_spec_prefers_artifacts_over_docs(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Artifacts directory is checked before docs directory."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create both artifacts and docs specs with different content
+        feature_dir = teambot_dir / loop.feature_name
+        feature_dir.mkdir(exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+        (artifacts_dir / "feature_spec.md").write_text("Artifacts spec content")
+
+        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
+        docs_dir.mkdir(parents=True)
+        (docs_dir / "user-authentication.md").write_text("Docs spec content")
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content == "Artifacts spec content"
+
+    def test_find_feature_spec_returns_none_when_not_found(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Returns None when no feature spec is found."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is None
