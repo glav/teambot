@@ -445,8 +445,7 @@ class ExecutionLoop:
         parts = [
             "# Acceptance Test Fix Required",
             "",
-            "The acceptance tests have **FAILED**. Your task is to analyze the failures "
-            "and implement a fix to make the tests pass.",
+            "The acceptance tests have **FAILED**. Your task is to analyze the failures and implement a fix to make the tests pass.",
             "",
             "## Failed Test Results",
             "",
