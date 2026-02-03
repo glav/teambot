@@ -170,7 +170,7 @@ class ExecutionLoop:
 
                 if stage in self.stages_config.acceptance_test_stages:
                     # Execute acceptance test stage with retry loop
-                    result = await self._execute_acceptance_test_with_retry(
+                    await self._execute_acceptance_test_with_retry(
                         stage, on_progress
                     )
                     if not self.acceptance_tests_passed:
