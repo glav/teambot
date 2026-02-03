@@ -421,8 +421,16 @@ class ExecutionLoop:
         # Store iteration history for state file
         self._acceptance_test_history = iteration_history
 
+        # Ensure we have a valid result before returning
+        # This should always be set by _execute_acceptance_test_stage in the loop above
+        if self.acceptance_test_result is None:
+            raise RuntimeError(
+                "Acceptance test result was not set after execution loop. "
+                "This indicates a programming error."
+            )
+
         # Set final pass/fail status
-        if self.acceptance_test_result and not self.acceptance_test_result.all_passed:
+        if not self.acceptance_test_result.all_passed:
             self.acceptance_tests_passed = False
 
         return self.acceptance_test_result
