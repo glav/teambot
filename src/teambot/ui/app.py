@@ -93,12 +93,13 @@ class TeamBotApp(App):
             await self._handle_system_command(command, output)
         else:
             # Handle raw input - check if default agent is configured
-            if self._router and hasattr(self._router, '_default_agent') and self._router._default_agent:
+            default_agent = self._router.get_default_agent() if self._router else None
+            if default_agent:
                 # Route to default agent
                 agent_command = Command(
                     type=CommandType.AGENT,
-                    agent_id=self._router._default_agent,
-                    agent_ids=[self._router._default_agent],
+                    agent_id=default_agent,
+                    agent_ids=[default_agent],
                     content=command.content,
                 )
                 task = asyncio.create_task(self._handle_agent_command(agent_command, output))

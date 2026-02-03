@@ -82,6 +82,14 @@ class AgentRouter:
         """
         return list(VALID_AGENTS)
 
+    def get_default_agent(self) -> Optional[str]:
+        """Get the default agent ID if configured.
+        
+        Returns:
+            Default agent ID or None if not configured.
+        """
+        return self._default_agent
+
     def register_agent_handler(
         self, handler: Callable[[str, str], Awaitable[str]]
     ) -> None:
