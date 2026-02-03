@@ -1,9 +1,7 @@
 """Tests for OutputInjector."""
 
-import pytest
-
-from teambot.tasks.output_injector import OutputInjector
 from teambot.tasks.models import TaskResult
+from teambot.tasks.output_injector import OutputInjector
 
 
 class TestOutputInjectorSingleParent:
@@ -12,9 +10,7 @@ class TestOutputInjectorSingleParent:
     def test_inject_single_parent(self):
         """Test injecting output from single parent."""
         injector = OutputInjector()
-        parent_results = {
-            "t1": TaskResult(task_id="t1", output="Parent output here", success=True)
-        }
+        parent_results = {"t1": TaskResult(task_id="t1", output="Parent output here", success=True)}
 
         result = injector.inject("Do something with this", parent_results, ["t1"])
 
@@ -26,9 +22,7 @@ class TestOutputInjectorSingleParent:
     def test_inject_preserves_order(self):
         """Test that task section comes after parent output."""
         injector = OutputInjector()
-        parent_results = {
-            "t1": TaskResult(task_id="t1", output="First", success=True)
-        }
+        parent_results = {"t1": TaskResult(task_id="t1", output="First", success=True)}
 
         result = injector.inject("My task", parent_results, ["t1"])
 

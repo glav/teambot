@@ -1,10 +1,11 @@
 """Tests for TaskManager."""
 
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from teambot.tasks.manager import TaskManager
-from teambot.tasks.models import Task, TaskStatus
+from teambot.tasks.models import TaskStatus
 
 
 class TestTaskManagerBasic:
@@ -72,7 +73,7 @@ class TestTaskManagerBasic:
         """Test listing tasks filtered by status."""
         manager = TaskManager()
         t1 = manager.create_task("pm", "Plan")
-        t2 = manager.create_task("ba", "Analyze")
+        manager.create_task("ba", "Analyze")
         t1.mark_running()
 
         running = manager.list_tasks(status=TaskStatus.RUNNING)
@@ -172,10 +173,8 @@ class TestTaskManagerConcurrency:
         manager = TaskManager(executor=slow_exec, max_concurrent=2)
 
         # Create 4 tasks
-        tasks = [
+        for i in range(4):
             manager.create_task("pm", f"Task {i}", background=True)
-            for i in range(4)
-        ]
 
         # Execute all
         await manager.execute_all()
@@ -212,6 +211,7 @@ class TestTaskManagerDependencyFailure:
     @pytest.mark.asyncio
     async def test_partial_failure_continues(self):
         """Test that partial failure allows continuation."""
+
         async def partial_exec(agent_id, prompt):
             if agent_id == "builder-1":
                 raise Exception("Builder-1 failed")

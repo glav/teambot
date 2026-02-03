@@ -1,9 +1,8 @@
 """Tests for Task dataclass and TaskStatus."""
 
-import pytest
 from datetime import datetime
 
-from teambot.tasks.models import Task, TaskStatus, TaskResult
+from teambot.tasks.models import Task, TaskResult, TaskStatus
 
 
 class TestTaskStatus:

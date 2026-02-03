@@ -9,9 +9,11 @@ from teambot.repl.router import AgentRouter, RouterError
 def __getattr__(name):
     if name == "REPLLoop":
         from teambot.repl.loop import REPLLoop
+
         return REPLLoop
     elif name == "run_interactive_mode":
         from teambot.repl.loop import run_interactive_mode
+
         return run_interactive_mode
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

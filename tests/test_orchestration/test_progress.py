@@ -153,9 +153,7 @@ class TestCreateProgressCallback:
         manager = AgentStatusManager()
         on_stage_mock = Mock()
         on_time_mock = Mock()
-        callback = create_progress_callback(
-            manager, on_stage=on_stage_mock, on_time=on_time_mock
-        )
+        callback = create_progress_callback(manager, on_stage=on_stage_mock, on_time=on_time_mock)
 
         # Simulate a complete workflow
         callback("stage_changed", {"stage": "SETUP"})

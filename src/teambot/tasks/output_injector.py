@@ -1,7 +1,5 @@
 """Output injector for passing parent task outputs to dependent tasks."""
 
-from typing import Optional
-
 from teambot.tasks.models import TaskResult
 
 
@@ -17,7 +15,7 @@ class OutputInjector:
         prompt: str,
         parent_results: dict[str, TaskResult],
         dependencies: list[str],
-        agent_map: Optional[dict[str, str]] = None,
+        agent_map: dict[str, str] | None = None,
     ) -> str:
         """Inject parent outputs into a task prompt.
 
@@ -61,8 +59,7 @@ class OutputInjector:
             else:
                 # Parent succeeded
                 sections.append(
-                    f"=== Output from @{agent_name} (task {dep_id}) ===\n"
-                    f"{result.output}\n"
+                    f"=== Output from @{agent_name} (task {dep_id}) ===\n{result.output}\n"
                 )
 
         # Add the task's own prompt

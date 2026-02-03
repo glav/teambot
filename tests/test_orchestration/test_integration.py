@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import pytest
+
 from teambot.orchestration import (
+    AgentTask,
     ExecutionLoop,
     ExecutionResult,
+    ParallelExecutor,
     ReviewStatus,
     parse_objective_file,
-    ParallelExecutor,
-    AgentTask,
     partition_tasks,
 )
 from teambot.workflow.stages import WorkflowStage
@@ -144,9 +145,7 @@ class TestParallelBuilderExecution:
         mock_client = AsyncMock()
         execution_times: dict[str, float] = {}
 
-        async def track_execution(
-            agent_id: str, prompt: str, callback: object
-        ) -> str:
+        async def track_execution(agent_id: str, prompt: str, callback: object) -> str:
             start = asyncio.get_event_loop().time()
             await asyncio.sleep(0.05)  # Simulate work
             end = asyncio.get_event_loop().time()
@@ -232,9 +231,7 @@ class TestTimeoutEnforcement:
     """Tests for time limit enforcement."""
 
     @pytest.mark.asyncio
-    async def test_timeout_stops_execution(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    async def test_timeout_stops_execution(self, objective_file: Path, teambot_dir: Path) -> None:
         """Execution stops when time limit is reached."""
         mock_client = AsyncMock()
         mock_client.execute_streaming.return_value = "APPROVED: Done."
@@ -302,9 +299,7 @@ class TestEndToEndScenarios:
     """End-to-end scenario tests."""
 
     @pytest.mark.asyncio
-    async def test_complete_feature_implementation_scenario(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_complete_feature_implementation_scenario(self, tmp_path: Path) -> None:
         """Simulate a complete feature implementation scenario."""
         # Create objective
         objective_content = """# Objective: Add User Profile Feature

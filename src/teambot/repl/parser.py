@@ -13,7 +13,6 @@ Supports:
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
 
 
 class CommandType(Enum):
@@ -60,14 +59,14 @@ class Command:
     """
 
     type: CommandType
-    agent_id: Optional[str] = None
+    agent_id: str | None = None
     agent_ids: list[str] = field(default_factory=list)
-    content: Optional[str] = None
-    command: Optional[str] = None
-    args: Optional[list[str]] = None
+    content: str | None = None
+    command: str | None = None
+    args: list[str] | None = None
     background: bool = False
     is_pipeline: bool = False
-    pipeline: Optional[list[PipelineStage]] = None
+    pipeline: list[PipelineStage] | None = None
 
 
 # Pattern for agent commands: @agent-id or @agent1,agent2
@@ -210,7 +209,7 @@ def _parse_pipeline(input_text: str) -> Command:
     # Validate all stages have content except possibly last
     for i, stage in enumerate(stages[:-1]):
         if not stage.content:
-            raise ParseError(f"Pipeline stage {i+1} requires task content")
+            raise ParseError(f"Pipeline stage {i + 1} requires task content")
 
     return Command(
         type=CommandType.AGENT,

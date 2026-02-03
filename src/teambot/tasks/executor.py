@@ -1,12 +1,12 @@
 """Task executor - bridges REPL commands to TaskManager."""
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional
 
-from teambot.repl.parser import Command, CommandType, PipelineStage
+from teambot.repl.parser import Command, CommandType
 from teambot.tasks.manager import TaskManager
-from teambot.tasks.models import Task, TaskResult, TaskStatus
+from teambot.tasks.models import Task, TaskStatus
 
 
 @dataclass
@@ -24,10 +24,10 @@ class ExecutionResult:
 
     success: bool
     output: str
-    task_id: Optional[str] = None
+    task_id: str | None = None
     task_ids: list[str] = field(default_factory=list)
     background: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class TaskExecutor:
@@ -46,9 +46,9 @@ class TaskExecutor:
         sdk_client,
         max_concurrent: int = 3,
         default_timeout: float = 120.0,
-        on_task_complete: Optional[callable] = None,
-        on_task_started: Optional[callable] = None,
-        on_streaming_chunk: Optional[callable] = None,
+        on_task_complete: Callable | None = None,
+        on_task_started: Callable | None = None,
+        on_streaming_chunk: Callable | None = None,
     ):
         """Initialize executor.
 
@@ -276,7 +276,7 @@ class TaskExecutor:
             )
         else:
             # Execute pipeline synchronously
-            results = await self._manager.execute_all()
+            await self._manager.execute_all()
 
             # Get final output
             final_outputs = []
@@ -293,10 +293,14 @@ class TaskExecutor:
                     else:
                         all_success = False
                         if task.status == TaskStatus.SKIPPED:
-                            final_outputs.append(f"=== @{task.agent_id} ===\n[Skipped: {result.error}]")
+                            final_outputs.append(
+                                f"=== @{task.agent_id} ===\n[Skipped: {result.error}]"
+                            )
                         else:
                             errors.append(f"@{task.agent_id}: {result.error}")
-                            final_outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+                            final_outputs.append(
+                                f"=== @{task.agent_id} ===\n[Failed: {result.error}]"
+                            )
 
             return ExecutionResult(
                 success=all_success,
@@ -341,7 +345,7 @@ class TaskExecutor:
                     if task and result:
                         self._on_task_complete(task, result)
 
-    def get_task(self, task_id: str) -> Optional[Task]:
+    def get_task(self, task_id: str) -> Task | None:
         """Get a task by ID.
 
         Args:
@@ -352,7 +356,7 @@ class TaskExecutor:
         """
         return self._manager.get_task(task_id)
 
-    def list_tasks(self, status: Optional[TaskStatus] = None) -> list[Task]:
+    def list_tasks(self, status: TaskStatus | None = None) -> list[Task]:
         """List tasks, optionally filtered by status.
 
         Args:

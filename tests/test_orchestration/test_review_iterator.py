@@ -80,10 +80,14 @@ class TestReviewIterator:
     ) -> None:
         """Boundary case: approved on iteration 4."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: Fix A",
-            "Attempt 2", "REJECTED: Fix B",
-            "Attempt 3", "REJECTED: Fix C",
-            "Attempt 4", "APPROVED: Finally!",
+            "Attempt 1",
+            "REJECTED: Fix A",
+            "Attempt 2",
+            "REJECTED: Fix B",
+            "Attempt 3",
+            "REJECTED: Fix C",
+            "Attempt 4",
+            "APPROVED: Finally!",
         ]
 
         result = await iterator.execute(
@@ -102,10 +106,14 @@ class TestReviewIterator:
     ) -> None:
         """4 rejections → FAILED status."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: Issue 1",
-            "Attempt 2", "REJECTED: Issue 2",
-            "Attempt 3", "REJECTED: Issue 3",
-            "Attempt 4", "REJECTED: Issue 4",
+            "Attempt 1",
+            "REJECTED: Issue 1",
+            "Attempt 2",
+            "REJECTED: Issue 2",
+            "Attempt 3",
+            "REJECTED: Issue 3",
+            "Attempt 4",
+            "REJECTED: Issue 4",
         ]
 
         result = await iterator.execute(
@@ -125,10 +133,14 @@ class TestReviewIterator:
     ) -> None:
         """Failure summary contains all iteration feedback."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: First issue",
-            "Attempt 2", "REJECTED: Second issue",
-            "Attempt 3", "REJECTED: Third issue",
-            "Attempt 4", "REJECTED: Fourth issue",
+            "Attempt 1",
+            "REJECTED: First issue",
+            "Attempt 2",
+            "REJECTED: Second issue",
+            "Attempt 3",
+            "REJECTED: Third issue",
+            "Attempt 4",
+            "REJECTED: Fourth issue",
         ]
 
         result = await iterator.execute(
@@ -148,10 +160,14 @@ class TestReviewIterator:
     ) -> None:
         """Suggestions from reviewer are extracted."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt", "REJECTED:\n- Add tests\n- Fix imports",
-            "Attempt", "REJECTED:\n- Update docs",
-            "Attempt", "REJECTED:\n- Handle errors",
-            "Attempt", "REJECTED:\n- Final fix",
+            "Attempt",
+            "REJECTED:\n- Add tests\n- Fix imports",
+            "Attempt",
+            "REJECTED:\n- Update docs",
+            "Attempt",
+            "REJECTED:\n- Handle errors",
+            "Attempt",
+            "REJECTED:\n- Final fix",
         ]
 
         result = await iterator.execute(
@@ -235,7 +251,8 @@ class TestReviewIterator:
     ) -> None:
         """Progress callback is invoked with iteration info."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Work", "APPROVED: Good",
+            "Work",
+            "APPROVED: Good",
         ]
         progress_calls = []
 
@@ -270,10 +287,14 @@ class TestReviewIteratorFailureReport:
     ) -> None:
         """Failure report is saved to .teambot/failures/."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "A1", "REJECTED: R1",
-            "A2", "REJECTED: R2",
-            "A3", "REJECTED: R3",
-            "A4", "REJECTED: R4",
+            "A1",
+            "REJECTED: R1",
+            "A2",
+            "REJECTED: R2",
+            "A3",
+            "REJECTED: R3",
+            "A4",
+            "REJECTED: R4",
         ]
 
         result = await iterator.execute(
@@ -293,10 +314,14 @@ class TestReviewIteratorFailureReport:
     ) -> None:
         """Failure report contains stage information."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "A1", "REJECTED: R1",
-            "A2", "REJECTED: R2",
-            "A3", "REJECTED: R3",
-            "A4", "REJECTED: R4",
+            "A1",
+            "REJECTED: R1",
+            "A2",
+            "REJECTED: R2",
+            "A3",
+            "REJECTED: R3",
+            "A4",
+            "REJECTED: R4",
         ]
 
         result = await iterator.execute(

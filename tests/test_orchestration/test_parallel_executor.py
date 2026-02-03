@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
 from teambot.orchestration.parallel_executor import (
-    ParallelExecutor,
     AgentTask,
+    ParallelExecutor,
     TaskResult,
     partition_tasks,
 )
@@ -30,9 +31,7 @@ class TestParallelExecutor:
         return ParallelExecutor(mock_sdk_client, max_concurrent=2)
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_empty_tasks(
-        self, executor: ParallelExecutor
-    ) -> None:
+    async def test_execute_parallel_empty_tasks(self, executor: ParallelExecutor) -> None:
         """Empty task list returns empty dict."""
         result = await executor.execute_parallel([])
         assert result == {}
@@ -115,9 +114,7 @@ class TestParallelExecutor:
 
         # With max_concurrent=1, tasks should be sequential
         # Start and end of first should come before start of second
-        assert execution_order.index("end-builder-1") < execution_order.index(
-            "start-builder-2"
-        )
+        assert execution_order.index("end-builder-1") < execution_order.index("start-builder-2")
 
     @pytest.mark.asyncio
     async def test_execute_parallel_progress_callback(
@@ -144,9 +141,7 @@ class TestParallelExecutor:
         assert running_event[1]["task"] == "Test"
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_cancellation_handled(
-        self, mock_sdk_client: AsyncMock
-    ) -> None:
+    async def test_execute_parallel_cancellation_handled(self, mock_sdk_client: AsyncMock) -> None:
         """Cancellation is handled - returns empty result for cancelled tasks."""
         executor = ParallelExecutor(mock_sdk_client, max_concurrent=2)
         progress_calls: list[tuple[str, dict]] = []

@@ -5,8 +5,6 @@ Provides the main read-eval-print loop for interactive commands.
 
 import asyncio
 import signal
-import sys
-from typing import Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -14,10 +12,10 @@ from rich.prompt import Prompt
 
 from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 from teambot.repl.commands import SystemCommands
-from teambot.repl.parser import parse_command, ParseError, CommandType
+from teambot.repl.parser import CommandType, ParseError, parse_command
 from teambot.repl.router import AgentRouter, RouterError
-from teambot.tasks.executor import TaskExecutor, ExecutionResult
-from teambot.tasks.models import Task, TaskResult, TaskStatus
+from teambot.tasks.executor import TaskExecutor
+from teambot.tasks.models import Task, TaskResult
 from teambot.visualization.overlay import OverlayRenderer
 
 
@@ -34,8 +32,8 @@ class REPLLoop:
 
     def __init__(
         self,
-        console: Optional[Console] = None,
-        sdk_client: Optional[CopilotSDKClient] = None,
+        console: Console | None = None,
+        sdk_client: CopilotSDKClient | None = None,
         enable_overlay: bool = True,
     ):
         """Initialize the REPL loop.
@@ -54,7 +52,7 @@ class REPLLoop:
         self._sdk_connected = False
 
         # Task executor for parallel execution
-        self._executor: Optional[TaskExecutor] = None
+        self._executor: TaskExecutor | None = None
 
         # Status overlay
         self._overlay = OverlayRenderer(console=self._console, enabled=enable_overlay)
@@ -209,16 +207,12 @@ class REPLLoop:
                 self._console.print("[green]✓ SDK connected[/green]")
                 self._sdk_connected = True
             else:
-                self._console.print(
-                    "[red]✗ Copilot SDK not installed[/red]"
-                )
-                self._console.print(
-                    "[dim]Run: uv add github-copilot-sdk[/dim]"
-                )
+                self._console.print("[red]✗ Copilot SDK not installed[/red]")
+                self._console.print("[dim]Run: uv add github-copilot-sdk[/dim]")
         except SDKClientError as e:
             self._console.print(f"[red]✗ SDK error: {e}[/red]")
         except Exception as e:
-            self._console.print(f"[red]✗ SDK connection failed[/red]")
+            self._console.print("[red]✗ SDK connection failed[/red]")
             self._console.print(f"[dim]{e}[/dim]")
             self._console.print(
                 "[yellow]Tip: Rebuild the devcontainer to update Copilot CLI.[/yellow]"
@@ -278,9 +272,7 @@ class REPLLoop:
                     try:
                         # Check if this is an advanced agent command
                         if command.type == CommandType.AGENT and (
-                            command.is_pipeline or
-                            len(command.agent_ids) > 1 or
-                            command.background
+                            command.is_pipeline or len(command.agent_ids) > 1 or command.background
                         ):
                             # Use task executor for parallel/pipeline/background
                             result = await self._handle_advanced_command(command)
@@ -306,14 +298,12 @@ class REPLLoop:
                         self._running = False
                     else:
                         self._interrupted = True
-                        self._console.print(
-                            "\n[yellow]Press Ctrl+C again to exit.[/yellow]"
-                        )
+                        self._console.print("\n[yellow]Press Ctrl+C again to exit.[/yellow]")
 
         finally:
             await self._cleanup()
 
-    async def _get_input(self) -> Optional[str]:
+    async def _get_input(self) -> str | None:
         """Get input from user.
 
         Returns:
@@ -349,7 +339,7 @@ class REPLLoop:
         self._console.print("[dim]Session ended.[/dim]")
 
 
-async def run_interactive_mode(console: Optional[Console] = None) -> None:
+async def run_interactive_mode(console: Console | None = None) -> None:
     """Run TeamBot in interactive mode.
 
     Args:

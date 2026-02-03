@@ -205,12 +205,12 @@ class TestOverlayConfig:
         from teambot.config.loader import ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text('''
+        config_file.write_text("""
         {
             "agents": [{"id": "pm", "persona": "project_manager"}],
             "overlay": {"position": "bottom-left"}
         }
-        ''')
+        """)
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -222,12 +222,12 @@ class TestOverlayConfig:
         from teambot.config.loader import ConfigError, ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text('''
+        config_file.write_text("""
         {
             "agents": [{"id": "pm", "persona": "project_manager"}],
             "overlay": {"position": "middle"}
         }
-        ''')
+        """)
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="Invalid overlay position"):
@@ -238,12 +238,12 @@ class TestOverlayConfig:
         from teambot.config.loader import ConfigError, ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text('''
+        config_file.write_text("""
         {
             "agents": [{"id": "pm", "persona": "project_manager"}],
             "overlay": {"enabled": "yes"}
         }
-        ''')
+        """)
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="must be a boolean"):
@@ -254,12 +254,12 @@ class TestOverlayConfig:
         from teambot.config.loader import ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text('''
+        config_file.write_text("""
         {
             "agents": [{"id": "pm", "persona": "project_manager"}],
             "overlay": {"enabled": false}
         }
-        ''')
+        """)
 
         loader = ConfigLoader()
         config = loader.load(config_file)

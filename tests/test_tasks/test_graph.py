@@ -2,7 +2,7 @@
 
 import pytest
 
-from teambot.tasks.graph import TaskGraph, CycleDetectedError
+from teambot.tasks.graph import CycleDetectedError, TaskGraph
 
 
 class TestTaskGraphBasic:

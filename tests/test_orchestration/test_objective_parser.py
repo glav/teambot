@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from teambot.orchestration.objective_parser import (
     ParsedObjective,
@@ -35,18 +36,14 @@ class TestParseObjectiveFile:
         assert result.goals[1] == "Implement JWT session management"
         assert result.goals[2] == "Add password reset flow"
 
-    def test_parse_extracts_criteria_with_unchecked(
-        self, objective_file: Path
-    ) -> None:
+    def test_parse_extracts_criteria_with_unchecked(self, objective_file: Path) -> None:
         """Unchecked criteria have completed=False."""
         result = parse_objective_file(objective_file)
         unchecked = [c for c in result.success_criteria if not c.completed]
         assert len(unchecked) == 2
         assert unchecked[0].description == "Login validates credentials against database"
 
-    def test_parse_extracts_criteria_with_checked(
-        self, objective_file: Path
-    ) -> None:
+    def test_parse_extracts_criteria_with_checked(self, objective_file: Path) -> None:
         """Checked criteria have completed=True."""
         result = parse_objective_file(objective_file)
         checked = [c for c in result.success_criteria if c.completed]
@@ -67,9 +64,7 @@ class TestParseObjectiveFile:
         assert "Express.js" in result.context
         assert "middleware" in result.context
 
-    def test_parse_handles_missing_optional_sections(
-        self, minimal_objective_file: Path
-    ) -> None:
+    def test_parse_handles_missing_optional_sections(self, minimal_objective_file: Path) -> None:
         """Missing optional sections don't cause errors."""
         result = parse_objective_file(minimal_objective_file)
         assert result.context is None
