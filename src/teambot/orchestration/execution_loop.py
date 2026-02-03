@@ -244,8 +244,7 @@ class ExecutionLoop:
                 scenarios=[],
             )
             self.stage_outputs[stage] = (
-                "ERROR: Could not find feature specification to extract "
-                "acceptance test scenarios."
+                "ERROR: Could not find feature specification to extract acceptance test scenarios."
             )
             return self.acceptance_test_result
 
@@ -268,8 +267,7 @@ class ExecutionLoop:
                 scenarios=[],
             )
             self.stage_outputs[stage] = (
-                "WARNING: No acceptance test scenarios found in the feature spec. "
-                "Acceptance test validation skipped."
+                "WARNING: No acceptance test scenarios found in the feature spec. Acceptance test validation skipped."
             )
             self.acceptance_tests_passed = True  # Allow to proceed with warning
             return self.acceptance_test_result
