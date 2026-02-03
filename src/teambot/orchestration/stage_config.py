@@ -204,7 +204,7 @@ def _get_default_configuration() -> StagesConfiguration:
         WorkflowStage.IMPLEMENTATION: ("builder-1", "reviewer"),
         WorkflowStage.IMPLEMENTATION_REVIEW: ("builder-1", "reviewer"),
         WorkflowStage.TEST: ("builder-1", None),
-        WorkflowStage.ACCEPTANCE_TEST: ("reviewer", None),
+        WorkflowStage.ACCEPTANCE_TEST: ("builder-1", None),
         WorkflowStage.POST_REVIEW: ("pm", "reviewer"),
         WorkflowStage.COMPLETE: (None, None),
     }
