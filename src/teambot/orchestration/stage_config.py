@@ -27,6 +27,8 @@ class StageConfig:
     exit_criteria: list[str] = field(default_factory=list)
     optional: bool = False
     is_review_stage: bool = False
+    is_acceptance_test_stage: bool = False  # Special handling for acceptance tests
+    requires_acceptance_tests_passed: bool = False  # Blocks if acceptance tests failed
     parallel_agents: list[str] | None = None
     prompt_template: str | None = None
     include_objective: bool = True  # Whether to include objective content in context
@@ -40,6 +42,7 @@ class StagesConfiguration:
     stage_order: list[WorkflowStage]
     work_to_review_mapping: dict[WorkflowStage, WorkflowStage]
     review_stages: set[WorkflowStage] = field(default_factory=set)
+    acceptance_test_stages: set[WorkflowStage] = field(default_factory=set)
     source: str = "built-in-defaults"  # Path to config file or "built-in-defaults"
 
     def get_stage_agents(self, stage: WorkflowStage) -> dict[str, str | None]:
@@ -114,6 +117,7 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
     # Parse individual stages
     stages: dict[WorkflowStage, StageConfig] = {}
     review_stages: set[WorkflowStage] = set()
+    acceptance_test_stages: set[WorkflowStage] = set()
 
     for stage_name, stage_data in stages_data.items():
         try:
@@ -131,6 +135,10 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             exit_criteria=stage_data.get("exit_criteria", []),
             optional=stage_data.get("optional", False),
             is_review_stage=stage_data.get("is_review_stage", False),
+            is_acceptance_test_stage=stage_data.get("is_acceptance_test_stage", False),
+            requires_acceptance_tests_passed=stage_data.get(
+                "requires_acceptance_tests_passed", False
+            ),
             parallel_agents=stage_data.get("parallel_agents"),
             prompt_template=stage_data.get("prompt_template"),
             include_objective=stage_data.get("include_objective", True),
@@ -139,6 +147,9 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
 
         if config.is_review_stage:
             review_stages.add(workflow_stage)
+
+        if config.is_acceptance_test_stage:
+            acceptance_test_stages.add(workflow_stage)
 
     # Parse stage order
     stage_order_names = data.get("stage_order", [])
@@ -165,6 +176,7 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
         stage_order=stage_order,
         work_to_review_mapping=work_to_review,
         review_stages=review_stages,
+        acceptance_test_stages=acceptance_test_stages,
     )
 
 
@@ -192,6 +204,7 @@ def _get_default_configuration() -> StagesConfiguration:
         WorkflowStage.IMPLEMENTATION: ("builder-1", "reviewer"),
         WorkflowStage.IMPLEMENTATION_REVIEW: ("builder-1", "reviewer"),
         WorkflowStage.TEST: ("builder-1", None),
+        WorkflowStage.ACCEPTANCE_TEST: ("reviewer", None),
         WorkflowStage.POST_REVIEW: ("pm", "reviewer"),
         WorkflowStage.COMPLETE: (None, None),
     }
@@ -203,9 +216,14 @@ def _get_default_configuration() -> StagesConfiguration:
         WorkflowStage.POST_REVIEW,
     }
 
+    acceptance_test_stage_set = {
+        WorkflowStage.ACCEPTANCE_TEST,
+    }
+
     for stage, metadata in STAGE_METADATA.items():
         work_agent, review_agent = default_agents.get(stage, (None, None))
         is_review = stage in review_stage_set
+        is_acceptance_test = stage in acceptance_test_stage_set
 
         config = StageConfig(
             name=metadata.name,
@@ -217,6 +235,8 @@ def _get_default_configuration() -> StagesConfiguration:
             exit_criteria=[],  # Not defined in old metadata
             optional=metadata.optional,
             is_review_stage=is_review,
+            is_acceptance_test_stage=is_acceptance_test,
+            requires_acceptance_tests_passed=(stage == WorkflowStage.POST_REVIEW),
             parallel_agents=["builder-1", "builder-2"] if stage == WorkflowStage.IMPLEMENTATION else None,
             prompt_template=None,
         )
@@ -237,6 +257,7 @@ def _get_default_configuration() -> StagesConfiguration:
         WorkflowStage.IMPLEMENTATION,
         WorkflowStage.IMPLEMENTATION_REVIEW,
         WorkflowStage.TEST,
+        WorkflowStage.ACCEPTANCE_TEST,
         WorkflowStage.POST_REVIEW,
         WorkflowStage.COMPLETE,
     ]
@@ -248,9 +269,12 @@ def _get_default_configuration() -> StagesConfiguration:
         WorkflowStage.TEST: WorkflowStage.POST_REVIEW,
     }
 
+    acceptance_test_stages_default: set[WorkflowStage] = {WorkflowStage.ACCEPTANCE_TEST}
+
     return StagesConfiguration(
         stages=stages,
         stage_order=stage_order,
         work_to_review_mapping=work_to_review,
         review_stages=review_stages,
+        acceptance_test_stages=acceptance_test_stages_default,
     )

@@ -73,9 +73,10 @@ work_to_review_mapping: {}
             monkeypatch.chdir(tmpdir)
             config = load_stages_config(None)
 
-        # Should get default configuration
+        # Should get default configuration with 14 stages
         assert WorkflowStage.SETUP in config.stages
-        assert len(config.stage_order) == 13
+        assert WorkflowStage.ACCEPTANCE_TEST in config.stages
+        assert len(config.stage_order) == 14
 
     def test_load_from_cwd_stages_yaml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Load from stages.yaml in current directory."""
@@ -264,11 +265,12 @@ class TestDefaultConfiguration:
     """Tests for default configuration."""
 
     def test_default_has_all_stages(self) -> None:
-        """Default configuration has all 13 stages."""
+        """Default configuration has all 14 stages."""
         config = _get_default_configuration()
 
-        assert len(config.stages) == 13
+        assert len(config.stages) == 14
         assert WorkflowStage.SETUP in config.stages
+        assert WorkflowStage.ACCEPTANCE_TEST in config.stages
         assert WorkflowStage.COMPLETE in config.stages
 
     def test_default_has_correct_order(self) -> None:
@@ -277,7 +279,7 @@ class TestDefaultConfiguration:
 
         assert config.stage_order[0] == WorkflowStage.SETUP
         assert config.stage_order[-1] == WorkflowStage.COMPLETE
-        assert len(config.stage_order) == 13
+        assert len(config.stage_order) == 14
 
     def test_default_has_review_stages(self) -> None:
         """Default configuration identifies review stages."""

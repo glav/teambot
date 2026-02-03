@@ -66,12 +66,12 @@ class TestExecutionLoopRun:
         return client
 
     @pytest.fixture
-    def loop(self, objective_file: Path, teambot_dir: Path) -> ExecutionLoop:
-        """Create ExecutionLoop instance."""
+    def loop(self, objective_file: Path, teambot_dir_with_spec: Path) -> ExecutionLoop:
+        """Create ExecutionLoop instance with feature spec."""
         return ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
             max_hours=8.0,
         )
 
@@ -308,13 +308,13 @@ class TestExecutionLoopStatePersistence:
 
     @pytest.mark.asyncio
     async def test_save_state_status_complete(
-        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+        self, objective_file: Path, teambot_dir_with_spec: Path, mock_sdk_client: AsyncMock
     ) -> None:
         """Saved state has status 'complete' when execution completes."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
         )
 
         result = await loop.run(mock_sdk_client)
@@ -353,16 +353,18 @@ class TestExecutionLoopStageProgression:
     def test_get_next_stage_follows_order(
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
-        """_get_next_stage follows STAGE_ORDER."""
+        """_get_next_stage follows the configured stage order."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir,
         )
 
-        for i, stage in enumerate(STAGE_ORDER[:-1]):
+        # Use the loop's actual stage order from config
+        stage_order = loop.stages_config.stage_order
+        for i, stage in enumerate(stage_order[:-1]):
             next_stage = loop._get_next_stage(stage)
-            assert next_stage == STAGE_ORDER[i + 1]
+            assert next_stage == stage_order[i + 1]
 
     def test_get_next_stage_returns_complete_at_end(
         self, objective_file: Path, teambot_dir: Path
@@ -436,13 +438,13 @@ class TestExecutionLoopReviewOutputs:
 
     @pytest.mark.asyncio
     async def test_review_stage_outputs_stored_in_state(
-        self, objective_file: Path, teambot_dir: Path
+        self, objective_file: Path, teambot_dir_with_spec: Path
     ) -> None:
         """Review stage outputs are stored in orchestration_state.json."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
         )
 
         # Mock client that returns approval with output
@@ -462,13 +464,13 @@ class TestExecutionLoopReviewOutputs:
 
     @pytest.mark.asyncio
     async def test_all_review_stages_stored(
-        self, objective_file: Path, teambot_dir: Path
+        self, objective_file: Path, teambot_dir_with_spec: Path
     ) -> None:
         """All review stages have their outputs stored."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
         )
 
         mock_client = AsyncMock()

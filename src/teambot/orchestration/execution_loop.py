@@ -7,6 +7,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from teambot.orchestration.acceptance_test_executor import (
+    AcceptanceTestExecutor,
+    AcceptanceTestResult,
+    generate_acceptance_test_report,
+)
 from teambot.orchestration.objective_parser import parse_objective_file
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewStatus
 from teambot.orchestration.stage_config import (
@@ -24,6 +29,7 @@ class ExecutionResult(Enum):
     CANCELLED = "cancelled"
     TIMEOUT = "timeout"
     REVIEW_FAILED = "review_failed"
+    ACCEPTANCE_TEST_FAILED = "acceptance_test_failed"
     ERROR = "error"
 
 
@@ -114,6 +120,10 @@ class ExecutionLoop:
         self.current_stage = WorkflowStage.SETUP
         self.stage_outputs: dict[WorkflowStage, str] = {}
 
+        # Acceptance test tracking
+        self.acceptance_tests_passed: bool = False
+        self.acceptance_test_result: AcceptanceTestResult | None = None
+
         # Will be set during run()
         self.sdk_client: Any = None
         self.review_iterator: ReviewIterator | None = None
@@ -153,8 +163,30 @@ class ExecutionLoop:
                 if on_progress:
                     on_progress("stage_changed", {"stage": stage.name})
 
-                # Execute stage - check if it's a review stage via config
-                if stage in self.stages_config.review_stages:
+                # Execute stage based on type
+                stage_config = self.stages_config.stages.get(stage)
+
+                if stage in self.stages_config.acceptance_test_stages:
+                    # Execute acceptance test stage
+                    result = await self._execute_acceptance_test_stage(stage, on_progress)
+                    if not result.all_passed:
+                        self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
+                        return ExecutionResult.ACCEPTANCE_TEST_FAILED
+                elif stage in self.stages_config.review_stages:
+                    # Check if this review requires acceptance tests to have passed
+                    if (
+                        stage_config
+                        and stage_config.requires_acceptance_tests_passed
+                        and not self.acceptance_tests_passed
+                    ):
+                        # Cannot proceed - acceptance tests haven't passed
+                        self.stage_outputs[stage] = (
+                            "BLOCKED: Cannot proceed with post-review - "
+                            "acceptance tests have not been executed or did not pass."
+                        )
+                        self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
+                        return ExecutionResult.ACCEPTANCE_TEST_FAILED
+
                     result = await self._execute_review_stage(stage, on_progress)
                     if result == ReviewStatus.FAILED:
                         self._save_state(ExecutionResult.REVIEW_FAILED)
@@ -178,6 +210,111 @@ class ExecutionLoop:
     def cancel(self) -> None:
         """Request cancellation of execution."""
         self.cancelled = True
+
+    async def _execute_acceptance_test_stage(
+        self,
+        stage: WorkflowStage,
+        on_progress: Callable[[str, Any], None] | None,
+    ) -> AcceptanceTestResult:
+        """Execute acceptance test stage.
+
+        This stage:
+        1. Finds the feature spec (from artifacts or docs/feature-specs/)
+        2. Parses acceptance test scenarios from the spec
+        3. Executes each scenario against the SDK client
+        4. Reports results and blocks if any fail
+        """
+        if on_progress:
+            on_progress("acceptance_test_stage_start", {"stage": stage.name})
+
+        # Find the feature spec
+        spec_content = self._find_feature_spec_content()
+
+        if not spec_content:
+            # No spec found - create a failing result
+            self.acceptance_test_result = AcceptanceTestResult(
+                total=0,
+                passed=0,
+                failed=1,
+                skipped=0,
+                scenarios=[],
+            )
+            self.stage_outputs[stage] = (
+                "ERROR: Could not find feature specification to extract "
+                "acceptance test scenarios."
+            )
+            return self.acceptance_test_result
+
+        # Create executor and run tests
+        executor = AcceptanceTestExecutor(
+            spec_content=spec_content,
+            timeout=60.0,
+            on_progress=on_progress,
+        )
+
+        executor.load_scenarios()
+
+        if not executor.scenarios:
+            # No acceptance tests defined - this is a warning but not a failure
+            self.acceptance_test_result = AcceptanceTestResult(
+                total=0,
+                passed=0,
+                failed=0,
+                skipped=0,
+                scenarios=[],
+            )
+            self.stage_outputs[stage] = (
+                "WARNING: No acceptance test scenarios found in the feature spec. "
+                "Acceptance test validation skipped."
+            )
+            self.acceptance_tests_passed = True  # Allow to proceed with warning
+            return self.acceptance_test_result
+
+        # Execute acceptance tests
+        self.acceptance_test_result = await executor.execute_all(self.sdk_client)
+
+        # Generate report
+        report = generate_acceptance_test_report(self.acceptance_test_result)
+        self.stage_outputs[stage] = report
+
+        # Save report to artifacts
+        report_path = self.teambot_dir / "artifacts" / "acceptance_test_results.md"
+        report_path.write_text(report)
+
+        # Update tracking
+        self.acceptance_tests_passed = self.acceptance_test_result.all_passed
+
+        if on_progress:
+            on_progress("acceptance_test_stage_complete", {
+                "stage": stage.name,
+                "passed": self.acceptance_test_result.passed,
+                "failed": self.acceptance_test_result.failed,
+                "all_passed": self.acceptance_tests_passed,
+            })
+
+        return self.acceptance_test_result
+
+    def _find_feature_spec_content(self) -> str | None:
+        """Find and load the feature specification content.
+
+        Searches in order:
+        1. .teambot/{feature}/artifacts/feature_spec.md
+        2. docs/feature-specs/*.md (matching feature name)
+        """
+        # Check artifacts directory first
+        artifacts_spec = self.teambot_dir / "artifacts" / "feature_spec.md"
+        if artifacts_spec.exists():
+            return artifacts_spec.read_text()
+
+        # Check docs/feature-specs/
+        feature_specs_dir = self.teambot_dir.parent.parent / "docs" / "feature-specs"
+        if feature_specs_dir.exists():
+            for spec_file in feature_specs_dir.glob("*.md"):
+                # Simple matching - could be improved
+                if self.feature_name.replace("-", "") in spec_file.stem.replace("-", ""):
+                    return spec_file.read_text()
+
+        return None
 
     async def _execute_work_stage(
         self,
@@ -441,6 +578,12 @@ class ExecutionLoop:
             "status": status,
             "stages_config_source": self.stages_config.source,
             "feature_name": self.feature_name,
+            "acceptance_tests_passed": self.acceptance_tests_passed,
+            "acceptance_test_summary": (
+                self.acceptance_test_result.summary
+                if self.acceptance_test_result
+                else None
+            ),
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
         }
 

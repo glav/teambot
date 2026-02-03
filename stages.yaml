@@ -204,9 +204,35 @@ stages:
     prompt_template: null  # Uses general test execution
     include_objective: true
 
+  ACCEPTANCE_TEST:
+    name: Acceptance Test
+    description: >
+      Execute acceptance test scenarios from the feature specification.
+      These tests validate the implementation works end-to-end from a user's perspective.
+      Unlike unit tests, acceptance tests exercise the complete user flow.
+      The orchestration will NOT proceed to completion if any acceptance tests fail.
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+    artifacts:
+      - acceptance_test_results.md
+    exit_criteria:
+      - All acceptance test scenarios executed
+      - All acceptance tests passing
+      - No failures blocking completion
+    optional: false
+    is_acceptance_test_stage: true  # Special flag for acceptance test handling
+    prompt_template: null
+    include_objective: true
+
   POST_REVIEW:
     name: Post Implementation Review
-    description: Final review, retrospective, and validation of all success criteria
+    description: >
+      Final review, retrospective, and validation of all success criteria.
+      MUST verify that acceptance tests have passed before approving.
+      Cannot mark workflow as complete if acceptance tests failed.
     work_agent: pm
     review_agent: reviewer
     allowed_personas:
@@ -217,9 +243,11 @@ stages:
       - post_review.md
     exit_criteria:
       - All success criteria validated
+      - Acceptance tests verified as passing
       - Final approval granted
     optional: false
     is_review_stage: true
+    requires_acceptance_tests_passed: true  # Blocks completion if acceptance tests failed
     prompt_template: .agent/commands/sdd/sdd.8-post-implementation-review.prompt.md
     include_objective: true
 
@@ -250,6 +278,7 @@ stage_order:
   - IMPLEMENTATION
   - IMPLEMENTATION_REVIEW
   - TEST
+  - ACCEPTANCE_TEST
   - POST_REVIEW
   - COMPLETE
 
@@ -258,4 +287,4 @@ work_to_review_mapping:
   SPEC: SPEC_REVIEW
   PLAN: PLAN_REVIEW
   IMPLEMENTATION: IMPLEMENTATION_REVIEW
-  TEST: POST_REVIEW
+  ACCEPTANCE_TEST: POST_REVIEW
