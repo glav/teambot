@@ -619,16 +619,16 @@ class TestFeatureSpecFinding:
             config={},
             teambot_dir=teambot_dir,
         )
-        
+
         # Create artifacts directory with feature spec
         feature_dir = teambot_dir / loop.feature_name
         feature_dir.mkdir(exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
         (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content)
-        
+
         spec_content = loop._find_feature_spec_content()
-        
+
         assert spec_content is not None
         assert "User Authentication" in spec_content
 
@@ -641,17 +641,17 @@ class TestFeatureSpecFinding:
             config={},
             teambot_dir=teambot_dir,
         )
-        
+
         # Create docs/feature-specs directory with various case variations
         docs_dir = teambot_dir.parent / "docs" / "feature-specs"
         docs_dir.mkdir(parents=True)
-        
+
         # Feature name is "user-authentication" from objective
         # Test with uppercase variation
         (docs_dir / "User-Authentication-Spec.md").write_text(sample_feature_spec_content)
-        
+
         spec_content = loop._find_feature_spec_content()
-        
+
         assert spec_content is not None
         assert "User Authentication" in spec_content
 
@@ -664,17 +664,17 @@ class TestFeatureSpecFinding:
             config={},
             teambot_dir=teambot_dir,
         )
-        
+
         # Create docs/feature-specs directory
         docs_dir = teambot_dir.parent / "docs" / "feature-specs"
         docs_dir.mkdir(parents=True)
-        
+
         # Feature name is "user-authentication"
         # Test with different hyphenation
         (docs_dir / "userauthentication-spec.md").write_text(sample_feature_spec_content)
-        
+
         spec_content = loop._find_feature_spec_content()
-        
+
         assert spec_content is not None
         assert "User Authentication" in spec_content
 
@@ -687,20 +687,20 @@ class TestFeatureSpecFinding:
             config={},
             teambot_dir=teambot_dir,
         )
-        
+
         # Create both artifacts and docs specs with different content
         feature_dir = teambot_dir / loop.feature_name
         feature_dir.mkdir(exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
         (artifacts_dir / "feature_spec.md").write_text("Artifacts spec content")
-        
+
         docs_dir = teambot_dir.parent / "docs" / "feature-specs"
         docs_dir.mkdir(parents=True)
         (docs_dir / "user-authentication.md").write_text("Docs spec content")
-        
+
         spec_content = loop._find_feature_spec_content()
-        
+
         assert spec_content == "Artifacts spec content"
 
     def test_find_feature_spec_returns_none_when_not_found(
@@ -712,7 +712,7 @@ class TestFeatureSpecFinding:
             config={},
             teambot_dir=teambot_dir,
         )
-        
+
         spec_content = loop._find_feature_spec_content()
-        
+
         assert spec_content is None
