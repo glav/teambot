@@ -1,6 +1,6 @@
 # TeamBot Stage Configuration
 #
-# This file defines the 13-stage prescriptive workflow for TeamBot orchestration.
+# This file defines the 14-stage prescriptive workflow for TeamBot orchestration.
 # Each stage specifies which agents run, what artifacts are produced, and exit criteria.
 #
 # To customize the workflow, copy this file and point to it in teambot.json:
