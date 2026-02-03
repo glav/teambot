@@ -37,6 +37,7 @@ class REPLLoop:
         console: Optional[Console] = None,
         sdk_client: Optional[CopilotSDKClient] = None,
         enable_overlay: bool = True,
+        config: Optional[dict] = None,
     ):
         """Initialize the REPL loop.
 
@@ -44,10 +45,17 @@ class REPLLoop:
             console: Rich console for output.
             sdk_client: Copilot SDK client (created if not provided).
             enable_overlay: Whether to enable status overlay.
+            config: Optional configuration dict with default_agent setting.
         """
         self._console = console or Console()
         self._sdk_client = sdk_client or CopilotSDKClient()
-        self._router = AgentRouter()
+        
+        # Extract default agent from config if provided
+        default_agent = None
+        if config and "default_agent" in config:
+            default_agent = config["default_agent"]
+        
+        self._router = AgentRouter(default_agent=default_agent)
         self._commands = SystemCommands()
         self._running = False
         self._interrupted = False
@@ -349,11 +357,12 @@ class REPLLoop:
         self._console.print("[dim]Session ended.[/dim]")
 
 
-async def run_interactive_mode(console: Optional[Console] = None) -> None:
+async def run_interactive_mode(console: Optional[Console] = None, config: Optional[dict] = None) -> None:
     """Run TeamBot in interactive mode.
 
     Args:
         console: Optional Rich console for output.
+        config: Optional configuration dict with default_agent setting.
 
     Uses split-pane Textual interface when supported, falls back to legacy mode
     for narrow terminals or when TEAMBOT_LEGACY_MODE=true.
@@ -380,7 +389,13 @@ async def run_interactive_mode(console: Optional[Console] = None) -> None:
             pass  # Will show error when command is executed
 
         executor = TaskExecutor(sdk_client=sdk_client)
-        router = AgentRouter()
+        
+        # Extract default agent from config if provided
+        default_agent = None
+        if config and "default_agent" in config:
+            default_agent = config["default_agent"]
+        
+        router = AgentRouter(default_agent=default_agent)
 
         app = TeamBotApp(executor=executor, router=router, sdk_client=sdk_client)
         try:
@@ -393,5 +408,5 @@ async def run_interactive_mode(console: Optional[Console] = None) -> None:
                 pass
     else:
         # Legacy mode with overlay
-        repl = REPLLoop(console=console)
+        repl = REPLLoop(console=console, config=config)
         await repl.run()

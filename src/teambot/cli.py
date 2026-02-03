@@ -149,7 +149,7 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     from teambot.repl import run_interactive_mode
 
     try:
-        asyncio.run(run_interactive_mode(console=display.console))
+        asyncio.run(run_interactive_mode(console=display.console, config=config))
     except KeyboardInterrupt:
         display.print_warning("Interrupted")
 

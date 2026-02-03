@@ -265,3 +265,82 @@ class TestOverlayConfig:
         config = loader.load(config_file)
 
         assert config["overlay"]["enabled"] is False
+
+
+class TestDefaultAgentConfig:
+    """Tests for default_agent configuration."""
+
+    def test_default_agent_valid(self, tmp_path):
+        """Test valid default_agent configuration."""
+        from teambot.config.loader import ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [
+                {"id": "pm", "persona": "project_manager"},
+                {"id": "ba", "persona": "business_analyst"}
+            ],
+            "default_agent": "pm"
+        }
+        ''')
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["default_agent"] == "pm"
+
+    def test_default_agent_not_in_agents_raises(self, tmp_path):
+        """Test default_agent not in agents list raises error."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [
+                {"id": "pm", "persona": "project_manager"}
+            ],
+            "default_agent": "unknown"
+        }
+        ''')
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="Invalid default_agent"):
+            loader.load(config_file)
+
+    def test_default_agent_not_string_raises(self, tmp_path):
+        """Test default_agent must be a string."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [
+                {"id": "pm", "persona": "project_manager"}
+            ],
+            "default_agent": 123
+        }
+        ''')
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="must be a string"):
+            loader.load(config_file)
+
+    def test_default_agent_optional(self, tmp_path):
+        """Test default_agent is optional."""
+        from teambot.config.loader import ConfigLoader
+
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text('''
+        {
+            "agents": [
+                {"id": "pm", "persona": "project_manager"}
+            ]
+        }
+        ''')
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        # Should not have default_agent key if not specified
+        assert "default_agent" not in config
