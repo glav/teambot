@@ -381,6 +381,7 @@ Each review stage iterates up to 4 times:
 ```json
 {
   "teambot_dir": ".teambot",
+  "default_agent": "pm",
   "agents": [
     {
       "id": "pm",
@@ -400,6 +401,33 @@ Each review stage iterates up to 4 times:
   ]
 }
 ```
+
+### Configuration Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `teambot_dir` | string | No | Directory for TeamBot workspace (default: `.teambot`) |
+| `default_agent` | string | No | Default agent for plain text input in interactive mode |
+| `agents` | array | Yes | List of agent configurations |
+
+### Default Agent
+
+When `default_agent` is configured, plain text input without `@agent` or `/command` prefixes is automatically routed to the specified agent. This provides a more natural interaction model for frequent use of a primary agent.
+
+**Example:**
+```json
+{
+  "default_agent": "pm",
+  "agents": [...]
+}
+```
+
+With this configuration:
+- `Create a project plan` → routes to `@pm`
+- `@ba Analyze requirements` → routes to `@ba` (explicit override)
+- `/help` → system command (not affected)
+
+If `default_agent` is not set (default behavior), plain text shows a helpful tip message.
 
 ### Agent Configuration
 

@@ -397,7 +397,7 @@ async def run_interactive_mode(console: Optional[Console] = None, config: Option
         
         router = AgentRouter(default_agent=default_agent)
 
-        app = TeamBotApp(executor=executor, router=router, sdk_client=sdk_client)
+        app = TeamBotApp(executor=executor, router=router, sdk_client=sdk_client, config=config)
         try:
             await app.run_async()
         finally:
