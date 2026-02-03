@@ -259,7 +259,7 @@ class ExecutionLoop:
         executor.load_scenarios()
 
         if not executor.scenarios:
-            # No acceptance tests defined - this is a warning but not a failure
+            # No acceptance tests defined - this is an ERROR (acceptance tests are MANDATORY)
             self.acceptance_test_result = AcceptanceTestResult(
                 total=0,
                 passed=0,
@@ -268,10 +268,18 @@ class ExecutionLoop:
                 scenarios=[],
             )
             self.stage_outputs[stage] = (
-                "WARNING: No acceptance test scenarios found in the feature spec. "
-                "Acceptance test validation skipped."
+                "ERROR: No acceptance test scenarios found in the feature spec. "
+                "Acceptance tests are MANDATORY per the specification requirements.\n\n"
+                "Action Required:\n"
+                "1. Add an 'Acceptance Test Scenarios' section (heading: ## Acceptance Test Scenarios) to the feature spec\n"
+                "2. Include at least one test scenario with the format:\n"
+                "   ### Scenario AT-001: [Description]\n"
+                "   - Given: [preconditions]\n"
+                "   - When: [action]\n"
+                "   - Then: [expected result]\n"
+                "3. Ensure scenarios test the complete user flow, not just unit functionality"
             )
-            self.acceptance_tests_passed = True  # Allow to proceed with warning
+            self.acceptance_tests_passed = False  # Block workflow - acceptance tests are mandatory
             return self.acceptance_test_result
 
         # Execute acceptance tests via code-level validation
