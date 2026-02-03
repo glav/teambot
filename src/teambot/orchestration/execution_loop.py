@@ -220,13 +220,13 @@ class ExecutionLoop:
         stage: WorkflowStage,
         on_progress: Callable[[str, Any], None] | None,
     ) -> AcceptanceTestResult:
-        """Execute acceptance test stage.
+        """Execute acceptance test stage via code-level validation.
 
         This stage:
         1. Finds the feature spec (from artifacts or docs/feature-specs/)
         2. Parses acceptance test scenarios from the spec
-        3. Executes each scenario against the SDK client
-        4. Reports results and blocks if any fail
+        3. Asks the builder to write and run pytest tests for each scenario
+        4. Parses results and reports pass/fail status
         """
         if on_progress:
             on_progress("acceptance_test_stage_start", {"stage": stage.name})
@@ -252,7 +252,7 @@ class ExecutionLoop:
         # Create executor and run tests
         executor = AcceptanceTestExecutor(
             spec_content=spec_content,
-            timeout=60.0,
+            timeout=300.0,  # Longer timeout for pytest runs
             on_progress=on_progress,
         )
 
@@ -274,11 +274,17 @@ class ExecutionLoop:
             self.acceptance_tests_passed = True  # Allow to proceed with warning
             return self.acceptance_test_result
 
-        # Execute acceptance tests
+        # Execute acceptance tests via code-level validation
         self.acceptance_test_result = await executor.execute_all(self.sdk_client)
 
-        # Generate report
-        report = generate_acceptance_test_report(self.acceptance_test_result)
+        # Store the validation output for debugging and fix context
+        self._acceptance_validation_output = executor.validation_output
+
+        # Generate report (include validation output for debugging)
+        report = generate_acceptance_test_report(
+            self.acceptance_test_result,
+            validation_output=executor.validation_output,
+        )
         self.stage_outputs[stage] = report
 
         # Save report to artifacts
@@ -339,6 +345,9 @@ class ExecutionLoop:
             # Run acceptance tests (don't let it overwrite stage_outputs)
             result = await self._execute_acceptance_test_stage(stage, on_progress)
 
+            # Get the validation output for this iteration
+            validation_output = getattr(self, "_acceptance_validation_output", "")
+
             # Record this iteration's test results
             iteration_record: dict[str, Any] = {
                 "iteration": self.acceptance_test_iterations,
@@ -353,7 +362,7 @@ class ExecutionLoop:
                 f"## Iteration {self.acceptance_test_iterations} - Test Results\n\n"
                 f"**Status**: {'✅ PASSED' if result.all_passed else '❌ FAILED'} "
                 f"({result.passed}/{result.total} passed)\n\n"
-                f"{generate_acceptance_test_report(result)}\n\n"
+                f"{generate_acceptance_test_report(result, validation_output)}\n\n"
                 f"---\n\n"
             )
 
@@ -389,7 +398,8 @@ class ExecutionLoop:
 
             # Record the fix
             iteration_record["fix_applied"] = True
-            iteration_record["fix_summary"] = fix_output[:500] + "..." if len(fix_output) > 500 else fix_output
+            fix_summary = fix_output[:500] + "..." if len(fix_output) > 500 else fix_output
+            iteration_record["fix_summary"] = fix_summary
             iteration_history.append(iteration_record)
 
             # Add fix output to accumulated output
@@ -429,6 +439,9 @@ class ExecutionLoop:
         Returns:
             Context string for the fix agent
         """
+        # Get validation output if available
+        validation_output = getattr(self, "_acceptance_validation_output", "")
+
         parts = [
             "# Acceptance Test Fix Required",
             "",
@@ -437,16 +450,41 @@ class ExecutionLoop:
             "",
             "## Failed Test Results",
             "",
-            generate_acceptance_test_report(test_result),
-            "",
+        ]
+
+        # Show failed scenarios
+        for scenario in test_result.scenarios:
+            if scenario.status.value in ("failed", "error"):
+                parts.extend([
+                    f"### {scenario.id}: {scenario.name}",
+                    f"**Failure Reason**: {scenario.failure_reason}",
+                    f"**Expected**: {scenario.expected_result}",
+                    "",
+                ])
+
+        # Include validation output for debugging
+        if validation_output:
+            parts.extend([
+                "## Previous Validation Output",
+                "",
+                "This is the output from the last validation run.",
+                "Use this to understand what failed:",
+                "",
+                "```",
+                validation_output[:4000] if len(validation_output) > 4000 else validation_output,
+                "```",
+                "",
+            ])
+
+        parts.extend([
             "## Feature Specification",
             "",
-        ]
+        ])
 
         # Include feature spec
         spec_content = self._find_feature_spec_content()
         if spec_content:
-            parts.append(spec_content)
+            parts.append(spec_content[:3000])  # Truncate long specs
         else:
             parts.append("(Feature spec not found)")
 
@@ -454,33 +492,26 @@ class ExecutionLoop:
             "",
             "## Your Task",
             "",
-            "1. Analyze the failed acceptance tests above",
-            "2. Identify the root cause of each failure",
-            "3. Review the current implementation code",
-            "4. Make the necessary code changes to fix the failures",
-            "5. Ensure the changes don't break existing functionality",
+            "1. **Analyze** the failed acceptance tests and validation output above",
+            "2. **Identify** the root cause of each failure from the pytest output",
+            "3. **Review** the current implementation code",
+            "4. **Fix** the code to make the tests pass",
+            "5. **Run** `uv run pytest` to verify your fix works",
+            "6. **Report** results in this format:",
             "",
-            "Focus on making the acceptance tests pass. The tests validate "
-            "real user-facing functionality, so the fixes must address the "
-            "actual behavior, not just test expectations.",
-            "",
-            "## Previous Stage Outputs",
-            "",
+            "```acceptance-results",
         ])
 
-        # Include relevant prior stage outputs
-        for output_stage in [
-            WorkflowStage.IMPLEMENTATION,
-            WorkflowStage.TEST,
-            WorkflowStage.PLAN,
-        ]:
-            if output_stage in self.stage_outputs:
-                parts.extend([
-                    f"### {output_stage.name}",
-                    "",
-                    self.stage_outputs[output_stage][:2000],  # Truncate for context
-                    "",
-                ])
+        for scenario in test_result.scenarios:
+            parts.append(f"{scenario.id}: PASSED  # or FAILED - Reason: ...")
+
+        parts.extend([
+            "```",
+            "",
+            "IMPORTANT: You must actually make code changes and run the tests.",
+            "Do not just describe what needs to be done - implement the fix.",
+            "",
+        ])
 
         return "\n".join(parts)
 
