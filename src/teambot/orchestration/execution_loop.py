@@ -244,8 +244,7 @@ class ExecutionLoop:
                 scenarios=[],
             )
             self.stage_outputs[stage] = (
-                "ERROR: Could not find feature specification to extract "
-                "acceptance test scenarios."
+                "ERROR: Could not find feature specification to extract acceptance test scenarios."
             )
             self.acceptance_tests_passed = False
             return self.acceptance_test_result
@@ -462,8 +461,7 @@ class ExecutionLoop:
         parts = [
             "# Acceptance Test Fix Required",
             "",
-            "The acceptance tests have **FAILED**. Your task is to analyze the failures "
-            "and implement a fix to make the tests pass.",
+            "The acceptance tests have **FAILED**. Your task is to analyze the failures and implement a fix to make the tests pass.",
             "",
             "## Failed Test Results",
             "",
