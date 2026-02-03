@@ -247,6 +247,7 @@ class ExecutionLoop:
                 "ERROR: Could not find feature specification to extract "
                 "acceptance test scenarios."
             )
+            self.acceptance_tests_passed = False
             return self.acceptance_test_result
 
         # Create executor and run tests
