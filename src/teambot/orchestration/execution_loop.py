@@ -123,6 +123,7 @@ class ExecutionLoop:
         # Acceptance test tracking
         self.acceptance_tests_passed: bool = False
         self.acceptance_test_result: AcceptanceTestResult | None = None
+        self.acceptance_test_iterations: int = 0
 
         # Will be set during run()
         self.sdk_client: Any = None
@@ -167,9 +168,11 @@ class ExecutionLoop:
                 stage_config = self.stages_config.stages.get(stage)
 
                 if stage in self.stages_config.acceptance_test_stages:
-                    # Execute acceptance test stage
-                    result = await self._execute_acceptance_test_stage(stage, on_progress)
-                    if not result.all_passed:
+                    # Execute acceptance test stage with retry loop
+                    result = await self._execute_acceptance_test_with_retry(
+                        stage, on_progress
+                    )
+                    if not self.acceptance_tests_passed:
                         self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
                         return ExecutionResult.ACCEPTANCE_TEST_FAILED
                 elif stage in self.stages_config.review_stages:
@@ -293,6 +296,181 @@ class ExecutionLoop:
             })
 
         return self.acceptance_test_result
+
+    async def _execute_acceptance_test_with_retry(
+        self,
+        stage: WorkflowStage,
+        on_progress: Callable[[str, Any], None] | None,
+    ) -> AcceptanceTestResult:
+        """Execute acceptance tests with fix-retry loop on failure.
+
+        When acceptance tests fail, this method:
+        1. Reviews the failed tests and current implementation
+        2. Asks the builder to implement a fix
+        3. Re-runs the acceptance tests
+        4. Repeats up to MAX_ITERATIONS times
+
+        Args:
+            stage: The acceptance test stage
+            on_progress: Optional callback for progress updates
+
+        Returns:
+            AcceptanceTestResult with final test results
+        """
+        max_iterations = ReviewIterator.MAX_ITERATIONS
+        self.acceptance_test_iterations = 0
+
+        while self.acceptance_test_iterations < max_iterations:
+            self.acceptance_test_iterations += 1
+
+            if on_progress:
+                on_progress("acceptance_test_iteration", {
+                    "iteration": self.acceptance_test_iterations,
+                    "max_iterations": max_iterations,
+                })
+
+            # Run acceptance tests
+            result = await self._execute_acceptance_test_stage(stage, on_progress)
+
+            if result.all_passed:
+                # Tests passed - we're done
+                self.acceptance_tests_passed = True
+                return result
+
+            # Tests failed - if we have iterations left, try to fix
+            if self.acceptance_test_iterations >= max_iterations:
+                # No more iterations - fail
+                if on_progress:
+                    on_progress("acceptance_test_max_iterations_reached", {
+                        "iterations_used": self.acceptance_test_iterations,
+                    })
+                break
+
+            # Build context for fix
+            fix_context = self._build_acceptance_test_fix_context(result)
+
+            if on_progress:
+                on_progress("acceptance_test_fix_start", {
+                    "iteration": self.acceptance_test_iterations,
+                    "failed_count": result.failed,
+                })
+
+            # Ask builder to implement fix
+            fix_output = await self._execute_acceptance_test_fix(fix_context, on_progress)
+
+            # Accumulate fix outputs for traceability
+            fix_record = (
+                f"## Iteration {self.acceptance_test_iterations} Fix Attempt\n\n"
+                f"{fix_output}\n\n"
+                f"---\n\n"
+            )
+            if stage in self.stage_outputs:
+                self.stage_outputs[stage] += fix_record
+            else:
+                self.stage_outputs[stage] = fix_record
+
+            if on_progress:
+                on_progress("acceptance_test_fix_complete", {
+                    "iteration": self.acceptance_test_iterations,
+                })
+
+        # All iterations exhausted - tests still failing
+        self.acceptance_tests_passed = False
+        return self.acceptance_test_result
+
+    def _build_acceptance_test_fix_context(
+        self,
+        test_result: AcceptanceTestResult,
+    ) -> str:
+        """Build context for the fix agent based on failed tests.
+
+        Args:
+            test_result: The acceptance test result with failures
+
+        Returns:
+            Context string for the fix agent
+        """
+        parts = [
+            "# Acceptance Test Fix Required",
+            "",
+            "The acceptance tests have **FAILED**. Your task is to analyze the failures "
+            "and implement a fix to make the tests pass.",
+            "",
+            "## Failed Test Results",
+            "",
+            generate_acceptance_test_report(test_result),
+            "",
+            "## Feature Specification",
+            "",
+        ]
+
+        # Include feature spec
+        spec_content = self._find_feature_spec_content()
+        if spec_content:
+            parts.append(spec_content)
+        else:
+            parts.append("(Feature spec not found)")
+
+        parts.extend([
+            "",
+            "## Your Task",
+            "",
+            "1. Analyze the failed acceptance tests above",
+            "2. Identify the root cause of each failure",
+            "3. Review the current implementation code",
+            "4. Make the necessary code changes to fix the failures",
+            "5. Ensure the changes don't break existing functionality",
+            "",
+            "Focus on making the acceptance tests pass. The tests validate "
+            "real user-facing functionality, so the fixes must address the "
+            "actual behavior, not just test expectations.",
+            "",
+            "## Previous Stage Outputs",
+            "",
+        ])
+
+        # Include relevant prior stage outputs
+        for output_stage in [
+            WorkflowStage.IMPLEMENTATION,
+            WorkflowStage.TEST,
+            WorkflowStage.PLAN,
+        ]:
+            if output_stage in self.stage_outputs:
+                parts.extend([
+                    f"### {output_stage.name}",
+                    "",
+                    self.stage_outputs[output_stage][:2000],  # Truncate for context
+                    "",
+                ])
+
+        return "\n".join(parts)
+
+    async def _execute_acceptance_test_fix(
+        self,
+        context: str,
+        on_progress: Callable[[str, Any], None] | None,
+    ) -> str:
+        """Execute the fix implementation agent.
+
+        Args:
+            context: The fix context including failed tests and implementation
+            on_progress: Optional callback for progress updates
+
+        Returns:
+            The fix agent's output
+        """
+        # Use builder-1 as the fix agent (same as implementation)
+        fix_agent = "builder-1"
+
+        if on_progress:
+            on_progress("agent_running", {"agent_id": fix_agent, "task": "fix_acceptance_tests"})
+
+        output = await self.sdk_client.execute_streaming(fix_agent, context, None)
+
+        if on_progress:
+            on_progress("agent_complete", {"agent_id": fix_agent})
+
+        return output
 
     def _find_feature_spec_content(self) -> str | None:
         """Find and load the feature specification content.
@@ -579,6 +757,7 @@ class ExecutionLoop:
             "stages_config_source": self.stages_config.source,
             "feature_name": self.feature_name,
             "acceptance_tests_passed": self.acceptance_tests_passed,
+            "acceptance_test_iterations": self.acceptance_test_iterations,
             "acceptance_test_summary": (
                 self.acceptance_test_result.summary
                 if self.acceptance_test_result
