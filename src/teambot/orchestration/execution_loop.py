@@ -574,9 +574,12 @@ class ExecutionLoop:
         # Check docs/feature-specs/
         feature_specs_dir = self.teambot_dir.parent.parent / "docs" / "feature-specs"
         if feature_specs_dir.exists():
+            # Normalize feature name for case-insensitive matching
+            normalized_feature = self.feature_name.replace("-", "").lower()
             for spec_file in feature_specs_dir.glob("*.md"):
-                # Simple matching - could be improved
-                if self.feature_name.replace("-", "") in spec_file.stem.replace("-", ""):
+                # Case-insensitive matching with hyphens removed
+                normalized_spec = spec_file.stem.replace("-", "").lower()
+                if normalized_feature in normalized_spec:
                     return spec_file.read_text()
 
         return None
