@@ -342,7 +342,7 @@ class ExecutionLoop:
                     "max_iterations": max_iterations,
                 })
 
-            # Run acceptance tests (don't let it overwrite stage_outputs)
+            # Run acceptance tests (output will be accumulated separately)
             result = await self._execute_acceptance_test_stage(stage, on_progress)
 
             # Get the validation output for this iteration
