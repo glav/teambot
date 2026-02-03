@@ -27,7 +27,7 @@ class TestFullWorkflowExecution:
     def mock_sdk_client(self) -> AsyncMock:
         """Create mock SDK client that approves all reviews."""
         client = AsyncMock()
-        client.execute_streaming.return_value = "APPROVED: Work completed successfully."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed successfully."
         return client
 
     @pytest.mark.asyncio
@@ -78,7 +78,7 @@ class TestResumeAfterCancellation:
     def mock_sdk_client(self) -> AsyncMock:
         """Create mock SDK client."""
         client = AsyncMock()
-        client.execute_streaming.return_value = "APPROVED: Done."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
         return client
 
     @pytest.mark.asyncio
@@ -214,7 +214,7 @@ class TestReviewIterationWithFeedback:
                 assert "error handling" in prompt.lower()
                 return "Second attempt with error handling"
             else:
-                return "APPROVED: Good!"
+                return "VERIFIED_APPROVED: Good!"
 
         mock_client.execute_streaming.side_effect = mock_execute
 
@@ -241,7 +241,7 @@ class TestTimeoutEnforcement:
     ) -> None:
         """Execution stops when time limit is reached."""
         mock_client = AsyncMock()
-        mock_client.execute_streaming.return_value = "APPROVED: Done."
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
 
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -355,7 +355,7 @@ Uses React components with Express API endpoints.
 
         # Mock successful execution
         mock_client = AsyncMock()
-        mock_client.execute_streaming.return_value = "APPROVED: Implementation complete."
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Implementation complete."
 
         loop = ExecutionLoop(
             objective_path=objective_file,

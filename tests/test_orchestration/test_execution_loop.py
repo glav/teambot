@@ -62,7 +62,7 @@ class TestExecutionLoopRun:
         """Create mock SDK client that approves all reviews."""
         client = AsyncMock()
         # Return work output, then approval for each stage
-        client.execute_streaming.return_value = "APPROVED: Work completed successfully."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed successfully."
         return client
 
     @pytest.fixture
@@ -146,7 +146,7 @@ class TestExecutionLoopStatePersistence:
     def mock_sdk_client(self) -> AsyncMock:
         """Create mock SDK client."""
         client = AsyncMock()
-        client.execute_streaming.return_value = "APPROVED: Done."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
         return client
 
     @pytest.mark.asyncio
@@ -449,7 +449,7 @@ class TestExecutionLoopReviewOutputs:
 
         # Mock client that returns approval with output
         mock_client = AsyncMock()
-        mock_client.execute_streaming.return_value = "APPROVED: Spec looks great!"
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Spec looks great!"
 
         result = await loop.run(mock_client)
 
@@ -474,7 +474,7 @@ class TestExecutionLoopReviewOutputs:
         )
 
         mock_client = AsyncMock()
-        mock_client.execute_streaming.return_value = "APPROVED: All good!"
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: All good!"
 
         await loop.run(mock_client)
 

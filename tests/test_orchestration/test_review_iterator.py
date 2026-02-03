@@ -36,10 +36,10 @@ class TestReviewIterator:
         self, iterator: ReviewIterator, mock_sdk_client: AsyncMock
     ) -> None:
         """Returns APPROVED after first review approves."""
-        # Work output, then review output with approval
+        # Work output, then review output with verified approval
         mock_sdk_client.execute_streaming.side_effect = [
-            "Implementation complete",
-            "APPROVED: Looks good!",
+            "Implementation complete with code changes",
+            "VERIFIED_APPROVED: All criteria met\n\nVerification Evidence:\n- Code changes: Updated module",
         ]
 
         result = await iterator.execute(
@@ -60,8 +60,8 @@ class TestReviewIterator:
         mock_sdk_client.execute_streaming.side_effect = [
             "First attempt",
             "REJECTED: Need more detail",
-            "Improved implementation",
-            "APPROVED: Great work!",
+            "Improved implementation with tests",
+            "VERIFIED_APPROVED: All requirements met\n\nVerification Evidence:\n- Tests pass",
         ]
 
         result = await iterator.execute(
@@ -83,7 +83,7 @@ class TestReviewIterator:
             "Attempt 1", "REJECTED: Fix A",
             "Attempt 2", "REJECTED: Fix B",
             "Attempt 3", "REJECTED: Fix C",
-            "Attempt 4", "APPROVED: Finally!",
+            "Attempt 4", "VERIFIED_APPROVED: Finally complete\n\nVerification Evidence:\n- All fixed",
         ]
 
         result = await iterator.execute(
@@ -173,7 +173,7 @@ class TestReviewIterator:
             "First attempt",
             "REJECTED: Need error handling",
             "Improved with error handling",
-            "APPROVED: Good!",
+            "VERIFIED_APPROVED: Good!\n\nVerification Evidence:\n- Error handling added",
         ]
 
         result = await iterator.execute(
@@ -235,7 +235,8 @@ class TestReviewIterator:
     ) -> None:
         """Progress callback is invoked with iteration info."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Work", "APPROVED: Good",
+            "Work output with code",
+            "VERIFIED_APPROVED: Good\n\nVerification Evidence:\n- Complete",
         ]
         progress_calls = []
 
