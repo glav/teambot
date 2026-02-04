@@ -91,9 +91,7 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     default_model = config.get("default_model")
     for agent in config["agents"]:
         model = agent.get("model") or default_model
-        display.add_agent(
-            agent["id"], agent["persona"], agent.get("display_name"), model=model
-        )
+        display.add_agent(agent["id"], agent["persona"], agent.get("display_name"), model=model)
     display.print_status()
 
     return 0

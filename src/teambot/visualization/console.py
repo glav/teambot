@@ -40,8 +40,7 @@ class ConsoleDisplay:
         self._live: Live | None = None
 
     def add_agent(
-        self, agent_id: str, persona: str, display_name: str | None = None,
-        model: str | None = None
+        self, agent_id: str, persona: str, display_name: str | None = None, model: str | None = None
     ) -> None:
         """Register an agent for display."""
         self.agents[agent_id] = {
