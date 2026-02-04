@@ -8,8 +8,8 @@
 - Like the Copilot CLI I would like to be able to specify a model when requesting an agent to perform a task.
 - Each agent should be able to use a default model or a specific model.
 - Each agent should be able to have a default model specified.
-  - For example, 'pm' agent may have Claude opus 4.5 model as the default, 'ba' agent may have GPOT 5.2 Codex as the default
-- Only models supported by the Copilot SDK are supported in teambot.
+  - For example, 'pm' agent may have Claude opus 4.5 model as the default, 'ba' agent may have GPT 5.2 Codex as the default
+- Only models supported by the Copilot SDk are supported in teambot.
 - The model currently being used should be evident in the terminal UI display so it is easy to see which agent has which model assigned to a task.
 - We should be able to list all available models that we can choose from.
 - When doing file based orchestration, we should be able to use different models per agent which will follow whatever the default model is for the agent currently running the file based orchestration task.
@@ -19,7 +19,7 @@
 - Teambot currently does not support using different models.
 - Each model has its strengths, speed and also related costs.
 - To provide a cost effective but still good experience, we need to allow teambot to use a selection of models via configuration
-- This allows the user to configure the mnost cost effective but suitable approach for agents.
+- This allows the user to configure the most cost effective but suitable approach for agents.
 - This also allows one model to either plan or implement, while another model performs review and feedback.
 
 **Success Criteria**:
