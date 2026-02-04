@@ -92,6 +92,12 @@ Available commands:
   /history       - Show command history
   /quit          - Exit interactive mode
 
+Default Agent:
+  If configured in teambot.json with "default_agent", plain text
+  automatically routes to that agent. For example:
+    "default_agent": "pm"   - Plain text routes to @pm
+  Without this config, plain text shows a helpful tip.
+
 Examples:
   @pm Create a project plan
   @builder-1 Implement the login feature

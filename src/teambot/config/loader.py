@@ -132,6 +132,10 @@ class ConfigLoader:
         for agent in agents:
             self._validate_agent(agent, seen_ids)
 
+        # Validate default_agent if present
+        if "default_agent" in config:
+            self._validate_default_agent(config["default_agent"], seen_ids)
+
         # Validate overlay config if present
         if "overlay" in config:
             self._validate_overlay(config["overlay"])
@@ -154,6 +158,16 @@ class ConfigLoader:
             raise ConfigError(
                 f"Invalid persona '{persona}' for agent {agent_id}. "
                 f"Valid personas: {VALID_PERSONAS}"
+            )
+
+    def _validate_default_agent(self, default_agent: str, seen_ids: set[str]) -> None:
+        """Validate default_agent configuration."""
+        if not isinstance(default_agent, str):
+            raise ConfigError("'default_agent' must be a string")
+
+        if default_agent not in seen_ids:
+            raise ConfigError(
+                f"Invalid default_agent '{default_agent}'. Agent must be defined in 'agents' list."
             )
 
     def _validate_overlay(self, overlay: dict[str, Any]) -> None:

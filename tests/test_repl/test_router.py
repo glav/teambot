@@ -196,3 +196,105 @@ class TestRouterHistory:
         # Should have last 5 (5-9)
         assert history[0]["content"] == "Task 5"
         assert history[4]["content"] == "Task 9"
+
+
+class TestRouterWithDefaultAgent:
+    """Tests for router with default agent configuration."""
+
+    @pytest.mark.asyncio
+    async def test_raw_input_routed_to_default_agent(self):
+        """Test raw input is routed to default agent when configured."""
+        router = AgentRouter(default_agent="pm")
+        mock_handler = AsyncMock(return_value="Response from PM")
+
+        router.register_agent_handler(mock_handler)
+        router.register_raw_handler(MagicMock(return_value="Raw handler response"))
+
+        cmd = Command(type=CommandType.RAW, content="Hello world")
+        result = await router.route(cmd)
+
+        # Should route to agent handler, not raw handler
+        mock_handler.assert_called_once_with("pm", "Hello world")
+        assert result == "Response from PM"
+
+    @pytest.mark.asyncio
+    async def test_raw_input_without_default_agent(self):
+        """Test raw input uses raw handler when no default agent."""
+        router = AgentRouter()  # No default agent
+        mock_raw_handler = MagicMock(return_value="Raw response")
+
+        router.register_raw_handler(mock_raw_handler)
+
+        cmd = Command(type=CommandType.RAW, content="Hello")
+        result = await router.route(cmd)
+
+        mock_raw_handler.assert_called_once_with("Hello")
+        assert result == "Raw response"
+
+    @pytest.mark.asyncio
+    async def test_empty_raw_input_uses_raw_handler(self):
+        """Test empty raw input uses raw handler even with default agent."""
+        router = AgentRouter(default_agent="pm")
+        mock_agent_handler = AsyncMock(return_value="Agent response")
+        mock_raw_handler = MagicMock(return_value="Raw response")
+
+        router.register_agent_handler(mock_agent_handler)
+        router.register_raw_handler(mock_raw_handler)
+
+        # Empty content
+        cmd = Command(type=CommandType.RAW, content="")
+        await router.route(cmd)
+
+        # Should use raw handler for empty input
+        mock_raw_handler.assert_called_once_with("")
+        mock_agent_handler.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_whitespace_raw_input_uses_raw_handler(self):
+        """Test whitespace-only raw input uses raw handler even with default agent."""
+        router = AgentRouter(default_agent="pm")
+        mock_agent_handler = AsyncMock(return_value="Agent response")
+        mock_raw_handler = MagicMock(return_value="Raw response")
+
+        router.register_agent_handler(mock_agent_handler)
+        router.register_raw_handler(mock_raw_handler)
+
+        # Whitespace only
+        cmd = Command(type=CommandType.RAW, content="   ")
+        await router.route(cmd)
+
+        # Should use raw handler for whitespace
+        mock_raw_handler.assert_called_once_with("   ")
+        mock_agent_handler.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_invalid_default_agent_uses_raw_handler(self):
+        """Test invalid default agent falls back to raw handler."""
+        router = AgentRouter(default_agent="invalid_agent")
+        mock_agent_handler = AsyncMock(return_value="Agent response")
+        mock_raw_handler = MagicMock(return_value="Raw fallback")
+
+        router.register_agent_handler(mock_agent_handler)
+        router.register_raw_handler(mock_raw_handler)
+
+        cmd = Command(type=CommandType.RAW, content="Hello")
+        result = await router.route(cmd)
+
+        # Should fallback to raw handler
+        mock_raw_handler.assert_called_once_with("Hello")
+        mock_agent_handler.assert_not_called()
+        assert result == "Raw fallback"
+
+    @pytest.mark.asyncio
+    async def test_default_agent_records_history(self):
+        """Test that default agent routing records in history."""
+        router = AgentRouter(default_agent="pm")
+        router.register_agent_handler(AsyncMock(return_value="OK"))
+
+        cmd = Command(type=CommandType.RAW, content="Create a plan")
+        await router.route(cmd)
+
+        history = router.get_history()
+        assert len(history) == 1
+        assert history[0]["agent_id"] == "pm"
+        assert history[0]["content"] == "Create a plan"

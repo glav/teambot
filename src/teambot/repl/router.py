@@ -33,20 +33,23 @@ class AgentRouter:
     Supports:
     - Agent commands routed to SDK client
     - System commands routed to command handlers
-    - Raw input routed to default handler
+    - Raw input routed to default handler or default agent (if configured)
     """
 
-    def __init__(self, history_limit: int = 100):
+    def __init__(self, history_limit: int = 100, default_agent: str | None = None):
         """Initialize the router.
 
         Args:
             history_limit: Maximum number of commands to keep in history.
+            default_agent: Optional agent ID to route raw input to. If None,
+                          raw input is handled by the raw handler.
         """
         self._agent_handler: Callable[[str, str], Awaitable[str]] | None = None
         self._system_handler: Callable[[str, list[str]], str] | None = None
         self._raw_handler: Callable[[str], str] | None = None
         self._history: list[dict[str, Any]] = []
         self._history_limit = history_limit
+        self._default_agent = default_agent
 
     def is_valid_agent(self, agent_id: str) -> bool:
         """Check if agent ID is valid.
@@ -78,6 +81,14 @@ class AgentRouter:
             List of agent IDs.
         """
         return list(VALID_AGENTS)
+
+    def get_default_agent(self) -> str | None:
+        """Get the default agent ID if configured.
+
+        Returns:
+            Default agent ID or None if not configured.
+        """
+        return self._default_agent
 
     def register_agent_handler(self, handler: Callable[[str, str], Awaitable[str]]) -> None:
         """Register handler for agent commands.
@@ -120,7 +131,7 @@ class AgentRouter:
         elif command.type == CommandType.SYSTEM:
             return self._route_system(command)
         else:
-            return self._route_raw(command)
+            return await self._route_raw(command)
 
     async def _route_agent(self, command: Command) -> str:
         """Route agent command."""
@@ -145,8 +156,32 @@ class AgentRouter:
 
         return self._system_handler(command.command, command.args or [])
 
-    def _route_raw(self, command: Command) -> str:
-        """Route raw input."""
+    async def _route_raw(self, command: Command) -> str:
+        """Route raw input.
+
+        If a default agent is configured, routes raw input to that agent.
+        Otherwise, uses the raw handler.
+        """
+        # If default agent is configured and content is not empty, route to agent
+        if self._default_agent and command.content and command.content.strip():
+            # Validate the default agent
+            if not self.is_valid_agent(self._default_agent):
+                # Fallback to raw handler if default agent is invalid
+                if self._raw_handler is None:
+                    raise RouterError("No handler registered for raw input")
+                return self._raw_handler(command.content)
+
+            # Convert to agent command and route
+            agent_command = Command(
+                type=CommandType.AGENT,
+                agent_id=self._default_agent,
+                agent_ids=[self._default_agent],
+                content=command.content,
+            )
+            # Route to agent handler
+            return await self._route_agent(agent_command)
+
+        # Use raw handler for empty input or when no default agent configured
         if self._raw_handler is None:
             raise RouterError("No handler registered for raw input")
 

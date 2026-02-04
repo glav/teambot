@@ -12,7 +12,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from teambot.repl.commands import SystemCommands
-from teambot.repl.parser import CommandType, parse_command
+from teambot.repl.parser import Command, CommandType, parse_command
 from teambot.ui.agent_state import AgentState, AgentStatusManager
 from teambot.ui.widgets import InputPane, OutputPane, StatusPanel
 
@@ -46,11 +46,12 @@ class TeamBotApp(App):
 
     CSS_PATH = Path(__file__).parent / "styles.css"
 
-    def __init__(self, executor=None, router=None, sdk_client=None, **kwargs):
+    def __init__(self, executor=None, router=None, sdk_client=None, config=None, **kwargs):
         super().__init__(**kwargs)
         self._executor = executor
         self._router = router
         self._sdk_client = sdk_client
+        self._config = config
         self._commands = SystemCommands(executor=executor)
         self._pending_tasks: set[asyncio.Task] = set()
         # Centralized agent status manager
@@ -91,7 +92,22 @@ class TeamBotApp(App):
         elif command.type == CommandType.SYSTEM:
             await self._handle_system_command(command, output)
         else:
-            output.write_info("Tip: Use @agent for tasks or /help for commands")
+            # Handle raw input - check if default agent is configured
+            default_agent = self._router.get_default_agent() if self._router else None
+            if default_agent:
+                # Route to default agent
+                agent_command = Command(
+                    type=CommandType.AGENT,
+                    agent_id=default_agent,
+                    agent_ids=[default_agent],
+                    content=command.content,
+                )
+                task = asyncio.create_task(self._handle_agent_command(agent_command, output))
+                self._pending_tasks.add(task)
+                task.add_done_callback(self._pending_tasks.discard)
+            else:
+                # Show helpful tip
+                output.write_info("Tip: Use @agent for tasks or /help for commands")
 
         event.input.clear()
 

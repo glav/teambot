@@ -1,5 +1,6 @@
 {
   "teambot_dir": ".teambot",
+  "default_agent": "pm",
   "agents": [
     {
       "id": "pm",
