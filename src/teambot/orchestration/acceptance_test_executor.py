@@ -157,11 +157,13 @@ def extract_commands_from_steps(steps: list[str]) -> list[dict]:
         for cmd in matches:
             # Check if step mentions waiting
             wait = "wait" in step.lower() or "completion" in step.lower()
-            commands.append({
-                "command": cmd.strip(),
-                "wait_for_completion": wait,
-                "step": step,
-            })
+            commands.append(
+                {
+                    "command": cmd.strip(),
+                    "wait_for_completion": wait,
+                    "step": step,
+                }
+            )
 
     return commands
 
@@ -245,9 +247,12 @@ class AcceptanceTestExecutor:
             )
 
         if self.on_progress:
-            self.on_progress("acceptance_test_validation_start", {
-                "total_scenarios": len(self.scenarios),
-            })
+            self.on_progress(
+                "acceptance_test_validation_start",
+                {
+                    "total_scenarios": len(self.scenarios),
+                },
+            )
 
         # Build the validation prompt
         prompt = self._build_validation_prompt()
@@ -307,9 +312,12 @@ class AcceptanceTestExecutor:
         from teambot.tasks.executor import TaskExecutor
 
         if self.on_progress:
-            self.on_progress("runtime_validation_start", {
-                "total_scenarios": len(self.scenarios),
-            })
+            self.on_progress(
+                "runtime_validation_start",
+                {
+                    "total_scenarios": len(self.scenarios),
+                },
+            )
 
         # Create a TaskExecutor instance that will be shared across all commands
         # This is critical - it ensures agent results are stored and retrievable
@@ -340,10 +348,13 @@ class AcceptanceTestExecutor:
                 continue
 
             if self.on_progress:
-                self.on_progress("runtime_scenario_start", {
-                    "scenario_id": scenario.id,
-                    "command_count": len(commands),
-                })
+                self.on_progress(
+                    "runtime_scenario_start",
+                    {
+                        "scenario_id": scenario.id,
+                        "command_count": len(commands),
+                    },
+                )
 
             try:
                 # Execute commands through TaskExecutor (not SDK directly!)
@@ -407,27 +418,29 @@ class AcceptanceTestExecutor:
             runtime_results.append(runtime_scenario)
 
             if self.on_progress:
-                self.on_progress("runtime_scenario_complete", {
-                    "scenario_id": scenario.id,
-                    "status": runtime_scenario.status.value,
-                })
+                self.on_progress(
+                    "runtime_scenario_complete",
+                    {
+                        "scenario_id": scenario.id,
+                        "status": runtime_scenario.status.value,
+                    },
+                )
 
         # Calculate totals
-        passed = sum(
-            1 for s in runtime_results if s.status == AcceptanceTestStatus.PASSED
-        )
+        passed = sum(1 for s in runtime_results if s.status == AcceptanceTestStatus.PASSED)
         failed_statuses = (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR)
         failed = sum(1 for s in runtime_results if s.status in failed_statuses)
-        skipped = sum(
-            1 for s in runtime_results if s.status == AcceptanceTestStatus.SKIPPED
-        )
+        skipped = sum(1 for s in runtime_results if s.status == AcceptanceTestStatus.SKIPPED)
 
         if self.on_progress:
-            self.on_progress("runtime_validation_complete", {
-                "passed": passed,
-                "failed": failed,
-                "skipped": skipped,
-            })
+            self.on_progress(
+                "runtime_validation_complete",
+                {
+                    "passed": passed,
+                    "failed": failed,
+                    "skipped": skipped,
+                },
+            )
 
         return AcceptanceTestResult(
             total=len(runtime_results),
@@ -456,12 +469,22 @@ class AcceptanceTestExecutor:
 
         # Extract key terms (words longer than 4 chars, not common words)
         common_words = {
-            "should", "would", "could", "must", "will", "have", "been",
-            "that", "this", "with", "from", "agent", "output"
+            "should",
+            "would",
+            "could",
+            "must",
+            "will",
+            "have",
+            "been",
+            "that",
+            "this",
+            "with",
+            "from",
+            "agent",
+            "output",
         }
         key_terms = [
-            word for word in re.findall(r"\b\w{4,}\b", expected)
-            if word not in common_words
+            word for word in re.findall(r"\b\w{4,}\b", expected) if word not in common_words
         ]
 
         if not key_terms:
@@ -516,9 +539,7 @@ class AcceptanceTestExecutor:
             merged_scenarios.append(scenario)
 
         # Recalculate totals
-        passed = sum(
-            1 for s in merged_scenarios if s.status == AcceptanceTestStatus.PASSED
-        )
+        passed = sum(1 for s in merged_scenarios if s.status == AcceptanceTestStatus.PASSED)
         failed_statuses = (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR)
         failed = sum(1 for s in merged_scenarios if s.status in failed_statuses)
         skipped = sum(1 for s in merged_scenarios if s.status == AcceptanceTestStatus.SKIPPED)
@@ -556,7 +577,7 @@ class AcceptanceTestExecutor:
 **Description**: {scenario.description}
 
 **Steps**:
-{chr(10).join(f"  {i+1}. {step}" for i, step in enumerate(scenario.steps))}
+{chr(10).join(f"  {i + 1}. {step}" for i, step in enumerate(scenario.steps))}
 
 **Expected Result**: {scenario.expected_result}
 
@@ -750,9 +771,7 @@ Begin validation now. Start by creating the test file.
                     if "failed" in output_lower or "error" in output_lower:
                         # There were failures, and we can't verify this test
                         scenario.status = AcceptanceTestStatus.FAILED
-                        scenario.failure_reason = (
-                            f"Could not verify test for {scenario.id} passed"
-                        )
+                        scenario.failure_reason = f"Could not verify test for {scenario.id} passed"
 
     def _parse_results_block(self, results_text: str) -> None:
         """Parse the structured results block.
@@ -795,9 +814,9 @@ Begin validation now. Start by creating the test file.
 
         # Check for overall pytest failure patterns
         all_passed = (
-            "passed" in output_lower and
-            "failed" not in output_lower and
-            "error" not in output_lower
+            "passed" in output_lower
+            and "failed" not in output_lower
+            and "error" not in output_lower
         )
 
         # Look for specific test failures mentioning scenario IDs
@@ -910,42 +929,52 @@ def generate_acceptance_test_report(
         status_col = f"{status_emoji} {scenario.status.value}"
         lines.append(f"| {scenario.id} | {scenario.name} | {status_col} | {details} |")
 
-    lines.extend([
-        "",
-        "## Summary",
-        "",
-        f"- **Total**: {result.total}",
-        f"- **Passed**: {result.passed}",
-        f"- **Failed**: {result.failed}",
-        f"- **Skipped**: {result.skipped}",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Summary",
+            "",
+            f"- **Total**: {result.total}",
+            f"- **Passed**: {result.passed}",
+            f"- **Failed**: {result.failed}",
+            f"- **Skipped**: {result.skipped}",
+            "",
+        ]
+    )
 
     if not result.all_passed:
-        lines.extend([
-            "## Failed Scenarios",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Failed Scenarios",
+                "",
+            ]
+        )
         for scenario in result.scenarios:
             if scenario.status in (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR):
-                lines.extend([
-                    f"### {scenario.id}: {scenario.name}",
-                    "",
-                    f"**Failure Reason**: {scenario.failure_reason}",
-                    "",
-                    f"**Expected**: {scenario.expected_result}",
-                    "",
-                ])
+                lines.extend(
+                    [
+                        f"### {scenario.id}: {scenario.name}",
+                        "",
+                        f"**Failure Reason**: {scenario.failure_reason}",
+                        "",
+                        f"**Expected**: {scenario.expected_result}",
+                        "",
+                    ]
+                )
 
         # Include validation output for debugging
         if validation_output:
-            lines.extend([
-                "## Validation Output (for debugging)",
-                "",
-                "```",
-                validation_output[:5000] if len(validation_output) > 5000 else validation_output,
-                "```",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Validation Output (for debugging)",
+                    "",
+                    "```",
+                    validation_output[:5000]
+                    if len(validation_output) > 5000
+                    else validation_output,
+                    "```",
+                    "",
+                ]
+            )
 
     return "\n".join(lines)

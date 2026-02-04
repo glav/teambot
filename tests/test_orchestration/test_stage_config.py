@@ -70,6 +70,7 @@ work_to_review_mapping: {}
         """Load default configuration when no path provided and no stages.yaml exists."""
         # Change to temp directory without stages.yaml
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             monkeypatch.chdir(tmpdir)
             config = load_stages_config(None)

@@ -193,9 +193,7 @@ class ReviewIterator:
                     )
 
                 # Incorporate feedback for next iteration
-                current_context = self._incorporate_feedback(
-                    current_context, feedback, work_output
-                )
+                current_context = self._incorporate_feedback(current_context, feedback, work_output)
 
             except asyncio.CancelledError:
                 # Get last review output if available
@@ -243,9 +241,7 @@ class ReviewIterator:
 
         return review_output, approved, feedback
 
-    def _build_strict_review_prompt(
-        self, work_output: str, evidence: str = ""
-    ) -> str:
+    def _build_strict_review_prompt(self, work_output: str, evidence: str = "") -> str:
         """Build a strict review prompt requiring demonstrated proof.
 
         Args:

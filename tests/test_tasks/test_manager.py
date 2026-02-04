@@ -351,6 +351,7 @@ class TestAgentResults:
     @pytest.mark.asyncio
     async def test_agent_result_stored_on_failure(self):
         """Test failed result is also stored by agent_id."""
+
         async def failing_executor(agent_id, prompt):
             raise Exception("Task failed")
 

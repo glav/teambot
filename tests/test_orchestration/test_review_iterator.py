@@ -83,10 +83,14 @@ class TestReviewIterator:
     ) -> None:
         """Boundary case: approved on iteration 4."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: Fix A",
-            "Attempt 2", "REJECTED: Fix B",
-            "Attempt 3", "REJECTED: Fix C",
-            "Attempt 4", "VERIFIED_APPROVED: Finally\n\nEvidence:\n- All fixed",
+            "Attempt 1",
+            "REJECTED: Fix A",
+            "Attempt 2",
+            "REJECTED: Fix B",
+            "Attempt 3",
+            "REJECTED: Fix C",
+            "Attempt 4",
+            "VERIFIED_APPROVED: Finally\n\nEvidence:\n- All fixed",
         ]
 
         result = await iterator.execute(

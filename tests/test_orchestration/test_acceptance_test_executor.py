@@ -209,9 +209,7 @@ Just a simple spec.
         assert scenarios == []
 
     @pytest.mark.asyncio
-    async def test_execute_all_with_no_scenarios(
-        self, spec_without_tests: str
-    ) -> None:
+    async def test_execute_all_with_no_scenarios(self, spec_without_tests: str) -> None:
         """Execute returns result with zero counts when no scenarios."""
         executor = AcceptanceTestExecutor(spec_content=spec_without_tests)
         mock_client = AsyncMock()
@@ -338,9 +336,7 @@ class TestRuntimeValidation:
 """
 
     @pytest.mark.asyncio
-    async def test_runtime_validation_executes_commands(
-        self, spec_with_commands: str
-    ) -> None:
+    async def test_runtime_validation_executes_commands(self, spec_with_commands: str) -> None:
         """Runtime validation actually executes extracted commands via TaskExecutor."""
         executor = AcceptanceTestExecutor(spec_content=spec_with_commands)
         executor.load_scenarios()
@@ -374,9 +370,7 @@ class TestRuntimeValidation:
         assert result.failed == 0
 
     @pytest.mark.asyncio
-    async def test_runtime_validation_with_references(
-        self, spec_with_references: str
-    ) -> None:
+    async def test_runtime_validation_with_references(self, spec_with_references: str) -> None:
         """Runtime validation works with $agent references when using TaskExecutor."""
         executor = AcceptanceTestExecutor(spec_content=spec_with_references)
         executor.load_scenarios()

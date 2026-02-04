@@ -174,6 +174,7 @@ class TestFeatureName:
     def test_feature_name_from_parsed_file(self, objective_file: Path) -> None:
         """Feature name derived from parsed objective file."""
         from teambot.orchestration.objective_parser import parse_objective_file
+
         result = parse_objective_file(objective_file)
         # Title is "Implement User Authentication"
         assert result.feature_name == "user-authentication"

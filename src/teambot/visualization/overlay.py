@@ -311,13 +311,13 @@ class OverlayRenderer:
             # Show waiting agents if any
             if self._state.waiting_count > 0:
                 waiting = ", ".join(f"@{a}→@{w}" for a, w in self._state.waiting_for.items())
-                lines.append(f"⏳ {waiting}"[:OVERLAY_WIDTH - 4])
+                lines.append(f"⏳ {waiting}"[: OVERLAY_WIDTH - 4])
             else:
                 spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
                 agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
                 if len(self._state.active_agents) > 3:
                     agents += f" +{len(self._state.active_agents) - 3}"
-                lines.append(f"{spinner} {agents}"[:OVERLAY_WIDTH - 4])
+                lines.append(f"{spinner} {agents}"[: OVERLAY_WIDTH - 4])
 
         # Line 2: Task counts
         running = self._state.running_count
