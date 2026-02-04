@@ -305,8 +305,8 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
         return CommandResult(output="No tasks.")
 
     lines = ["Tasks:", ""]
-    lines.append(f"  {'ID':<6} {'Agent':<12} {'Model':<15} {'Status':<11} {'Task'}")
-    lines.append(f"  {'-' * 6} {'-' * 12} {'-' * 15} {'-' * 11} {'-' * 20}")
+    lines.append(f"  {'ID':<15} {'Agent':<12} {'Model':<15} {'Status':<11} {'Task'}")
+    lines.append(f"  {'-' * 15} {'-' * 12} {'-' * 15} {'-' * 11} {'-' * 20}")
     for task in tasks:
         status_icon = {
             TaskStatus.PENDING: "⏳",
@@ -330,10 +330,15 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
             model_display = model_display[:12] + "..."
 
         # Format line with proper column widths matching header
-        task_id = f"#{task.id}"
+        task_id = task.id
+        if len(task_id) > 15:
+            task_id = task_id[:12] + "..."
         agent_id = f"@{task.agent_id}"
-        line = f"  {task_id:<6} {agent_id:<12} {model_display:<15} {status_display:<11} {prompt}"
+        line = f"  {task_id:<15} {agent_id:<12} {model_display:<15} {status_display:<11} {prompt}"
         lines.append(line)
+
+    lines.append("")
+    lines.append("Use: /task <id> to view details")
 
     return CommandResult(output="\n".join(lines))
 
