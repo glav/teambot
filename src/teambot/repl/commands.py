@@ -317,11 +317,14 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
             TaskStatus.CANCELLED: "🚫",
         }.get(task.status, "?")
 
+        # Get status text (capitalize first letter of enum name)
+        status_text = task.status.name.capitalize()
+        
         prompt = task.prompt[:30] + "..." if len(task.prompt) > 30 else task.prompt
         model_display = task.model if task.model else "(default)"
         if len(model_display) > 15:
             model_display = model_display[:12] + "..."
-        line = f"  {status_icon} #{task.id:<4} @{task.agent_id:<12} {model_display:<15} {prompt}"
+        line = f"  #{task.id:<5} @{task.agent_id:<11} {model_display:<15} {status_icon} {status_text:<9} {prompt}"
         lines.append(line)
 
     return CommandResult(output="\n".join(lines))
