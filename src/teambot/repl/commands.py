@@ -305,8 +305,8 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
         return CommandResult(output="No tasks.")
 
     lines = ["Tasks:", ""]
-    lines.append(f"  {'ID':<6} {'Agent':<12} {'Model':<15} {'Status':<10} {'Task'}")
-    lines.append(f"  {'-' * 6} {'-' * 12} {'-' * 15} {'-' * 10} {'-' * 20}")
+    lines.append(f"  {'ID':<6} {'Agent':<12} {'Model':<15} {'Status':<11} {'Task'}")
+    lines.append(f"  {'-' * 6} {'-' * 12} {'-' * 15} {'-' * 11} {'-' * 20}")
     for task in tasks:
         status_icon = {
             TaskStatus.PENDING: "⏳",
