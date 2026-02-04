@@ -319,6 +319,9 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
 
         # Format status with icon and text
         status_text = task.status.name.replace('_', ' ').title()
+        # Truncate status text if needed (icon=1 + space=1 leaves 9 chars for text)
+        if len(status_text) > 9:
+            status_text = status_text[:8] + "…"
         status_display = f"{status_icon} {status_text}"
         
         prompt = task.prompt[:30] + "..." if len(task.prompt) > 30 else task.prompt
