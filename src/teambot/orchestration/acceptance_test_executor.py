@@ -289,7 +289,12 @@ class AcceptanceTestExecutor:
 
         This is the critical check that verifies the feature ACTUALLY WORKS,
         not just that tests pass. It extracts commands from scenario steps
-        and runs them through the SDK client.
+        and runs them through the SAME TaskExecutor that production uses.
+
+        This ensures that features like $agent references work because:
+        1. Commands go through the parser (extracting references)
+        2. Commands go through TaskExecutor (which stores results)
+        3. Reference commands can find stored results
 
         Args:
             sdk_client: The SDK client to use for executing commands.
@@ -297,10 +302,18 @@ class AcceptanceTestExecutor:
         Returns:
             AcceptanceTestResult with runtime validation results.
         """
+        # Import here to avoid circular imports
+        from teambot.repl.parser import parse_command
+        from teambot.tasks.executor import TaskExecutor
+
         if self.on_progress:
             self.on_progress("runtime_validation_start", {
                 "total_scenarios": len(self.scenarios),
             })
+
+        # Create a TaskExecutor instance that will be shared across all commands
+        # This is critical - it ensures agent results are stored and retrievable
+        executor = TaskExecutor(sdk_client=sdk_client)
 
         runtime_results: list[AcceptanceTestScenario] = []
 
@@ -333,44 +346,36 @@ class AcceptanceTestExecutor:
                 })
 
             try:
-                # Execute commands and collect outputs
+                # Execute commands through TaskExecutor (not SDK directly!)
                 outputs: dict[str, str] = {}
                 all_commands_succeeded = True
 
                 for cmd_info in commands:
-                    cmd = cmd_info["command"]
-                    # Parse agent and task from command like "@pm tell a joke"
-                    parts = cmd.split(maxsplit=1)
-                    if len(parts) < 2:
-                        continue
-
-                    agent_id = parts[0].lstrip("@")
-                    task = parts[1]
+                    cmd_str = cmd_info["command"]
 
                     try:
-                        # Execute the command for real
-                        output = await sdk_client.execute_streaming(
-                            agent_id, task, None
-                        )
-                        outputs[agent_id] = output
+                        # Parse the command using the real parser
+                        # This extracts $agent references properly
+                        cmd = parse_command(cmd_str)
 
-                        # Check if this command references another agent's output
-                        # e.g., "@ba review $pm" needs PM's output to be available
-                        if "$" in task:
-                            # Extract referenced agents
-                            ref_pattern = r"\$([a-zA-Z][a-zA-Z0-9-]*)"
-                            refs = re.findall(ref_pattern, task)
-                            for ref_agent in refs:
-                                if ref_agent not in outputs:
-                                    all_commands_succeeded = False
-                                    runtime_scenario.failure_reason = (
-                                        f"Referenced agent ${ref_agent} output not available. "
-                                        f"The feature may not be wired up correctly."
-                                    )
+                        if cmd.type.name == "UNKNOWN" or not cmd.agent_ids:
+                            continue
+
+                        # Execute through TaskExecutor (stores results, handles references)
+                        result = await executor.execute(cmd)
+
+                        if result.success:
+                            outputs[cmd.agent_ids[0]] = result.output
+                        else:
+                            all_commands_succeeded = False
+                            runtime_scenario.failure_reason = (
+                                f"Command '{cmd_str}' failed: {result.error}"
+                            )
+                            break
 
                     except Exception as e:
                         all_commands_succeeded = False
-                        runtime_scenario.failure_reason = f"Command '{cmd}' failed: {e}"
+                        runtime_scenario.failure_reason = f"Command '{cmd_str}' failed: {e}"
                         break
 
                 # Verify expected result if specified

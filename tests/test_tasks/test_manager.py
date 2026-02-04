@@ -264,3 +264,102 @@ class TestTaskManagerCancel:
 
         assert result is False
         assert task.status == TaskStatus.COMPLETED
+
+
+class TestAgentResults:
+    """Tests for agent result storage and retrieval."""
+
+    @pytest.mark.asyncio
+    async def test_agent_result_stored_on_completion(self):
+        """Test result is stored by agent_id after completion."""
+        mock_executor = AsyncMock(return_value="Analysis complete")
+        manager = TaskManager(executor=mock_executor)
+
+        task = manager.create_task(agent_id="ba", prompt="Analyze")
+        await manager.execute_task(task.id)
+
+        result = manager.get_agent_result("ba")
+        assert result is not None
+        assert result.success
+        assert result.output == "Analysis complete"
+
+    @pytest.mark.asyncio
+    async def test_get_agent_result_returns_latest(self):
+        """Test latest result overwrites previous."""
+        call_count = {"count": 0}
+
+        async def mock_executor(agent_id, prompt):
+            call_count["count"] += 1
+            return f"Result {call_count['count']}"
+
+        manager = TaskManager(executor=mock_executor)
+
+        # First task
+        task1 = manager.create_task(agent_id="ba", prompt="First")
+        await manager.execute_task(task1.id)
+
+        # Second task for same agent
+        task2 = manager.create_task(agent_id="ba", prompt="Second")
+        await manager.execute_task(task2.id)
+
+        result = manager.get_agent_result("ba")
+        # Should be from second task
+        assert result.output == "Result 2"
+
+    def test_get_agent_result_returns_none_when_missing(self):
+        """Test None returned when agent has no results."""
+        manager = TaskManager()
+
+        result = manager.get_agent_result("never_ran")
+
+        assert result is None
+
+    def test_get_running_task_for_agent(self):
+        """Test finding running task for agent."""
+        manager = TaskManager()
+
+        task = manager.create_task(agent_id="ba", prompt="Slow task")
+        # Manually set running state
+        task.mark_running()
+
+        running = manager.get_running_task_for_agent("ba")
+
+        assert running is not None
+        assert running.id == task.id
+        assert running.status == TaskStatus.RUNNING
+
+    def test_get_running_task_returns_none_when_idle(self):
+        """Test None returned when agent has no running task."""
+        manager = TaskManager()
+
+        running = manager.get_running_task_for_agent("idle_agent")
+
+        assert running is None
+
+    def test_get_running_task_ignores_completed(self):
+        """Test completed tasks are not returned as running."""
+        manager = TaskManager()
+
+        task = manager.create_task(agent_id="ba", prompt="Task")
+        task.mark_running()
+        task.mark_completed("Done")
+
+        running = manager.get_running_task_for_agent("ba")
+
+        assert running is None
+
+    @pytest.mark.asyncio
+    async def test_agent_result_stored_on_failure(self):
+        """Test failed result is also stored by agent_id."""
+        async def failing_executor(agent_id, prompt):
+            raise Exception("Task failed")
+
+        manager = TaskManager(executor=failing_executor)
+
+        task = manager.create_task(agent_id="ba", prompt="Will fail")
+        await manager.execute_task(task.id)
+
+        result = manager.get_agent_result("ba")
+        assert result is not None
+        assert not result.success
+        assert "Task failed" in result.error

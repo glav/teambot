@@ -276,17 +276,15 @@ class REPLLoop:
 
                     # Route command
                     try:
-                        # Check if this is an advanced agent command
-                        if command.type == CommandType.AGENT and (
-                            command.is_pipeline or
-                            len(command.agent_ids) > 1 or
-                            command.background
-                        ):
-                            # Use task executor for parallel/pipeline/background
+                        # ALL agent commands go through TaskExecutor to ensure
+                        # outputs are stored and can be referenced with $agent syntax
+                        if command.type == CommandType.AGENT:
+                            # Use task executor for ALL agent commands
+                            # This ensures outputs are stored for $ref syntax
                             result = await self._handle_advanced_command(command)
                             self._console.print(result)
                         else:
-                            # Use existing router for simple commands
+                            # Use existing router for system commands only
                             result = await self._router.route(command)
 
                             # Handle system command results

@@ -16,6 +16,7 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 - ⚡ **Parallel Builders** - builder-1 and builder-2 execute concurrently during implementation
 - 🔁 **Review Iteration** - Automatic review cycles with max 4 iterations per stage
 - ➡️ **Pipeline Operator** - Chain tasks with `->` to pass output between agents
+- 🔗 **Shared Context References** - Use `$agent` to reference another agent's output
 - 💾 **State Persistence** - Resume interrupted workflows with `--resume`
 - ⏱️ **Time Limits** - Configurable execution timeout (default 8 hours)
 - 📁 **Shared Context** - Agents collaborate via `.teambot/` directory
@@ -240,10 +241,47 @@ teambot: /cancel 1
 | `@a,b,c task` | Multi-agent parallel, same prompt | `@pm,ba,writer Analyze feature` |
 | `@a task -> @b task` | Pipeline with dependency | `@pm Plan -> @builder-1 Implement` |
 | `@a,b t1 -> @c t2` | Parallel then pipeline | `@pm,ba Analyze -> @builder-1 Build` |
+| `@a task $b` | Reference agent output | `@pm Summarize $ba` |
 | `/tasks` | List all tasks | |
 | `/task <id>` | View task details | `/task 1` |
 | `/cancel <id>` | Cancel task | `/cancel 3` |
 | `/status` | Show agent status | |
+
+### Shared Context References (`$agent`)
+
+Reference another agent's most recent output using `$agent` syntax:
+
+```bash
+# Reference PM's last output
+teambot: @builder-1 Implement based on $pm
+
+# Reference multiple agents
+teambot: @reviewer Check $builder-1 against $pm requirements
+
+# Wait for running task
+teambot: @pm Summarize $ba  # Waits if @ba is still running
+```
+
+**How It Works**:
+1. Parser detects `$agent` references in your prompt
+2. If referenced agent has a running task, waits for completion
+3. Referenced agent's latest output is prepended to your prompt
+4. Your agent receives full context automatically
+
+### Comparing `$ref` vs `->` Syntax
+
+| Feature | `$ref` Syntax | `->` Pipeline |
+|---------|---------------|---------------|
+| **Use Case** | Reference existing output | Chain new tasks |
+| **Example** | `@pm Summarize $ba` | `@ba Analyze -> @pm Summarize` |
+| **Producer Task** | Uses last completed output | Runs new task |
+| **Direction** | Consumer pulls | Producer pushes |
+| **Multiple Sources** | `@pm Use $ba and $writer` | `@ba,writer Analyze -> @pm` |
+| **Best For** | Building on previous work | Designing new workflows |
+
+**When to Use Which**:
+- **`$ref`**: When you want to reference work an agent already completed
+- **`->`**: When you want to define a complete workflow from scratch
 
 ### Split-Pane Interface
 

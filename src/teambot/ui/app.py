@@ -124,13 +124,15 @@ class TeamBotApp(App):
         output.write_streaming_start(agent_id)
 
         try:
-            # For simple single-agent commands, use direct SDK streaming for better UX
-            # but still track the task via executor's manager
+            # For simple single-agent commands WITHOUT references, use direct SDK 
+            # streaming for better UX but still track the task via executor's manager.
+            # Commands WITH references ($agent) must go through executor for injection.
             if (
                 self._sdk_client
                 and hasattr(self._sdk_client, "execute_streaming")
                 and not command.is_pipeline
                 and len(command.agent_ids) == 1
+                and not command.references  # Don't bypass executor if has $refs
             ):
                 # Mark as streaming in centralized state
                 self._agent_status.set_streaming(agent_id)
@@ -152,15 +154,19 @@ class TeamBotApp(App):
                         agent_id, content, on_chunk
                     )
                     task.mark_completed(result_text)
+                    # Store result by agent_id for $ref lookups
+                    self._executor._manager._agent_results[agent_id] = task.result
                     self._agent_status.set_completed(agent_id)
                     output.finish_streaming(agent_id, success=True)
                 except Exception as e:
                     task.mark_failed(str(e))
+                    # Store failed result too for $ref lookups
+                    self._executor._manager._agent_results[agent_id] = task.result
                     self._agent_status.set_failed(agent_id)
                     output.finish_streaming(agent_id, success=False)
                     output.write_task_error(agent_id, str(e))
             else:
-                # Use executor for pipelines (no streaming, show combined results)
+                # Use executor for pipelines, references, and complex commands
                 result = await self._executor.execute(command)
                 if result.background:
                     output.finish_streaming(agent_id)

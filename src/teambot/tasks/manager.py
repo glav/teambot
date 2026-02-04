@@ -45,6 +45,7 @@ class TaskManager:
         self._graph = TaskGraph()
         self._injector = OutputInjector()
         self._results: dict[str, TaskResult] = {}
+        self._agent_results: dict[str, TaskResult] = {}  # agent_id -> latest result
 
         # Semaphore for concurrency control
         self._semaphore: Optional[asyncio.Semaphore] = None
@@ -148,10 +149,12 @@ class TaskManager:
             output = await self._executor(task.agent_id, prompt)
             task.mark_completed(output)
             self._results[task_id] = task.result
+            self._agent_results[task.agent_id] = task.result  # Store by agent_id
             self._graph.mark_completed(task_id)
         except Exception as e:
             task.mark_failed(str(e))
             self._results[task_id] = task.result
+            self._agent_results[task.agent_id] = task.result  # Store failed result too
             # Mark dependents to skip
             to_skip = self._graph.mark_failed(task_id)
             for skip_id in to_skip:
@@ -267,3 +270,28 @@ class TaskManager:
             TaskResult if available.
         """
         return self._results.get(task_id)
+
+    def get_agent_result(self, agent_id: str) -> Optional[TaskResult]:
+        """Get latest result for an agent.
+
+        Args:
+            agent_id: Agent identifier.
+
+        Returns:
+            Latest TaskResult for agent, or None.
+        """
+        return self._agent_results.get(agent_id)
+
+    def get_running_task_for_agent(self, agent_id: str) -> Optional[Task]:
+        """Get currently running task for an agent.
+
+        Args:
+            agent_id: Agent identifier.
+
+        Returns:
+            Running Task if found, else None.
+        """
+        for task in self._tasks.values():
+            if task.agent_id == agent_id and task.status == TaskStatus.RUNNING:
+                return task
+        return None

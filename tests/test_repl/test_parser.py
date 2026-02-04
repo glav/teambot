@@ -261,3 +261,88 @@ class TestEdgeCases:
 
         assert result.type == CommandType.AGENT
         assert "🚀" in result.content
+
+
+class TestParseReferences:
+    """Tests for $agent reference parsing."""
+
+    def test_parse_single_reference(self):
+        """Test parsing single $agent reference."""
+        result = parse_command("@pm Summarize $ba output")
+
+        assert result.references == ["ba"]
+        assert "$ba" in result.content
+
+    def test_parse_multiple_references(self):
+        """Test parsing multiple references."""
+        result = parse_command("@reviewer Check $builder-1 against $pm")
+
+        assert result.references == ["builder-1", "pm"]
+
+    def test_parse_hyphenated_reference(self):
+        """Test parsing reference with hyphenated agent ID."""
+        result = parse_command("@pm Use $builder-1 work")
+
+        assert result.references == ["builder-1"]
+
+    def test_parse_no_reference(self):
+        """Test command without references."""
+        result = parse_command("@pm Create a plan")
+
+        assert result.references == []
+
+    def test_parse_duplicate_references_deduplicated(self):
+        """Test duplicate references are deduplicated."""
+        result = parse_command("@pm Check $ba then verify $ba again")
+
+        assert result.references == ["ba"]
+
+    def test_dollar_amount_not_reference(self):
+        """Test that $100 is not treated as reference."""
+        result = parse_command("@pm Budget is $100")
+
+        assert result.references == []
+
+    def test_reference_at_end_of_content(self):
+        """Test reference at end of content."""
+        result = parse_command("@pm Summarize output from $ba")
+
+        assert result.references == ["ba"]
+
+    def test_reference_in_multiline_content(self):
+        """Test reference detection in multiline content."""
+        result = parse_command("@pm Check this\nbased on $ba\nwork")
+
+        assert result.references == ["ba"]
+
+    def test_command_has_references_field(self):
+        """Test Command dataclass has references field."""
+        cmd = Command(type=CommandType.AGENT)
+
+        assert hasattr(cmd, "references")
+        assert cmd.references == []
+
+    def test_command_references_default_empty(self):
+        """Test references defaults to empty list."""
+        cmd = Command(type=CommandType.AGENT, agent_id="pm")
+
+        assert cmd.references == []
+
+    def test_reference_with_background(self):
+        """Test reference parsing with background operator."""
+        result = parse_command("@pm Summarize $ba output &")
+
+        assert result.references == ["ba"]
+        assert result.background is True
+
+    def test_multiple_same_agent_refs_deduplicated(self):
+        """Test same agent referenced multiple times is deduplicated."""
+        result = parse_command("@pm Use $writer intro and $writer conclusion")
+
+        assert result.references == ["writer"]
+
+    def test_references_preserve_order(self):
+        """Test references maintain discovery order."""
+        result = parse_command("@pm Combine $writer with $ba and $reviewer")
+
+        assert result.references == ["writer", "ba", "reviewer"]

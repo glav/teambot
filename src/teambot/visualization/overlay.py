@@ -64,11 +64,13 @@ class OverlayState:
     pending_count: int = 0
     completed_count: int = 0
     failed_count: int = 0
+    waiting_count: int = 0
+    waiting_for: dict[str, str] = field(default_factory=dict)  # agent -> waiting_for_agent
     spinner_frame: int = 0
 
     def is_idle(self) -> bool:
         """Check if no tasks are running."""
-        return self.running_count == 0 and len(self.active_agents) == 0
+        return self.running_count == 0 and self.waiting_count == 0 and len(self.active_agents) == 0
 
     def total_tasks(self) -> int:
         """Get total task count."""
@@ -306,17 +308,25 @@ class OverlayRenderer:
         if self._state.is_idle():
             lines.append("✓ Idle")
         else:
-            spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
-            agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
-            if len(self._state.active_agents) > 3:
-                agents += f" +{len(self._state.active_agents) - 3}"
-            lines.append(f"{spinner} {agents}"[:OVERLAY_WIDTH - 4])
+            # Show waiting agents if any
+            if self._state.waiting_count > 0:
+                waiting = ", ".join(f"@{a}→@{w}" for a, w in self._state.waiting_for.items())
+                lines.append(f"⏳ {waiting}"[:OVERLAY_WIDTH - 4])
+            else:
+                spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
+                agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
+                if len(self._state.active_agents) > 3:
+                    agents += f" +{len(self._state.active_agents) - 3}"
+                lines.append(f"{spinner} {agents}"[:OVERLAY_WIDTH - 4])
 
         # Line 2: Task counts
         running = self._state.running_count
         pending = self._state.pending_count
         completed = self._state.completed_count
+        waiting = self._state.waiting_count
         counts = f"{running}⏳ {pending}⏸ {completed}✓"
+        if waiting > 0:
+            counts += f" {waiting}⏱"
         if self._state.failed_count > 0:
             counts += f" {self._state.failed_count}✗"
         lines.append(f"Tasks: {counts}"[:OVERLAY_WIDTH - 4])
