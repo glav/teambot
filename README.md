@@ -447,6 +447,7 @@ Each review stage iterates up to 4 times:
 |-------|------|----------|-------------|
 | `teambot_dir` | string | No | Directory for TeamBot workspace (default: `.teambot`) |
 | `default_agent` | string | No | Default agent for plain text input in interactive mode |
+| `default_model` | string | No | Default AI model for all agents (can be overridden per-agent) |
 | `agents` | array | Yes | List of agent configurations |
 
 ### Default Agent
@@ -468,6 +469,44 @@ With this configuration:
 
 If `default_agent` is not set (default behavior), plain text shows a helpful tip message.
 
+### Model Configuration
+
+TeamBot supports configuring which AI model each agent uses. Models can be set at multiple levels with the following priority (highest to lowest):
+
+1. **Inline override**: `@pm --model gpt-5 create a plan`
+2. **Session override**: `/model @pm gpt-5-mini` (lasts for current session)
+3. **Agent config**: `model` field in agent definition
+4. **Global default**: `default_model` field in teambot.json
+5. **SDK default**: If none specified, uses Copilot SDK default
+
+**Example configuration:**
+```json
+{
+  "default_model": "claude-sonnet-4",
+  "agents": [
+    {
+      "id": "pm",
+      "persona": "project_manager",
+      "model": "claude-opus-4.5"
+    },
+    {
+      "id": "builder-1", 
+      "persona": "builder"
+    }
+  ]
+}
+```
+
+In this example:
+- `pm` uses `claude-opus-4.5` (agent-specific)
+- `builder-1` uses `claude-sonnet-4` (falls back to default_model)
+
+**Interactive commands:**
+- `/models` - List all available models
+- `/model` - Show current session overrides
+- `/model @agent <model>` - Set model for agent in current session
+- `/model @agent clear` - Clear session override
+
 ### Agent Configuration
 
 | Field | Type | Description |
@@ -475,6 +514,7 @@ If `default_agent` is not set (default behavior), plain text shows a helpful tip
 | `id` | string | Unique agent identifier |
 | `persona` | string | Persona type |
 | `display_name` | string | Human-readable name for UI |
+| `model` | string | AI model for this agent (optional, falls back to `default_model`) |
 
 ### Stage Configuration (stages.yaml)
 
