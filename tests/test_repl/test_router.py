@@ -243,7 +243,7 @@ class TestRouterWithDefaultAgent:
 
         # Empty content
         cmd = Command(type=CommandType.RAW, content="")
-        result = await router.route(cmd)
+        await router.route(cmd)
 
         # Should use raw handler for empty input
         mock_raw_handler.assert_called_once_with("")
@@ -261,7 +261,7 @@ class TestRouterWithDefaultAgent:
 
         # Whitespace only
         cmd = Command(type=CommandType.RAW, content="   ")
-        result = await router.route(cmd)
+        await router.route(cmd)
 
         # Should use raw handler for whitespace
         mock_raw_handler.assert_called_once_with("   ")

@@ -5,7 +5,6 @@ Provides the main read-eval-print loop for interactive commands.
 
 import asyncio
 import signal
-from typing import Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -36,7 +35,7 @@ class REPLLoop:
         console: Console | None = None,
         sdk_client: CopilotSDKClient | None = None,
         enable_overlay: bool = True,
-        config: Optional[dict] = None,
+        config: dict | None = None,
     ):
         """Initialize the REPL loop.
 
@@ -349,7 +348,7 @@ class REPLLoop:
 
 
 async def run_interactive_mode(
-    console: Optional[Console] = None, config: Optional[dict] = None
+    console: Console | None = None, config: dict | None = None
 ) -> None:
     """Run TeamBot in interactive mode.
 

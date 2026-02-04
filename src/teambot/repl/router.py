@@ -5,7 +5,7 @@ Routes parsed commands to appropriate handlers based on type.
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from teambot.repl.parser import Command, CommandType
 
@@ -36,7 +36,7 @@ class AgentRouter:
     - Raw input routed to default handler or default agent (if configured)
     """
 
-    def __init__(self, history_limit: int = 100, default_agent: Optional[str] = None):
+    def __init__(self, history_limit: int = 100, default_agent: str | None = None):
         """Initialize the router.
 
         Args:
@@ -82,7 +82,7 @@ class AgentRouter:
         """
         return list(VALID_AGENTS)
 
-    def get_default_agent(self) -> Optional[str]:
+    def get_default_agent(self) -> str | None:
         """Get the default agent ID if configured.
 
         Returns:
