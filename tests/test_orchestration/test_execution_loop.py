@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from teambot.orchestration.execution_loop import (
+    REVIEW_STAGES,
     STAGE_ORDER,
     ExecutionLoop,
     ExecutionResult,

@@ -13,6 +13,7 @@ Supports:
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from typing import Optional
 
 
 class CommandType(Enum):

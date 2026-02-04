@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
+from typing import Optional
 
 from teambot.tasks.graph import TaskGraph
 from teambot.tasks.models import Task, TaskResult, TaskStatus
