@@ -1,8 +1,10 @@
 """Tests for agent loader."""
 
-import pytest
 from pathlib import Path
-from teambot.copilot.agent_loader import AgentLoader, AgentDefinition
+
+import pytest
+
+from teambot.copilot.agent_loader import AgentDefinition, AgentLoader
 
 
 class TestAgentDefinition:

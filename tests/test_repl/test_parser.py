@@ -5,8 +5,8 @@ import pytest
 from teambot.repl.parser import (
     Command,
     CommandType,
-    parse_command,
     ParseError,
+    parse_command,
 )
 
 

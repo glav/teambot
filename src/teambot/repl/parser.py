@@ -13,7 +13,6 @@ Supports:
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
 
 
 class CommandType(Enum):
@@ -61,11 +60,11 @@ class Command:
     """
 
     type: CommandType
-    agent_id: Optional[str] = None
+    agent_id: str | None = None
     agent_ids: list[str] = field(default_factory=list)
-    content: Optional[str] = None
-    command: Optional[str] = None
-    args: Optional[list[str]] = None
+    content: str | None = None
+    command: str | None = None
+    args: list[str] | None = None
     background: bool = False
     is_pipeline: bool = False
     pipeline: Optional[list[PipelineStage]] = None
@@ -225,7 +224,18 @@ def _parse_pipeline(input_text: str) -> Command:
     # Validate all stages have content except possibly last
     for i, stage in enumerate(stages[:-1]):
         if not stage.content:
-            raise ParseError(f"Pipeline stage {i+1} requires task content")
+            raise ParseError(f"Pipeline stage {i + 1} requires task content")
+
+    # Extract references from all stages
+    all_content = " ".join(stage.content for stage in stages)
+    ref_matches = REFERENCE_PATTERN.findall(all_content)
+    # Deduplicate while preserving order
+    seen = set()
+    references = []
+    for ref in ref_matches:
+        if ref not in seen:
+            seen.add(ref)
+            references.append(ref)
 
     # Extract references from all stages
     all_content = " ".join(stage.content for stage in stages)

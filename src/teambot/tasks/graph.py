@@ -1,7 +1,6 @@
 """Task dependency graph with cycle detection."""
 
 from collections import defaultdict
-from typing import Optional
 
 
 class CycleDetectedError(Exception):
@@ -185,9 +184,7 @@ class TaskGraph:
 
                 # Check if ALL parents have failed
                 deps = self._dependencies.get(dependent_id, [])
-                all_failed = all(
-                    dep_id in self._failed for dep_id in deps
-                )
+                all_failed = all(dep_id in self._failed for dep_id in deps)
 
                 if all_failed:
                     to_skip.append(dependent_id)
@@ -205,7 +202,7 @@ class TaskGraph:
         # Kahn's algorithm
         in_degree: dict[str, int] = {tid: 0 for tid in self._dependencies}
 
-        for task_id, deps in self._dependencies.items():
+        for _task_id, deps in self._dependencies.items():
             for dep_id in deps:
                 if dep_id in in_degree:
                     pass  # dep exists

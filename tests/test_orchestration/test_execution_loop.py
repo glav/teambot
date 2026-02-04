@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import json
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import pytest
+
 from teambot.orchestration.execution_loop import (
+    STAGE_ORDER,
     ExecutionLoop,
     ExecutionResult,
-    STAGE_ORDER,
-    REVIEW_STAGES,
 )
 from teambot.workflow.stages import WorkflowStage
 
@@ -19,9 +19,7 @@ from teambot.workflow.stages import WorkflowStage
 class TestExecutionLoopInit:
     """Tests for ExecutionLoop initialization."""
 
-    def test_init_parses_objective_file(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    def test_init_parses_objective_file(self, objective_file: Path, teambot_dir: Path) -> None:
         """Initialization parses the objective file."""
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -30,9 +28,7 @@ class TestExecutionLoopInit:
         )
         assert loop.objective.title == "Implement User Authentication"
 
-    def test_init_sets_max_hours(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    def test_init_sets_max_hours(self, objective_file: Path, teambot_dir: Path) -> None:
         """Initialization sets max hours."""
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -42,9 +38,7 @@ class TestExecutionLoopInit:
         )
         assert loop.time_manager.max_seconds == 4 * 3600
 
-    def test_init_starts_at_setup_stage(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    def test_init_starts_at_setup_stage(self, objective_file: Path, teambot_dir: Path) -> None:
         """Initialization starts at SETUP stage."""
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -127,9 +121,7 @@ class TestExecutionLoopRun:
         assert result == ExecutionResult.TIMEOUT
 
     @pytest.mark.asyncio
-    async def test_run_review_failure_returns_review_failed(
-        self, loop: ExecutionLoop
-    ) -> None:
+    async def test_run_review_failure_returns_review_failed(self, loop: ExecutionLoop) -> None:
         """Run returns REVIEW_FAILED when review fails."""
         # Create a client that always rejects
         mock_client = AsyncMock()
@@ -220,9 +212,7 @@ class TestExecutionLoopStatePersistence:
         with pytest.raises(ValueError, match="No orchestration state"):
             ExecutionLoop.resume(teambot_dir, {})
 
-    def test_resume_restores_stage_outputs(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    def test_resume_restores_stage_outputs(self, objective_file: Path, teambot_dir: Path) -> None:
         """Resume restores stage outputs."""
         # Create feature subdirectory with state file
         feature_dir = teambot_dir / "user-authentication"
@@ -325,9 +315,7 @@ class TestExecutionLoopStatePersistence:
         assert state["status"] == "complete"
 
     @pytest.mark.asyncio
-    async def test_save_state_status_error(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    async def test_save_state_status_error(self, objective_file: Path, teambot_dir: Path) -> None:
         """Saved state has status 'error' when execution raises an exception."""
         loop = ExecutionLoop(
             objective_path=objective_file,

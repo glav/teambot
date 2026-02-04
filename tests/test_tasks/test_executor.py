@@ -1,11 +1,12 @@
 """Tests for TaskExecutor - bridges REPL commands to TaskManager."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
+import pytest
+
+from teambot.repl.parser import parse_command
 from teambot.tasks.executor import TaskExecutor
 from teambot.tasks.models import TaskStatus
-from teambot.repl.parser import parse_command
 
 
 class TestTaskExecutorBasic:
@@ -55,6 +56,7 @@ class TestTaskExecutorBackground:
 
         # Should return quickly (not wait for task)
         import time
+
         start = time.time()
         result = await executor.execute(cmd)
         elapsed = time.time() - start
@@ -100,6 +102,7 @@ class TestTaskExecutorMultiAgent:
     @pytest.mark.asyncio
     async def test_multiagent_collects_all_outputs(self):
         """Test that multi-agent collects all outputs."""
+
         async def agent_response(agent_id, prompt):
             return f"Response from {agent_id}"
 
@@ -364,7 +367,7 @@ class TestTaskExecutorStreaming:
         )
 
         cmd = parse_command("@pm Test streaming")
-        result = await executor.execute(cmd)
+        await executor.execute(cmd)
 
         # Verify execute_streaming was called with raw content
         # Custom agents in .github/agents/ handle persona
@@ -411,7 +414,7 @@ class TestTaskExecutorStreaming:
         executor = TaskExecutor(sdk_client=mock_sdk)
 
         cmd = parse_command("@pm Test")
-        result = await executor.execute(cmd)
+        await executor.execute(cmd)
 
         # Should use regular execute, not execute_streaming
         mock_sdk.execute.assert_called_once()

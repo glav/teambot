@@ -211,7 +211,9 @@ def _run_orchestration(
     def handle_interrupt(sig: int, frame: object) -> None:
         cancel_count[0] += 1
         if cancel_count[0] == 1:
-            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            display.print_warning(
+                "Cancellation requested, saving state... (Ctrl+C again to force quit)"
+            )
             loop.cancel()
         else:
             # Force exit on second Ctrl+C
@@ -312,7 +314,9 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
     def handle_interrupt(sig: int, frame: object) -> None:
         cancel_count[0] += 1
         if cancel_count[0] == 1:
-            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            display.print_warning(
+                "Cancellation requested, saving state... (Ctrl+C again to force quit)"
+            )
             loop.cancel()
         else:
             # Force exit on second Ctrl+C

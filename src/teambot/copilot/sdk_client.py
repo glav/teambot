@@ -3,7 +3,8 @@
 import asyncio
 import logging
 import os
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from teambot.copilot.agent_loader import get_agent_loader
 
@@ -142,12 +143,14 @@ class CopilotSDKClient:
 
         # Add custom agent definition if available
         if agent_def:
-            session_config["customAgents"] = [{
-                "name": agent_id,
-                "displayName": agent_def.display_name,
-                "description": agent_def.description,
-                "prompt": agent_def.prompt,
-            }]
+            session_config["customAgents"] = [
+                {
+                    "name": agent_id,
+                    "displayName": agent_def.display_name,
+                    "description": agent_def.description,
+                    "prompt": agent_def.prompt,
+                }
+            ]
             logger.info(f"Configured session with custom agent '{agent_id}'")
         else:
             logger.warning(f"No agent definition found for '{agent_id}', using defaults")
@@ -213,10 +216,10 @@ User request: {user_prompt}"""
             try:
                 response = await session.send_and_wait({"prompt": full_prompt, "timeout": timeout})
                 return response.data.content
-            except asyncio.TimeoutError:
-                raise SDKClientError(f"Request timed out after {timeout}s")
+            except TimeoutError as e:
+                raise SDKClientError(f"Request timed out after {timeout}s") from e
             except Exception as e:
-                raise SDKClientError(f"SDK error: {e}")
+                raise SDKClientError(f"SDK error: {e}") from e
 
         # Use streaming (default) - persona injection happens in execute_streaming
         return await self.execute_streaming(agent_id, prompt, on_chunk=lambda _: None)
@@ -253,7 +256,7 @@ User request: {user_prompt}"""
 
         accumulated: list[str] = []
         done = asyncio.Event()
-        error_holder: list[Optional[Exception]] = [None]
+        error_holder: list[Exception | None] = [None]
 
         def on_event(event):
             """Handle streaming events from SDK."""
@@ -318,9 +321,9 @@ User request: {user_prompt}"""
             logger.debug("Waiting for completion...")
             try:
                 await asyncio.wait_for(done.wait(), timeout=1800.0)  # 30 min max
-            except asyncio.TimeoutError:
+            except TimeoutError as e:
                 logger.warning(f"Streaming timeout after 30 minutes for {agent_id}")
-                raise SDKClientError("Streaming timeout - no completion event received")
+                raise SDKClientError("Streaming timeout - no completion event received") from e
 
             logger.debug(f"Done waiting, accumulated {len(accumulated)} chunks")
 

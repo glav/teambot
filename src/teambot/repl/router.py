@@ -3,9 +3,9 @@
 Routes parsed commands to appropriate handlers based on type.
 """
 
-from collections.abc import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from teambot.repl.parser import Command, CommandType
 
@@ -42,9 +42,9 @@ class AgentRouter:
         Args:
             history_limit: Maximum number of commands to keep in history.
         """
-        self._agent_handler: Optional[Callable[[str, str], Awaitable[str]]] = None
-        self._system_handler: Optional[Callable[[str, list[str]], str]] = None
-        self._raw_handler: Optional[Callable[[str], str]] = None
+        self._agent_handler: Callable[[str, str], Awaitable[str]] | None = None
+        self._system_handler: Callable[[str, list[str]], str] | None = None
+        self._raw_handler: Callable[[str], str] | None = None
         self._history: list[dict[str, Any]] = []
         self._history_limit = history_limit
 
@@ -79,9 +79,7 @@ class AgentRouter:
         """
         return list(VALID_AGENTS)
 
-    def register_agent_handler(
-        self, handler: Callable[[str, str], Awaitable[str]]
-    ) -> None:
+    def register_agent_handler(self, handler: Callable[[str, str], Awaitable[str]]) -> None:
         """Register handler for agent commands.
 
         Args:
@@ -89,9 +87,7 @@ class AgentRouter:
         """
         self._agent_handler = handler
 
-    def register_system_handler(
-        self, handler: Callable[[str, list[str]], str]
-    ) -> None:
+    def register_system_handler(self, handler: Callable[[str, list[str]], str]) -> None:
         """Register handler for system commands.
 
         Args:

@@ -5,16 +5,18 @@ Write these BEFORE implementation (TDD).
 """
 
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 class TestExecuteStreaming:
     """Tests for execute_streaming method."""
 
     @pytest.mark.asyncio
-    async def test_receives_delta_events(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_receives_delta_events(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify on_chunk callback receives each delta."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
@@ -57,7 +59,9 @@ class TestExecuteStreaming:
             assert result == "Hello World!"
 
     @pytest.mark.asyncio
-    async def test_completes_on_session_idle(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_completes_on_session_idle(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify streaming completes when SESSION_IDLE received."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
@@ -88,7 +92,9 @@ class TestExecuteStreaming:
             assert result == "Done"
 
     @pytest.mark.asyncio
-    async def test_handles_session_error(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_handles_session_error(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify SESSION_ERROR raises SDKClientError."""
         from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 
@@ -116,7 +122,9 @@ class TestExecuteStreaming:
                 await client.execute_streaming("pm", "Test", lambda _: None)
 
     @pytest.mark.asyncio
-    async def test_accumulates_content(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_accumulates_content(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify all chunks accumulated into return value."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
@@ -154,7 +162,9 @@ class TestExecuteStreaming:
             assert result == "ABC"
 
     @pytest.mark.asyncio
-    async def test_unsubscribes_on_complete(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_unsubscribes_on_complete(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify event listener unsubscribed after completion."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
@@ -190,7 +200,9 @@ class TestExecuteStreaming:
             assert len(mock_streaming_session._handlers) == 0
 
     @pytest.mark.asyncio
-    async def test_unsubscribes_on_error(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_unsubscribes_on_error(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify event listener unsubscribed even on error."""
         from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 
@@ -221,10 +233,13 @@ class TestExecuteStreaming:
             assert len(mock_streaming_session._handlers) == 0
 
     @pytest.mark.asyncio
-    async def test_filters_empty_deltas(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_filters_empty_deltas(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify None or empty delta_content is skipped."""
-        from teambot.copilot.sdk_client import CopilotSDKClient
         from types import SimpleNamespace
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
 
         chunks_received = []
 
@@ -275,7 +290,9 @@ class TestExecuteStreaming:
             assert result == "AB"
 
     @pytest.mark.asyncio
-    async def test_handles_abort_event(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_handles_abort_event(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify ABORT event is handled gracefully."""
         from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 
@@ -308,7 +325,9 @@ class TestBackwardCompatibility:
     """Tests for backward compatible execute()."""
 
     @pytest.mark.asyncio
-    async def test_execute_returns_complete_response(self, mock_streaming_session, mock_event_types, mock_event_data):
+    async def test_execute_returns_complete_response(
+        self, mock_streaming_session, mock_event_types, mock_event_data
+    ):
         """Verify execute() returns complete response using streaming internally."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
@@ -345,8 +364,9 @@ class TestBackwardCompatibility:
     @pytest.mark.asyncio
     async def test_execute_api_signature_unchanged(self):
         """Verify execute() has same signature as before."""
-        from teambot.copilot.sdk_client import CopilotSDKClient
         import inspect
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
 
         sig = inspect.signature(CopilotSDKClient.execute)
         params = list(sig.parameters.keys())

@@ -53,10 +53,9 @@ class ParallelExecutor:
         async def execute_one(task: AgentTask) -> tuple[str, TaskResult]:
             async with self.semaphore:
                 if on_progress:
-                    on_progress("agent_running", {
-                        "agent_id": task.agent_id,
-                        "task": task.description
-                    })
+                    on_progress(
+                        "agent_running", {"agent_id": task.agent_id, "task": task.description}
+                    )
 
                 try:
                     chunks: list[str] = []
@@ -64,35 +63,27 @@ class ParallelExecutor:
                     def on_chunk(chunk: str) -> None:
                         chunks.append(chunk)
                         if on_progress:
-                            on_progress("agent_streaming", {
-                                "agent_id": task.agent_id,
-                                "chunk": chunk
-                            })
+                            on_progress(
+                                "agent_streaming", {"agent_id": task.agent_id, "chunk": chunk}
+                            )
 
                     output = await self.sdk_client.execute_streaming(
                         task.agent_id, task.prompt, on_chunk
                     )
 
                     if on_progress:
-                        on_progress("agent_complete", {
-                            "agent_id": task.agent_id
-                        })
+                        on_progress("agent_complete", {"agent_id": task.agent_id})
 
                     return (task.agent_id, TaskResult(success=True, output=output))
 
                 except asyncio.CancelledError:
                     if on_progress:
-                        on_progress("agent_cancelled", {
-                            "agent_id": task.agent_id
-                        })
+                        on_progress("agent_cancelled", {"agent_id": task.agent_id})
                     raise
 
                 except Exception as e:
                     if on_progress:
-                        on_progress("agent_failed", {
-                            "agent_id": task.agent_id,
-                            "error": str(e)
-                        })
+                        on_progress("agent_failed", {"agent_id": task.agent_id, "error": str(e)})
                     return (task.agent_id, TaskResult(success=False, error=str(e)))
 
         results = await asyncio.gather(*[execute_one(t) for t in tasks], return_exceptions=True)

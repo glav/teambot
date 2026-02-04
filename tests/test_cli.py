@@ -149,7 +149,6 @@ class TestCLIRun:
         display = ConsoleDisplay()
 
         # Mock the REPL to avoid hanging on input
-        import teambot.cli
 
         async def mock_repl(*args, **kwargs):
             pass
