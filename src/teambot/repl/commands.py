@@ -317,8 +317,8 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
             TaskStatus.CANCELLED: "🚫",
         }.get(task.status, "?")
 
-        # Get status text (capitalize first letter of enum name)
-        status_text = task.status.name.capitalize()
+        # Get status text (format enum name for display)
+        status_text = task.status.name.replace('_', ' ').title()
         
         prompt = task.prompt[:30] + "..." if len(task.prompt) > 30 else task.prompt
         model_display = task.model if task.model else "(default)"
