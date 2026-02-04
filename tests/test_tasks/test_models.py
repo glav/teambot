@@ -165,3 +165,17 @@ class TestTaskResult:
 
         assert result.completed_at is not None
         assert isinstance(result.completed_at, datetime)
+
+
+class TestTaskModel:
+    """Tests for model field in Task."""
+
+    def test_task_with_model(self):
+        """Task can be created with model."""
+        task = Task(id="t1", agent_id="pm", prompt="test", model="gpt-5")
+        assert task.model == "gpt-5"
+
+    def test_task_model_defaults_to_none(self):
+        """Task.model defaults to None."""
+        task = Task(id="t1", agent_id="pm", prompt="test")
+        assert task.model is None

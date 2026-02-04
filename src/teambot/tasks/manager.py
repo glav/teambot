@@ -9,7 +9,7 @@ from teambot.tasks.models import Task, TaskResult, TaskStatus
 from teambot.tasks.output_injector import OutputInjector
 
 # Type for the executor function
-ExecutorFn = Callable[[str, str], Awaitable[str]]
+ExecutorFn = Callable[[str, str, str | None], Awaitable[str]]
 
 
 class TaskManager:
@@ -65,6 +65,7 @@ class TaskManager:
         dependencies: list[str] | None = None,
         timeout: float | None = None,
         background: bool = False,
+        model: str | None = None,
     ) -> Task:
         """Create a new task.
 
@@ -74,11 +75,12 @@ class TaskManager:
             dependencies: List of task IDs this task depends on.
             timeout: Timeout in seconds (uses default if not specified).
             background: Whether task runs in background.
+            model: AI model to use for this task.
 
         Returns:
             Created Task object.
         """
-        task_id = f"task-{agent_id}-{uuid.uuid4().hex[:8]}"
+        task_id = uuid.uuid4().hex[:8]
         deps = dependencies or []
 
         task = Task(
@@ -88,6 +90,7 @@ class TaskManager:
             dependencies=deps,
             timeout=timeout or self._default_timeout,
             background=background,
+            model=model,
         )
 
         self._tasks[task_id] = task
@@ -144,7 +147,7 @@ class TaskManager:
         task.mark_running()
 
         try:
-            output = await self._executor(task.agent_id, prompt)
+            output = await self._executor(task.agent_id, prompt, task.model)
             task.mark_completed(output)
             self._results[task_id] = task.result
             self._agent_results[task.agent_id] = task.result  # Store by agent_id

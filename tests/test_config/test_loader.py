@@ -344,3 +344,121 @@ class TestDefaultAgentConfig:
 
         # Should not have default_agent key if not specified
         assert "default_agent" not in config
+
+
+class TestAgentModelConfig:
+    """Tests for agent model field in config loader."""
+
+    def test_agent_with_valid_model(self, tmp_path):
+        """Agent with valid model loads successfully."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [
+                {
+                    "id": "pm",
+                    "persona": "project_manager",
+                    "display_name": "Project Manager",
+                    "model": "gpt-5",
+                }
+            ]
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["agents"][0]["model"] == "gpt-5"
+
+    def test_agent_with_invalid_model_raises(self, tmp_path):
+        """Agent with invalid model raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [
+                {
+                    "id": "pm",
+                    "persona": "project_manager",
+                    "display_name": "Project Manager",
+                    "model": "invalid-model",
+                }
+            ]
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+
+        with pytest.raises(ConfigError, match="Invalid model"):
+            loader.load(config_file)
+
+    def test_agent_without_model_is_valid(self, tmp_path):
+        """Agent without model field is valid (optional)."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [
+                {
+                    "id": "pm",
+                    "persona": "project_manager",
+                    "display_name": "Project Manager",
+                }
+            ]
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["agents"][0].get("model") is None
+
+
+class TestGlobalDefaultModel:
+    """Tests for global default_model in config."""
+
+    def test_valid_default_model(self, tmp_path):
+        """Valid global default_model loads successfully."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "default_model": "claude-sonnet-4",
+            "agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}],
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["default_model"] == "claude-sonnet-4"
+
+    def test_invalid_default_model_raises(self, tmp_path):
+        """Invalid global default_model raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "default_model": "invalid-model",
+            "agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}],
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+
+        with pytest.raises(ConfigError, match="Invalid default_model"):
+            loader.load(config_file)
+
+    def test_default_model_optional(self, tmp_path):
+        """Config without default_model is valid."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {"agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}]}
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config.get("default_model") is None

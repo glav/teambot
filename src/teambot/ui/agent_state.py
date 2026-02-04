@@ -27,11 +27,13 @@ class AgentStatus:
         agent_id: Unique identifier for the agent.
         state: Current state of the agent.
         task: Current task description (truncated for display).
+        model: AI model assigned to this agent.
     """
 
     agent_id: str
     state: AgentState = AgentState.IDLE
     task: str | None = None
+    model: str | None = None
 
     def with_state(self, state: AgentState, task: str | None = None) -> "AgentStatus":
         """Create a new AgentStatus with updated state.
@@ -47,6 +49,23 @@ class AgentStatus:
             agent_id=self.agent_id,
             state=state,
             task=task if task is not None else self.task,
+            model=self.model,
+        )
+
+    def with_model(self, model: str | None) -> "AgentStatus":
+        """Create a new AgentStatus with updated model.
+
+        Args:
+            model: New model for the agent.
+
+        Returns:
+            New AgentStatus instance with updated model.
+        """
+        return AgentStatus(
+            agent_id=self.agent_id,
+            state=self.state,
+            task=self.task,
+            model=model,
         )
 
 
@@ -146,6 +165,7 @@ class AgentStatusManager:
             agent_id=agent_id,
             state=AgentState.IDLE,
             task=None,
+            model=old_status.model,
         )
 
         if old_status.state != new_status.state or old_status.task != new_status.task:
@@ -169,6 +189,23 @@ class AgentStatusManager:
         # Only notify if something changed
         if old_status.state != new_status.state or old_status.task != new_status.task:
             self._statuses[agent_id] = new_status
+            self._notify()
+
+    def set_model(self, agent_id: str, model: str | None) -> None:
+        """Set model for an agent.
+
+        Args:
+            agent_id: Agent identifier.
+            model: Model to set (or None to clear).
+        """
+        if agent_id not in self._statuses:
+            self._statuses[agent_id] = AgentStatus(agent_id=agent_id, model=model)
+            self._notify()
+            return
+
+        old_status = self._statuses[agent_id]
+        if old_status.model != model:
+            self._statuses[agent_id] = old_status.with_model(model)
             self._notify()
 
     def _notify(self) -> None:

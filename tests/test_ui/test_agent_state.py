@@ -239,3 +239,49 @@ class TestAgentStatusManagerListeners:
 
         manager.set_running("pm", "task")
         assert calls == [1]  # Only one call
+
+
+class TestAgentStatusModel:
+    """Tests for model field in AgentStatus."""
+
+    def test_agent_status_with_model(self):
+        """AgentStatus can be created with model."""
+        status = AgentStatus(agent_id="pm", model="gpt-5")
+        assert status.model == "gpt-5"
+
+    def test_agent_status_model_defaults_to_none(self):
+        """AgentStatus.model defaults to None."""
+        status = AgentStatus(agent_id="pm")
+        assert status.model is None
+
+    def test_with_state_preserves_model(self):
+        """with_state() preserves model field."""
+        status = AgentStatus(agent_id="pm", model="gpt-5")
+        new_status = status.with_state(AgentState.RUNNING, task="test")
+        assert new_status.model == "gpt-5"
+
+    def test_with_model_creates_new_status(self):
+        """with_model() creates new status with different model."""
+        status = AgentStatus(agent_id="pm", model="gpt-5")
+        new_status = status.with_model("claude-opus-4.5")
+        assert new_status.model == "claude-opus-4.5"
+        assert status.model == "gpt-5"  # Original unchanged
+
+
+class TestAgentStatusManagerModel:
+    """Tests for model in AgentStatusManager."""
+
+    def test_set_model_updates_agent(self):
+        """set_model() updates agent's model."""
+        manager = AgentStatusManager()
+        manager.set_model("pm", "claude-opus-4.5")
+        assert manager.get("pm").model == "claude-opus-4.5"
+
+    def test_set_model_notifies_listeners(self):
+        """set_model() triggers listener notification."""
+        manager = AgentStatusManager()
+        notified = []
+        manager.add_listener(lambda m: notified.append(True))
+
+        manager.set_model("pm", "gpt-5")
+        assert len(notified) == 1

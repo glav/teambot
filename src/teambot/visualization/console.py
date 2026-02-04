@@ -39,7 +39,9 @@ class ConsoleDisplay:
         self.agents: dict[str, dict[str, Any]] = {}
         self._live: Live | None = None
 
-    def add_agent(self, agent_id: str, persona: str, display_name: str | None = None) -> None:
+    def add_agent(
+        self, agent_id: str, persona: str, display_name: str | None = None, model: str | None = None
+    ) -> None:
         """Register an agent for display."""
         self.agents[agent_id] = {
             "persona": persona,
@@ -48,6 +50,7 @@ class ConsoleDisplay:
             "current_task": None,
             "progress": 0,
             "message": "",
+            "model": model,
         }
 
     def update_status(
@@ -82,29 +85,16 @@ class ConsoleDisplay:
         table = Table(title="TeamBot Agents", show_header=True)
         table.add_column("Agent", style="bold")
         table.add_column("Persona")
-        table.add_column("Status")
-        table.add_column("Task")
-        table.add_column("Progress")
+        table.add_column("Model", style="dim italic")
 
         for _agent_id, info in self.agents.items():
             color = PERSONA_COLORS.get(info["persona"], "white")
-            status = info["status"].value
-            status_color = {
-                "idle": "dim",
-                "working": "yellow",
-                "completed": "green",
-                "failed": "red",
-                "waiting": "cyan",
-            }.get(status, "white")
-
-            progress_bar = self._make_progress_bar(info["progress"])
+            model_display = info.get("model") or "-"
 
             table.add_row(
                 f"[{color}]{info['display_name']}[/]",
                 info["persona"],
-                f"[{status_color}]{status}[/]",
-                info["current_task"] or "-",
-                progress_bar,
+                model_display,
             )
 
         return table

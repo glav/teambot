@@ -109,8 +109,8 @@ class StatusPanel(Static):
         # Git branch header (if available)
         if self._git_branch:
             branch_display = self._git_branch
-            if len(branch_display) > 15:
-                branch_display = branch_display[:12] + "..."
+            if len(branch_display) > 25:
+                branch_display = branch_display[:22] + "..."
             lines.append(f"[dim]Branch:[/dim] [white]{branch_display}[/white]")
             lines.append("")
 
@@ -120,14 +120,19 @@ class StatusPanel(Static):
             indicator = self._get_indicator(status.state)
             line = f"{indicator} {agent_id}"
 
+            # Add model indicator if set - with nice abbreviated display
+            if status.model:
+                model_display = self._format_model_name(status.model)
+                line += f" [dim italic]({model_display})[/dim italic]"
+
             # Add task info for active agents (indented on next line)
             if status.state in (AgentState.RUNNING, AgentState.STREAMING):
                 lines.append(line)
                 if status.task:
                     # Truncate task for display
                     task_display = status.task
-                    if len(task_display) > 20:
-                        task_display = task_display[:17] + "..."
+                    if len(task_display) > 30:
+                        task_display = task_display[:27] + "..."
                     lines.append(f"  [dim]→ {task_display}[/dim]")
             elif status.state == AgentState.IDLE:
                 lines.append(f"{line} [dim]idle[/dim]")
@@ -135,6 +140,34 @@ class StatusPanel(Static):
                 lines.append(line)
 
         return "\n".join(lines)
+
+    def _format_model_name(self, model: str) -> str:
+        """Format model name for compact display.
+
+        Args:
+            model: Full model name (e.g., 'claude-sonnet-4', 'gpt-4o-mini').
+
+        Returns:
+            Abbreviated display name (e.g., 'sonnet-4', 'gpt-4o-mini').
+        """
+        # Common abbreviations for cleaner display
+        abbreviations = {
+            "claude-sonnet-4": "sonnet-4",
+            "claude-sonnet-4.5": "sonnet-4.5",
+            "claude-haiku-4": "haiku-4",
+            "claude-haiku-4.5": "haiku-4.5",
+            "claude-opus-4": "opus-4",
+            "claude-opus-4.5": "opus-4.5",
+        }
+
+        if model in abbreviations:
+            return abbreviations[model]
+
+        # For other models, truncate if too long
+        if len(model) > 18:
+            return model[:15] + "..."
+
+        return model
 
     def _get_indicator(self, state: AgentState) -> str:
         """Get colored indicator for agent state.

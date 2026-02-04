@@ -57,6 +57,8 @@ class Command:
         is_pipeline: Whether this is a pipeline (->).
         pipeline: List of pipeline stages if is_pipeline.
         references: Agent IDs from $ref syntax (e.g., $pm -> ["pm"]).
+        model: AI model override for this command (--model or -m).
+        is_session_model_set: True if command is setting session model only.
     """
 
     type: CommandType
@@ -69,6 +71,8 @@ class Command:
     is_pipeline: bool = False
     pipeline: list[PipelineStage] | None = None
     references: list[str] = field(default_factory=list)
+    model: str | None = None
+    is_session_model_set: bool = False
 
 
 # Pattern for agent commands: @agent-id or @agent1,agent2
@@ -83,6 +87,9 @@ PIPELINE_PATTERN = re.compile(r"\s*->\s*@")
 # Pattern for agent references in content: $pm, $ba, $builder-1
 # Uses negative lookbehind to exclude escaped \$
 REFERENCE_PATTERN = re.compile(r"(?<!\\)\$([a-zA-Z][a-zA-Z0-9-]*)")
+
+# Pattern for model flag: --model <value> or -m <value>
+MODEL_FLAG_PATTERN = re.compile(r"(?:--model|-m)\s+([^\s]+)")
 
 
 def parse_command(input_text: str) -> Command:
@@ -136,6 +143,20 @@ def _parse_agent_command(input_text: str, agent_match: re.Match) -> Command:
     # Parse agent IDs (comma-separated)
     agent_ids = [a.strip() for a in agents_str.split(",") if a.strip()]
 
+    # Extract model flag if present
+    model = None
+    is_session_model_set = False
+    if content:
+        model_match = MODEL_FLAG_PATTERN.search(content)
+        if model_match:
+            model = model_match.group(1)
+            # Remove model flag from content
+            content = MODEL_FLAG_PATTERN.sub("", content)
+
+    # Check for missing model value (--model or -m at end without value)
+    if content and ("--model" in content or re.search(r"-m\s*$", content)):
+        raise ParseError("--model flag requires a model name")
+
     # Check for background operator (&)
     background = False
     if content:
@@ -144,15 +165,22 @@ def _parse_agent_command(input_text: str, agent_match: re.Match) -> Command:
             background = True
             content = content[:-1].strip()
 
-    if not content:
+    # Determine if this is just setting session model (no task)
+    if model and not content:
+        is_session_model_set = True
+
+    if not content and not is_session_model_set:
         raise ParseError(f"Agent command requires task: @{agents_str} <task required>")
 
-    # Remove exactly one leading space if present
-    if agent_match.group(2).startswith(" "):
+    # Remove exactly one leading space if present (for original content)
+    if content and agent_match.group(2).startswith(" "):
         raw_content = agent_match.group(2)[1:]
+        # Remove model flag from raw content if present
+        if model:
+            raw_content = MODEL_FLAG_PATTERN.sub("", raw_content)
         if raw_content.endswith("&"):
             raw_content = raw_content[:-1].rstrip()
-        content = raw_content
+        content = raw_content.strip()
 
     # Detect $agent references in content
     references = []
@@ -170,6 +198,8 @@ def _parse_agent_command(input_text: str, agent_match: re.Match) -> Command:
         background=background,
         is_pipeline=False,
         references=references,
+        model=model,
+        is_session_model_set=is_session_model_set,
     )
 
 
