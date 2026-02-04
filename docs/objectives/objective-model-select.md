@@ -19,7 +19,7 @@
 - Teambot currently does not support using different models.
 - Each model has its strengths, speed and also related costs.
 - To provide a cost effective but still good experience, we need to allow teambot to use a selection of models via configuration
-- This allows the user to configure the mnost cost effective but suitable approach for agents.
+- This allows the user to configure the most cost effective but suitable approach for agents.
 - This also allows one model to either plan or implement, while another model performs review and feedback.
 
 **Success Criteria**:
