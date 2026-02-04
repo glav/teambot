@@ -28,6 +28,7 @@ class TestWorkflowStage:
             "IMPLEMENTATION",
             "IMPLEMENTATION_REVIEW",
             "TEST",
+            "ACCEPTANCE_TEST",
             "POST_REVIEW",
             "COMPLETE",
         ]
@@ -36,7 +37,7 @@ class TestWorkflowStage:
 
     def test_stage_count(self):
         """Test correct number of stages."""
-        assert len(WorkflowStage) == 13
+        assert len(WorkflowStage) == 14
 
 
 class TestStageMetadata:

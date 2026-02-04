@@ -278,7 +278,7 @@ class REPLLoop:
                             result = await self._handle_advanced_command(command)
                             self._console.print(result)
                         else:
-                            # Use existing router for simple commands
+                            # Use existing router for system commands only
                             result = await self._router.route(command)
 
                             # Handle system command results

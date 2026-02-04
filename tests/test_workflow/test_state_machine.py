@@ -218,6 +218,7 @@ class TestWorkflowStateMachine:
         machine.transition_to(WorkflowStage.IMPLEMENTATION)
         machine.transition_to(WorkflowStage.IMPLEMENTATION_REVIEW)
         machine.transition_to(WorkflowStage.TEST)
+        machine.transition_to(WorkflowStage.ACCEPTANCE_TEST)
         machine.transition_to(WorkflowStage.POST_REVIEW)
         machine.transition_to(WorkflowStage.COMPLETE)
 

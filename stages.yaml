@@ -1,0 +1,290 @@
+# TeamBot Stage Configuration
+#
+# This file defines the 14-stage prescriptive workflow for TeamBot orchestration.
+# Each stage specifies which agents run, what artifacts are produced, and exit criteria.
+#
+# To customize the workflow, copy this file and point to it in teambot.json:
+#   "stages_config": "path/to/custom-stages.yaml"
+
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize project, configure agents, and establish working directory
+    work_agent: pm
+    review_agent: null
+    allowed_personas:
+      - project_manager
+      - pm
+    artifacts: []
+    exit_criteria:
+      - Environment ready
+      - Configuration validated
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.0-initialize.prompt.md
+    include_objective: false  # Generic initialization, no objective needed
+
+  BUSINESS_PROBLEM:
+    name: Business Problem
+    description: Define the business problem, goals, and success criteria
+    work_agent: ba
+    review_agent: null
+    allowed_personas:
+      - business_analyst
+      - ba
+      - project_manager
+      - pm
+    artifacts:
+      - problem_statement.md
+    exit_criteria:
+      - Clear problem definition with measurable goals
+    optional: true  # May be skipped for small changes
+    prompt_template: null  # No SDD prompt for this stage
+    include_objective: true
+
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas:
+      - business_analyst
+      - ba
+      - technical_writer
+      - writer
+    artifacts:
+      - feature_spec.md
+    exit_criteria:
+      - Complete specification with all required sections
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+    include_objective: true
+
+  SPEC_REVIEW:
+    name: Spec Review
+    description: Review and approve the feature specification
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas:
+      - reviewer
+      - project_manager
+      - pm
+    artifacts:
+      - spec_review.md
+    exit_criteria:
+      - Specification approved or revision feedback provided
+    optional: false
+    is_review_stage: true
+    prompt_template: .agent/commands/sdd/sdd.2-review-spec.prompt.md
+    include_objective: true
+
+  RESEARCH:
+    name: Research
+    description: Research technical approaches, analyze project structure, and identify dependencies
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+      - technical_writer
+      - writer
+    artifacts:
+      - research.md
+    exit_criteria:
+      - Research document with implementation recommendations
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.3-research-feature.prompt.md
+    include_objective: true
+
+  TEST_STRATEGY:
+    name: Test Strategy
+    description: Define testing approach (TDD vs Code-First), coverage targets, and test patterns
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+      - reviewer
+    artifacts:
+      - test_strategy.md
+    exit_criteria:
+      - Test strategy document with approach per component
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.4-determine-test-strategy.prompt.md
+    include_objective: true
+
+  PLAN:
+    name: Plan
+    description: Create implementation plan with task breakdown and dependencies
+    work_agent: pm
+    review_agent: reviewer
+    allowed_personas:
+      - project_manager
+      - pm
+      - builder
+      - developer
+    artifacts:
+      - implementation_plan.md
+    exit_criteria:
+      - Actionable plan with atomic tasks and clear dependencies
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.5-task-planner-for-feature.prompt.md
+    include_objective: true
+
+  PLAN_REVIEW:
+    name: Plan Review
+    description: Review and approve the implementation plan
+    work_agent: pm
+    review_agent: reviewer
+    allowed_personas:
+      - reviewer
+      - project_manager
+      - pm
+    artifacts:
+      - plan_review.md
+    exit_criteria:
+      - Plan approved or revision feedback provided
+    optional: false
+    is_review_stage: true
+    prompt_template: .agent/commands/sdd/sdd.6-review-plan.prompt.md
+    include_objective: true
+
+  IMPLEMENTATION:
+    name: Implementation
+    description: Execute the implementation plan, write code, and implement tests
+    work_agent: builder-1
+    review_agent: reviewer
+    allowed_personas:
+      - builder
+      - developer
+    artifacts: []  # Dynamic based on plan
+    exit_criteria:
+      - All tasks complete
+      - Code implemented per plan
+    optional: false
+    parallel_agents:
+      - builder-1
+      - builder-2
+    prompt_template: .agent/commands/sdd/sdd.7-task-implementer-for-feature.prompt.md
+    include_objective: true
+
+  IMPLEMENTATION_REVIEW:
+    name: Implementation Review
+    description: Review implemented changes for quality, correctness, and adherence to spec
+    work_agent: builder-1
+    review_agent: reviewer
+    allowed_personas:
+      - reviewer
+    artifacts:
+      - impl_review.md
+    exit_criteria:
+      - Implementation approved or revision feedback provided
+    optional: false
+    is_review_stage: true
+    prompt_template: null  # Uses general review approach
+    include_objective: true
+
+  TEST:
+    name: Test
+    description: >
+      Execute tests and validate implementation meets requirements.
+      New tests should be introduced to ensure new functionality is covered
+      and tests pass before continuing.
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+      - reviewer
+    artifacts:
+      - test_results.md
+    exit_criteria:
+      - All tests passing
+      - Coverage targets met
+    optional: false
+    prompt_template: null  # Uses general test execution
+    include_objective: true
+
+  ACCEPTANCE_TEST:
+    name: Acceptance Test
+    description: >
+      Execute acceptance test scenarios from the feature specification.
+      These tests validate the implementation works end-to-end from a user's perspective.
+      Unlike unit tests, acceptance tests exercise the complete user flow.
+      The orchestration will NOT proceed to completion if any acceptance tests fail.
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+    artifacts:
+      - acceptance_test_results.md
+    exit_criteria:
+      - All acceptance test scenarios executed
+      - All acceptance tests passing
+      - No failures blocking completion
+    optional: false
+    is_acceptance_test_stage: true  # Special flag for acceptance test handling
+    prompt_template: null
+    include_objective: true
+
+  POST_REVIEW:
+    name: Post Implementation Review
+    description: >
+      Final review, retrospective, and validation of all success criteria.
+      MUST verify that acceptance tests have passed before approving.
+      Cannot mark workflow as complete if acceptance tests failed.
+    work_agent: pm
+    review_agent: reviewer
+    allowed_personas:
+      - project_manager
+      - pm
+      - reviewer
+    artifacts:
+      - post_review.md
+    exit_criteria:
+      - All success criteria validated
+      - Acceptance tests verified as passing
+      - Final approval granted
+    optional: false
+    is_review_stage: true
+    requires_acceptance_tests_passed: true  # Blocks completion if acceptance tests failed
+    prompt_template: .agent/commands/sdd/sdd.8-post-implementation-review.prompt.md
+    include_objective: true
+
+  COMPLETE:
+    name: Complete
+    description: Workflow complete, all artifacts finalized
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+    artifacts: []
+    exit_criteria:
+      - All success criteria met
+      - Documentation complete
+    optional: false
+    prompt_template: null
+    include_objective: false
+
+# Stage execution order
+stage_order:
+  - SETUP
+  - BUSINESS_PROBLEM
+  - SPEC
+  - SPEC_REVIEW
+  - RESEARCH
+  - TEST_STRATEGY
+  - PLAN
+  - PLAN_REVIEW
+  - IMPLEMENTATION
+  - IMPLEMENTATION_REVIEW
+  - TEST
+  - ACCEPTANCE_TEST
+  - POST_REVIEW
+  - COMPLETE
+
+# Mapping of work stages to their review stages
+work_to_review_mapping:
+  SPEC: SPEC_REVIEW
+  PLAN: PLAN_REVIEW
+  IMPLEMENTATION: IMPLEMENTATION_REVIEW
+  ACCEPTANCE_TEST: POST_REVIEW

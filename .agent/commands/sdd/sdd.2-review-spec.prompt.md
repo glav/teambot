@@ -103,6 +103,14 @@ You MUST verify testing-related requirements:
 * [ ] Edge cases and error scenarios are documented
 * [ ] Success metrics can be validated through testing
 
+#### Acceptance Test Scenarios (CRITICAL)
+* [ ] At least 2-3 acceptance test scenarios defined
+* [ ] Each scenario has clear steps and expected results
+* [ ] Scenarios cover the primary user flows
+* [ ] Scenarios are concrete and executable (not vague descriptions)
+
+**Why Acceptance Tests Are Critical**: Unit tests validate individual components work in isolation. Acceptance tests validate the **complete user flow** works end-to-end. A feature can pass all unit tests but fail when components are integrated. The specification MUST define acceptance test scenarios that will be executed during post-implementation review.
+
 ### 4. Generate Review Report
 
 Create review report at `.agent-tracking/spec-reviews/YYYYMMDD-{{spec-name}}-review.md`:
@@ -275,12 +283,14 @@ If **REVISIONS NEEDED**:
 * Non-testable requirements
 * No success metrics
 * Empty in-scope section
+* **Missing acceptance test scenarios** (CRITICAL - cannot approve without at least 2-3 scenarios)
 
 ### High Priority Issues
 * Vague acceptance criteria
 * Missing NFRs
 * Undefined dependencies
 * No risk mitigation
+* Acceptance test scenarios too vague to execute
 
 ### Nice to Have
 * Additional personas

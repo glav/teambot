@@ -108,6 +108,51 @@ Cross-reference with specification:
 - [ ] All NFRs addressed (or documented exceptions)
 - [ ] Acceptance criteria satisfied
 
+#### F. Acceptance Test Execution (CRITICAL)
+
+You MUST execute the acceptance test scenarios from the specification. This is the **most important validation** because unit tests validate components work in isolation, but acceptance tests validate the **complete user flow** works end-to-end.
+
+**Process**:
+1. Load the original specification from `docs/feature-specs/{{feature-name}}.md`
+2. Find the "Acceptance Test Scenarios" section
+3. Execute EACH scenario manually and document results
+
+**Acceptance Test Execution Template**:
+
+```markdown
+## Acceptance Test Execution
+
+### AT-001: {{Scenario Name from Spec}}
+**Executed**: {{YYYY-MM-DD HH:MM}}
+**Steps Performed**:
+1. {{Actual action taken}}
+2. {{Actual action taken}}
+3. {{Observed result}}
+
+**Expected**: {{From spec}}
+**Actual**: {{What actually happened}}
+**Status**: ✅ PASS | ❌ FAIL
+
+{{If FAIL}}:
+**Failure Details**: {{What went wrong}}
+**Root Cause**: {{Why it failed}}
+**Required Fix**: {{What needs to change}}
+
+### AT-002: {{Next Scenario}}
+...
+```
+
+**Why This Matters**: The shared-context feature (`$pm` syntax) passed ALL automated tests (765 tests, 83% coverage) but failed the first real usage because:
+- Unit tests validated individual components worked
+- No one actually ran: `@pm task` followed by `@ba analyze $pm`
+- Manual acceptance testing would have caught that simple commands don't record to the result store
+
+**Acceptance Test Execution Requirements**:
+- [ ] ALL acceptance scenarios from spec executed
+- [ ] Each scenario has documented steps and results
+- [ ] Any failing scenarios have root cause analysis
+- [ ] CANNOT approve unless all acceptance tests pass
+
 ### 3. Generate Final Review Report
 
 Create at `.agent-tracking/implementation-reviews/YYYYMMDD-{{task-name}}-final-review.md`:
@@ -156,6 +201,27 @@ Create at `.agent-tracking/implementation-reviews/YYYYMMDD-{{task-name}}-final-r
 - **Non-Functional Requirements**: {{X}}/{{Y}} addressed
 - **Acceptance Criteria**: {{X}}/{{Y}} satisfied
 
+### Acceptance Test Execution Results (CRITICAL)
+
+| Test ID | Scenario | Executed | Result | Notes |
+|---------|----------|----------|--------|-------|
+| AT-001 | {{scenario_name}} | {{timestamp}} | ✅/❌ | {{notes}} |
+| AT-002 | {{scenario_name}} | {{timestamp}} | ✅/❌ | {{notes}} |
+
+**Acceptance Tests Summary**:
+- **Total Scenarios**: {{X}}
+- **Passed**: {{Y}}
+- **Failed**: {{Z}}
+- **Status**: {{ALL PASS | FAILURES PRESENT}}
+
+{{If any FAILED}}:
+### Acceptance Test Failures (BLOCKING)
+| Test ID | Expected | Actual | Root Cause |
+|---------|----------|--------|------------|
+| {{id}} | {{expected}} | {{actual}} | {{cause}} |
+
+**⚠️ CANNOT APPROVE until all acceptance tests pass**
+
 ## Issues Found
 
 ### Critical (Must Fix)
@@ -181,7 +247,8 @@ Create at `.agent-tracking/implementation-reviews/YYYYMMDD-{{task-name}}-final-r
 
 ## Deployment Readiness
 
-- [ ] All tests passing
+- [ ] All unit tests passing
+- [ ] All acceptance tests passing (CRITICAL)
 - [ ] Coverage targets met
 - [ ] Code quality verified
 - [ ] No critical issues
@@ -207,7 +274,8 @@ Create at `.agent-tracking/implementation-reviews/YYYYMMDD-{{task-name}}-final-r
 ## Final Sign-off
 
 - [ ] Implementation complete and working
-- [ ] Tests comprehensive and passing
+- [ ] Unit tests comprehensive and passing
+- [ ] Acceptance tests executed and passing (CRITICAL)
 - [ ] Coverage meets targets
 - [ ] Code quality verified
 - [ ] Ready for production
@@ -234,11 +302,16 @@ You WILL provide:
    - Coverage comparison to targets
    - Code quality check results
 
-3. **Issues Found** (if any)
+3. **Acceptance Test Results** (CRITICAL)
+   - Each acceptance test scenario executed
+   - Pass/fail status for each
+   - Root cause for any failures
+
+4. **Issues Found** (if any)
    - Prioritized by severity
    - Specific remediation steps
 
-4. **Recommendation**
+5. **Recommendation**
    - Clear approve/needs-work decision
    - Next steps
    - Cleanup options
@@ -247,16 +320,20 @@ You WILL provide:
 
 **APPROVE FOR COMPLETION** when:
 * All tasks marked complete
-* All tests passing
+* All unit tests passing
+* **All acceptance tests passing** (CRITICAL - this is the primary gate)
 * Coverage meets targets
 * No linting errors
 * No critical issues
 
 **NEEDS WORK** when:
 * Tests failing
+* **Any acceptance test failing** (CRITICAL)
 * Coverage below targets
 * Critical issues found
 * Missing implementation
+
+**⚠️ IMPORTANT**: A feature that passes all unit tests but fails acceptance tests is NOT ready for approval. Acceptance tests validate the complete user experience, not just individual components.
 
 ### Cleanup Options
 
@@ -279,7 +356,8 @@ Recommended: {{option}} because {{reason}}
 Before completing review:
 
 - [ ] **Review Report Created**: `.agent-tracking/implementation-reviews/YYYYMMDD-{{name}}-final-review.md`
-- [ ] **All Tests Executed**: Test suite run with results captured
+- [ ] **All Unit Tests Executed**: Test suite run with results captured
+- [ ] **All Acceptance Tests Executed**: Each scenario from spec manually tested (CRITICAL)
 - [ ] **Coverage Measured**: Coverage report generated and compared to targets
 - [ ] **Linting Run**: Code quality checks executed
 - [ ] **Requirements Traced**: All spec requirements verified
@@ -289,7 +367,8 @@ Before completing review:
 ```
 FINAL_REVIEW_VALIDATION: PASS | FAIL
 - Review Report: CREATED | MISSING
-- Tests: X PASS / Y FAIL / Z SKIP
+- Unit Tests: X PASS / Y FAIL / Z SKIP
+- Acceptance Tests: X PASS / Y FAIL (CRITICAL)
 - Coverage: X% (target: Y%) - MET | NOT_MET
 - Linting: PASS | FAIL
 - Requirements: X/Y satisfied
@@ -308,15 +387,17 @@ Congratulations! The Spec-Driven Development workflow is complete.
 **📊 Final Summary:**
 * Specification: `docs/feature-specs/{{name}}.md`
 * Implementation: {{X}} files created/modified
-* Tests: {{Y}} tests, all passing
-* Coverage: {{Z}}%
+* Unit Tests: {{Y}} tests, all passing
+* Acceptance Tests: {{Z}}/{{Z}} scenarios passed
+* Coverage: {{W}}%
 
 **📄 Final Review:**
 * Report: `.agent-tracking/implementation-reviews/{{date}}-{{name}}-final-review.md`
 
 **✅ Quality Verified:**
 * All requirements satisfied
-* All tests passing
+* All unit tests passing
+* All acceptance tests passing ← Real user flows validated
 * Coverage targets met
 * Code quality verified
 

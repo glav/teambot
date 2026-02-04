@@ -28,18 +28,18 @@ class TestFullWorkflowExecution:
     def mock_sdk_client(self) -> AsyncMock:
         """Create mock SDK client that approves all reviews."""
         client = AsyncMock()
-        client.execute_streaming.return_value = "APPROVED: Work completed successfully."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed successfully."
         return client
 
     @pytest.mark.asyncio
     async def test_full_workflow_completes(
-        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+        self, objective_file: Path, teambot_dir_with_spec: Path, mock_sdk_client: AsyncMock
     ) -> None:
         """Full workflow execution completes all stages."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
         )
 
         result = await loop.run(mock_sdk_client)
@@ -49,13 +49,13 @@ class TestFullWorkflowExecution:
 
     @pytest.mark.asyncio
     async def test_workflow_tracks_stage_progression(
-        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+        self, objective_file: Path, teambot_dir_with_spec: Path, mock_sdk_client: AsyncMock
     ) -> None:
         """Workflow progresses through expected stages."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
         )
 
         stages_visited: list[str] = []
@@ -79,14 +79,18 @@ class TestResumeAfterCancellation:
     def mock_sdk_client(self) -> AsyncMock:
         """Create mock SDK client."""
         client = AsyncMock()
-        client.execute_streaming.return_value = "APPROVED: Done."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
         return client
 
     @pytest.mark.asyncio
     async def test_resume_continues_from_saved_stage(
-        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+        self, objective_file: Path, teambot_dir_with_spec: Path, mock_sdk_client: AsyncMock
     ) -> None:
         """Resume continues execution from saved stage."""
+        # The feature name from the objective is "user-authentication"
+        feature_dir = teambot_dir_with_spec / "user-authentication"
+        # Feature dir should already exist from the fixture
+
         # Create initial state at PLAN stage
         state = {
             "objective_file": str(objective_file),
@@ -100,11 +104,11 @@ class TestResumeAfterCancellation:
                 "SPEC": "Specification written",
             },
         }
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = feature_dir / "orchestration_state.json"
         state_file.write_text(json.dumps(state))
 
-        # Resume execution
-        loop = ExecutionLoop.resume(teambot_dir, {})
+        # Resume execution from the feature directory
+        loop = ExecutionLoop.resume(feature_dir, {})
 
         assert loop.current_stage == WorkflowStage.PLAN
         assert loop.time_manager._prior_elapsed == 100.0
@@ -128,8 +132,8 @@ class TestResumeAfterCancellation:
         loop.cancel()
         await loop.run(mock_sdk_client)
 
-        # Verify state file exists
-        state_file = teambot_dir / "orchestration_state.json"
+        # Verify state file exists in feature subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
         state = json.loads(state_file.read_text())
@@ -209,7 +213,7 @@ class TestReviewIterationWithFeedback:
                 assert "error handling" in prompt.lower()
                 return "Second attempt with error handling"
             else:
-                return "APPROVED: Good!"
+                return "VERIFIED_APPROVED: Good!"
 
         mock_client.execute_streaming.side_effect = mock_execute
 
@@ -234,7 +238,7 @@ class TestTimeoutEnforcement:
     async def test_timeout_stops_execution(self, objective_file: Path, teambot_dir: Path) -> None:
         """Execution stops when time limit is reached."""
         mock_client = AsyncMock()
-        mock_client.execute_streaming.return_value = "APPROVED: Done."
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
 
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -328,9 +332,25 @@ The application uses React for frontend and Express for backend.
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()
 
+        # Create feature-specific directory with feature spec (no acceptance tests)
+        # Feature name from "Add User Profile" -> "user-profile"
+        feature_dir = teambot_dir / "user-profile"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        feature_spec = """# Feature Specification: User Profile
+
+## Overview
+Implements user profile functionality.
+
+## Technical Design
+Uses React components with Express API endpoints.
+"""
+        (artifacts_dir / "feature_spec.md").write_text(feature_spec)
+
         # Mock successful execution
         mock_client = AsyncMock()
-        mock_client.execute_streaming.return_value = "APPROVED: Implementation complete."
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Implementation complete."
 
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -354,8 +374,8 @@ The application uses React for frontend and Express for backend.
         for stage in expected_stages:
             assert stage in stages_visited, f"Expected {stage} to be visited"
 
-        # Verify state was saved
-        state_file = teambot_dir / "orchestration_state.json"
+        # Verify state was saved in feature subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
     @pytest.mark.asyncio
@@ -390,8 +410,8 @@ The application uses React for frontend and Express for backend.
         # Verify failure
         assert result == ExecutionResult.REVIEW_FAILED
 
-        # Verify failure report was created
-        failures_dir = teambot_dir / "failures"
+        # Verify failure report was created in feature subdirectory
+        failures_dir = loop.teambot_dir / "failures"
         assert failures_dir.exists()
         failure_reports = list(failures_dir.glob("*.md"))
         assert len(failure_reports) > 0

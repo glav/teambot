@@ -12,7 +12,7 @@ class WorkflowStage(Enum):
     Workflow:
     Setup → Business Problem → Spec → Review → Research →
     Test Strategy → Plan → Review → Task Implementation →
-    Review → Test → Post Implementation Review
+    Review → Test → Acceptance Test → Post Implementation Review
     """
 
     SETUP = auto()
@@ -26,6 +26,7 @@ class WorkflowStage(Enum):
     IMPLEMENTATION = auto()
     IMPLEMENTATION_REVIEW = auto()
     TEST = auto()
+    ACCEPTANCE_TEST = auto()
     POST_REVIEW = auto()
     COMPLETE = auto()
 
@@ -129,6 +130,14 @@ STAGE_METADATA: dict[WorkflowStage, StageMetadata] = {
         description="Execute tests and validate implementation",
         allowed_personas=["builder", "developer", "reviewer"],
         required_artifacts=["test_results.md"],
+        optional=False,
+        next_stages=[WorkflowStage.ACCEPTANCE_TEST],
+    ),
+    WorkflowStage.ACCEPTANCE_TEST: StageMetadata(
+        name="Acceptance Test",
+        description="Execute acceptance test scenarios to validate end-to-end functionality",
+        allowed_personas=["builder", "developer"],
+        required_artifacts=["acceptance_test_results.md"],
         optional=False,
         next_stages=[WorkflowStage.POST_REVIEW],
     ),

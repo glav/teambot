@@ -121,3 +121,60 @@ class TestParsedObjective:
         """Raw content defaults to empty string."""
         obj = ParsedObjective(title="Test")
         assert obj.raw_content == ""
+
+
+class TestFeatureName:
+    """Tests for feature_name property."""
+
+    def test_feature_name_from_simple_title(self) -> None:
+        """Simple title becomes feature name."""
+        obj = ParsedObjective(title="User Authentication")
+        assert obj.feature_name == "user-authentication"
+
+    def test_feature_name_strips_common_words(self) -> None:
+        """Common words like 'Add', 'Create' are stripped."""
+        obj = ParsedObjective(title="Add User Authentication with OAuth2 Support")
+        assert obj.feature_name == "user-authentication-oauth2"
+
+    def test_feature_name_limits_to_three_words(self) -> None:
+        """Feature name limited to 3 meaningful words."""
+        obj = ParsedObjective(title="Implement Complex User Authentication System Module")
+        assert obj.feature_name == "complex-user-authentication"
+
+    def test_feature_name_handles_untitled(self) -> None:
+        """Untitled objective gets 'feature' name."""
+        obj = ParsedObjective(title="Untitled")
+        assert obj.feature_name == "feature"
+
+    def test_feature_name_handles_empty_title(self) -> None:
+        """Empty title gets 'feature' name."""
+        obj = ParsedObjective(title="")
+        assert obj.feature_name == "feature"
+
+    def test_feature_name_handles_objective_prefix(self) -> None:
+        """Objective: prefix is stripped."""
+        obj = ParsedObjective(title="Objective: Build API Endpoints")
+        assert obj.feature_name == "api-endpoints"
+
+    def test_feature_name_lowercase(self) -> None:
+        """Feature name is lowercase."""
+        obj = ParsedObjective(title="HTTP REST API")
+        assert obj.feature_name == "http-rest-api"
+
+    def test_feature_name_alphanumeric_only(self) -> None:
+        """Feature name contains only alphanumeric and dashes."""
+        obj = ParsedObjective(title="OAuth2.0 & JWT Auth!")
+        assert obj.feature_name == "oauth2-jwt-auth"
+
+    def test_feature_name_single_word(self) -> None:
+        """Single meaningful word works."""
+        obj = ParsedObjective(title="Refactoring")
+        assert obj.feature_name == "refactoring"
+
+    def test_feature_name_from_parsed_file(self, objective_file: Path) -> None:
+        """Feature name derived from parsed objective file."""
+        from teambot.orchestration.objective_parser import parse_objective_file
+
+        result = parse_objective_file(objective_file)
+        # Title is "Implement User Authentication"
+        assert result.feature_name == "user-authentication"

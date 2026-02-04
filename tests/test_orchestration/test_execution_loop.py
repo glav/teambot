@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from teambot.orchestration.execution_loop import (
-    STAGE_ORDER,
+    REVIEW_STAGES,
     ExecutionLoop,
     ExecutionResult,
 )
@@ -56,16 +56,16 @@ class TestExecutionLoopRun:
         """Create mock SDK client that approves all reviews."""
         client = AsyncMock()
         # Return work output, then approval for each stage
-        client.execute_streaming.return_value = "APPROVED: Work completed successfully."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed successfully."
         return client
 
     @pytest.fixture
-    def loop(self, objective_file: Path, teambot_dir: Path) -> ExecutionLoop:
-        """Create ExecutionLoop instance."""
+    def loop(self, objective_file: Path, teambot_dir_with_spec: Path) -> ExecutionLoop:
+        """Create ExecutionLoop instance with feature spec."""
         return ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
             max_hours=8.0,
         )
 
@@ -138,14 +138,14 @@ class TestExecutionLoopStatePersistence:
     def mock_sdk_client(self) -> AsyncMock:
         """Create mock SDK client."""
         client = AsyncMock()
-        client.execute_streaming.return_value = "APPROVED: Done."
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
         return client
 
     @pytest.mark.asyncio
     async def test_save_state_creates_file(
         self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
     ) -> None:
-        """Save state creates orchestration_state.json."""
+        """Save state creates orchestration_state.json in feature directory."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
@@ -155,7 +155,8 @@ class TestExecutionLoopStatePersistence:
         loop.cancel()
         await loop.run(mock_sdk_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        # State file is in feature-specific subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
     @pytest.mark.asyncio
@@ -172,7 +173,8 @@ class TestExecutionLoopStatePersistence:
         loop.cancel()
         await loop.run(mock_sdk_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        # State file is in feature-specific subdirectory
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
 
         assert "objective_file" in state
@@ -181,8 +183,12 @@ class TestExecutionLoopStatePersistence:
         assert "status" in state
 
     def test_resume_loads_state(self, objective_file: Path, teambot_dir: Path) -> None:
-        """Resume loads state from file."""
-        # Create state file
+        """Resume loads state from file in feature directory."""
+        # Create feature subdirectory with state file
+        # The objective file has title "Implement User Authentication" -> "user-authentication"
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
         state = {
             "objective_file": str(objective_file),
             "current_stage": "RESEARCH",
@@ -191,10 +197,10 @@ class TestExecutionLoopStatePersistence:
             "status": "paused",
             "stage_outputs": {},
         }
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = feature_dir / "orchestration_state.json"
         state_file.write_text(json.dumps(state))
 
-        loop = ExecutionLoop.resume(teambot_dir, {})
+        loop = ExecutionLoop.resume(feature_dir, {})
 
         assert loop.current_stage == WorkflowStage.RESEARCH
         assert loop.time_manager._prior_elapsed == 100.0
@@ -206,6 +212,10 @@ class TestExecutionLoopStatePersistence:
 
     def test_resume_restores_stage_outputs(self, objective_file: Path, teambot_dir: Path) -> None:
         """Resume restores stage outputs."""
+        # Create feature subdirectory with state file
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
         state = {
             "objective_file": str(objective_file),
             "current_stage": "PLAN",
@@ -216,10 +226,10 @@ class TestExecutionLoopStatePersistence:
                 "SPEC": "Feature specification content",
             },
         }
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = feature_dir / "orchestration_state.json"
         state_file.write_text(json.dumps(state))
 
-        loop = ExecutionLoop.resume(teambot_dir, {})
+        loop = ExecutionLoop.resume(feature_dir, {})
 
         assert WorkflowStage.SPEC in loop.stage_outputs
         assert "Feature specification" in loop.stage_outputs[WorkflowStage.SPEC]
@@ -239,7 +249,7 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_sdk_client)
 
         assert result == ExecutionResult.CANCELLED
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "cancelled"
 
@@ -258,7 +268,7 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_sdk_client)
 
         assert result == ExecutionResult.TIMEOUT
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "timeout"
 
@@ -280,25 +290,25 @@ class TestExecutionLoopStatePersistence:
         result = await loop.run(mock_client)
 
         assert result == ExecutionResult.REVIEW_FAILED
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "review_failed"
 
     @pytest.mark.asyncio
     async def test_save_state_status_complete(
-        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+        self, objective_file: Path, teambot_dir_with_spec: Path, mock_sdk_client: AsyncMock
     ) -> None:
         """Saved state has status 'complete' when execution completes."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
-            teambot_dir=teambot_dir,
+            teambot_dir=teambot_dir_with_spec,
         )
 
         result = await loop.run(mock_sdk_client)
 
         assert result == ExecutionResult.COMPLETE
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "complete"
 
@@ -318,7 +328,7 @@ class TestExecutionLoopStatePersistence:
         with pytest.raises(RuntimeError, match="Test error"):
             await loop.run(mock_client)
 
-        state_file = teambot_dir / "orchestration_state.json"
+        state_file = loop.teambot_dir / "orchestration_state.json"
         state = json.loads(state_file.read_text())
         assert state["status"] == "error"
 
@@ -327,16 +337,18 @@ class TestExecutionLoopStageProgression:
     """Tests for stage progression logic."""
 
     def test_get_next_stage_follows_order(self, objective_file: Path, teambot_dir: Path) -> None:
-        """_get_next_stage follows STAGE_ORDER."""
+        """_get_next_stage follows the configured stage order."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir,
         )
 
-        for i, stage in enumerate(STAGE_ORDER[:-1]):
+        # Use the loop's actual stage order from config
+        stage_order = loop.stages_config.stage_order
+        for i, stage in enumerate(stage_order[:-1]):
             next_stage = loop._get_next_stage(stage)
-            assert next_stage == STAGE_ORDER[i + 1]
+            assert next_stage == stage_order[i + 1]
 
     def test_get_next_stage_returns_complete_at_end(
         self, objective_file: Path, teambot_dir: Path
@@ -403,3 +415,288 @@ class TestExecutionLoopContextBuilding:
 
         assert "Work to Review" in context
         assert "This is the spec content" in context
+
+
+class TestExecutionLoopReviewOutputs:
+    """Tests for review stage output storage."""
+
+    @pytest.mark.asyncio
+    async def test_review_stage_outputs_stored_in_state(
+        self, objective_file: Path, teambot_dir_with_spec: Path
+    ) -> None:
+        """Review stage outputs are stored in orchestration_state.json."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir_with_spec,
+        )
+
+        # Mock client that returns approval with output
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Spec looks great!"
+
+        result = await loop.run(mock_client)
+
+        assert result == ExecutionResult.COMPLETE
+        state_file = loop.teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+
+        # Verify review stage outputs are in state
+        stage_outputs = state.get("stage_outputs", {})
+        assert "SPEC_REVIEW" in stage_outputs
+        assert "APPROVED" in stage_outputs["SPEC_REVIEW"]
+
+    @pytest.mark.asyncio
+    async def test_all_review_stages_stored(
+        self, objective_file: Path, teambot_dir_with_spec: Path
+    ) -> None:
+        """All review stages have their outputs stored."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir_with_spec,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: All good!"
+
+        await loop.run(mock_client)
+
+        state_file = loop.teambot_dir / "orchestration_state.json"
+        state = json.loads(state_file.read_text())
+        stage_outputs = state.get("stage_outputs", {})
+
+        # Check all review stages are stored
+        for review_stage in REVIEW_STAGES:
+            assert review_stage.name in stage_outputs, f"Missing output for {review_stage.name}"
+
+
+class TestPromptTemplateLoading:
+    """Tests for prompt template loading functionality."""
+
+    def test_load_prompt_template_when_file_exists(
+        self, objective_file: Path, teambot_dir: Path, tmp_path: Path
+    ) -> None:
+        """Prompt template content is loaded when file exists."""
+        # Create a prompt template file
+        prompt_dir = tmp_path / ".agent" / "commands" / "sdd"
+        prompt_dir.mkdir(parents=True)
+        prompt_file = prompt_dir / "sdd.1-create-feature-spec.prompt.md"
+        prompt_file.write_text("# Create Feature Spec\n\nYou are creating a spec...")
+
+        # Create stages.yaml pointing to this prompt
+        stages_yaml = tmp_path / "stages.yaml"
+        stages_yaml.write_text("""
+stages:
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+    include_objective: true
+stage_order:
+  - SPEC
+work_to_review_mapping: {}
+""")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"stages_config": str(stages_yaml)},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "# Create Feature Spec" in context
+        assert "You are creating a spec..." in context
+
+    def test_context_excludes_objective_when_include_objective_false(
+        self, objective_file: Path, teambot_dir: Path, tmp_path: Path
+    ) -> None:
+        """Objective is not included when include_objective is false."""
+        stages_yaml = tmp_path / "stages.yaml"
+        stages_yaml.write_text("""
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize project
+    work_agent: pm
+    review_agent: null
+    prompt_template: null
+    include_objective: false
+stage_order:
+  - SETUP
+work_to_review_mapping: {}
+""")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"stages_config": str(stages_yaml)},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SETUP)
+
+        # Objective should not be in context
+        assert "# Objective:" not in context
+        assert "Implement User Authentication" not in context
+        # But stage info should still be there
+        assert "Setup" in context
+
+    def test_context_includes_objective_by_default(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Objective is included when include_objective is not specified (default True)."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "# Objective:" in context
+        assert "Implement User Authentication" in context
+
+    def test_load_prompt_template_returns_none_when_file_missing(
+        self, objective_file: Path, teambot_dir: Path, tmp_path: Path
+    ) -> None:
+        """Returns None when prompt template file doesn't exist."""
+        stages_yaml = tmp_path / "stages.yaml"
+        stages_yaml.write_text("""
+stages:
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    prompt_template: nonexistent/prompt.md
+    include_objective: true
+stage_order:
+  - SPEC
+work_to_review_mapping: {}
+""")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"stages_config": str(stages_yaml)},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        # Should not have the nonexistent prompt, but should have objective
+        assert "nonexistent/prompt.md" not in context
+        assert "# Objective:" in context
+
+
+class TestFeatureSpecFinding:
+    """Tests for finding and loading feature specifications."""
+
+    def test_find_feature_spec_from_artifacts(
+        self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
+    ) -> None:
+        """Feature spec is loaded from artifacts directory."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create artifacts directory with feature spec
+        feature_dir = teambot_dir / loop.feature_name
+        feature_dir.mkdir(exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+        (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content)
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is not None
+        assert "User Authentication" in spec_content
+
+    def test_find_feature_spec_from_docs_case_insensitive(
+        self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
+    ) -> None:
+        """Feature spec is found with case-insensitive matching."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create docs/feature-specs directory with various case variations
+        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
+        docs_dir.mkdir(parents=True)
+
+        # Feature name is "user-authentication" from objective
+        # Test with uppercase variation
+        (docs_dir / "User-Authentication-Spec.md").write_text(sample_feature_spec_content)
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is not None
+        assert "User Authentication" in spec_content
+
+    def test_find_feature_spec_from_docs_hyphen_variations(
+        self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
+    ) -> None:
+        """Feature spec matching ignores hyphens."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create docs/feature-specs directory
+        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
+        docs_dir.mkdir(parents=True)
+
+        # Feature name is "user-authentication"
+        # Test with different hyphenation
+        (docs_dir / "userauthentication-spec.md").write_text(sample_feature_spec_content)
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is not None
+        assert "User Authentication" in spec_content
+
+    def test_find_feature_spec_prefers_artifacts_over_docs(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Artifacts directory is checked before docs directory."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        # Create both artifacts and docs specs with different content
+        feature_dir = teambot_dir / loop.feature_name
+        feature_dir.mkdir(exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir(exist_ok=True)
+        (artifacts_dir / "feature_spec.md").write_text("Artifacts spec content")
+
+        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
+        docs_dir.mkdir(parents=True)
+        (docs_dir / "user-authentication.md").write_text("Docs spec content")
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content == "Artifacts spec content"
+
+    def test_find_feature_spec_returns_none_when_not_found(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Returns None when no feature spec is found."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        spec_content = loop._find_feature_spec_content()
+
+        assert spec_content is None

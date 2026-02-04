@@ -9,6 +9,7 @@ class TaskStatus(Enum):
     """Status of a task in the execution pipeline."""
 
     PENDING = auto()  # Waiting to run (may have unmet dependencies)
+    WAITING = auto()  # Waiting for referenced agent to complete
     RUNNING = auto()  # Currently executing
     COMPLETED = auto()  # Finished successfully
     FAILED = auto()  # Finished with error
