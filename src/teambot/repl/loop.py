@@ -347,9 +347,7 @@ class REPLLoop:
         self._console.print("[dim]Session ended.[/dim]")
 
 
-async def run_interactive_mode(
-    console: Console | None = None, config: dict | None = None
-) -> None:
+async def run_interactive_mode(console: Console | None = None, config: dict | None = None) -> None:
     """Run TeamBot in interactive mode.
 
     Args:
