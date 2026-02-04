@@ -1,7 +1,8 @@
 """Tests for REPL agent router."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from teambot.repl.parser import Command, CommandType
 from teambot.repl.router import AgentRouter, RouterError
@@ -188,9 +189,7 @@ class TestRouterHistory:
         router.register_agent_handler(AsyncMock(return_value="OK"))
 
         for i in range(10):
-            await router.route(
-                Command(type=CommandType.AGENT, agent_id="pm", content=f"Task {i}")
-            )
+            await router.route(Command(type=CommandType.AGENT, agent_id="pm", content=f"Task {i}"))
 
         history = router.get_history()
         assert len(history) == 5

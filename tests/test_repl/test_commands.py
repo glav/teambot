@@ -1,15 +1,13 @@
 """Tests for REPL system commands."""
 
-import pytest
 from unittest.mock import MagicMock
 
 from teambot.repl.commands import (
-    SystemCommands,
     CommandResult,
+    SystemCommands,
     handle_help,
-    handle_status,
-    handle_history,
     handle_quit,
+    handle_status,
 )
 
 
@@ -116,9 +114,7 @@ class TestHistoryCommand:
     def test_history_limit_entries(self):
         """Test /history limits output."""
         commands = SystemCommands()
-        commands._history = [
-            {"agent_id": "pm", "content": f"Task {i}"} for i in range(50)
-        ]
+        commands._history = [{"agent_id": "pm", "content": f"Task {i}"} for i in range(50)]
 
         result = commands.history([])
 

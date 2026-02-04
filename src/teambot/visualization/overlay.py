@@ -64,11 +64,13 @@ class OverlayState:
     pending_count: int = 0
     completed_count: int = 0
     failed_count: int = 0
+    waiting_count: int = 0
+    waiting_for: dict[str, str] = field(default_factory=dict)  # agent -> waiting_for_agent
     spinner_frame: int = 0
 
     def is_idle(self) -> bool:
         """Check if no tasks are running."""
-        return self.running_count == 0 and len(self.active_agents) == 0
+        return self.running_count == 0 and self.waiting_count == 0 and len(self.active_agents) == 0
 
     def total_tasks(self) -> int:
         """Get total task count."""
@@ -220,7 +222,7 @@ class OverlayRenderer:
         """
         old_position = self._state.position
         self._state.position = position
-        
+
         # Update scroll region if switching between top/bottom positions
         if self.is_enabled:
             if old_position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
@@ -230,7 +232,7 @@ class OverlayRenderer:
             elif position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
                 # Moving from bottom to top - set scroll region
                 self._set_scroll_region(OVERLAY_HEIGHT + 2)
-            
+
             self.render()
 
     def _calculate_position(self) -> tuple[int, int]:
@@ -262,7 +264,7 @@ class OverlayRenderer:
         width = 0
         for char in text:
             # East Asian characters and emoji are typically wide
-            if unicodedata.east_asian_width(char) in ('F', 'W'):
+            if unicodedata.east_asian_width(char) in ("F", "W"):
                 width += 2
             else:
                 width += 1
@@ -284,7 +286,7 @@ class OverlayRenderer:
             result = ""
             width = 0
             for char in text:
-                char_width = 2 if unicodedata.east_asian_width(char) in ('F', 'W') else 1
+                char_width = 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
                 if width + char_width > target_width:
                     break
                 result += char
@@ -306,20 +308,28 @@ class OverlayRenderer:
         if self._state.is_idle():
             lines.append("✓ Idle")
         else:
-            spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
-            agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
-            if len(self._state.active_agents) > 3:
-                agents += f" +{len(self._state.active_agents) - 3}"
-            lines.append(f"{spinner} {agents}"[:OVERLAY_WIDTH - 4])
+            # Show waiting agents if any
+            if self._state.waiting_count > 0:
+                waiting = ", ".join(f"@{a}→@{w}" for a, w in self._state.waiting_for.items())
+                lines.append(f"⏳ {waiting}"[: OVERLAY_WIDTH - 4])
+            else:
+                spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
+                agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
+                if len(self._state.active_agents) > 3:
+                    agents += f" +{len(self._state.active_agents) - 3}"
+                lines.append(f"{spinner} {agents}"[: OVERLAY_WIDTH - 4])
 
         # Line 2: Task counts
         running = self._state.running_count
         pending = self._state.pending_count
         completed = self._state.completed_count
+        waiting = self._state.waiting_count
         counts = f"{running}⏳ {pending}⏸ {completed}✓"
+        if waiting > 0:
+            counts += f" {waiting}⏱"
         if self._state.failed_count > 0:
             counts += f" {self._state.failed_count}✗"
-        lines.append(f"Tasks: {counts}"[:OVERLAY_WIDTH - 4])
+        lines.append(f"Tasks: {counts}"[: OVERLAY_WIDTH - 4])
 
         return lines
 

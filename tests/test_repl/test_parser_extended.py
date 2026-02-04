@@ -1,12 +1,8 @@
 """Tests for extended parser syntax (parallel execution)."""
 
-import pytest
-
 from teambot.repl.parser import (
-    Command,
     CommandType,
     parse_command,
-    ParseError,
 )
 
 

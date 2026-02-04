@@ -211,7 +211,9 @@ def _run_orchestration(
     def handle_interrupt(sig: int, frame: object) -> None:
         cancel_count[0] += 1
         if cancel_count[0] == 1:
-            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            display.print_warning(
+                "Cancellation requested, saving state... (Ctrl+C again to force quit)"
+            )
             loop.cancel()
         else:
             # Force exit on second Ctrl+C
@@ -229,6 +231,21 @@ def _run_orchestration(
             display.print_success(f"Agent {data.get('agent_id')} complete")
         elif event_type == "review_progress":
             display.print_success(data.get("message", ""))
+        elif event_type == "acceptance_test_iteration":
+            iteration = data.get("iteration", 1)
+            max_iter = data.get("max_iterations", 4)
+            display.print_success(f"Acceptance test iteration {iteration}/{max_iter}")
+        elif event_type == "acceptance_test_fix_start":
+            iteration = data.get("iteration", 1)
+            failed = data.get("failed_count", 0)
+            msg = f"Iteration {iteration}: {failed} tests failed, requesting fix..."
+            display.print_warning(msg)
+        elif event_type == "acceptance_test_fix_complete":
+            iteration = data.get("iteration", 1)
+            display.print_success(f"Iteration {iteration}: Fix applied, re-running tests...")
+        elif event_type == "acceptance_test_max_iterations_reached":
+            iterations = data.get("iterations_used", 4)
+            display.print_error(f"Acceptance tests still failing after {iterations} fix attempts")
 
     try:
         result = asyncio.run(_run_orchestration_async(loop, display, on_progress))
@@ -298,7 +315,9 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
     def handle_interrupt(sig: int, frame: object) -> None:
         cancel_count[0] += 1
         if cancel_count[0] == 1:
-            display.print_warning("Cancellation requested, saving state... (Ctrl+C again to force quit)")
+            display.print_warning(
+                "Cancellation requested, saving state... (Ctrl+C again to force quit)"
+            )
             loop.cancel()
         else:
             # Force exit on second Ctrl+C
@@ -310,6 +329,27 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
     def on_progress(event_type: str, data: dict) -> None:
         if event_type == "stage_changed":
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+        elif event_type == "agent_running":
+            display.print_success(f"Agent {data.get('agent_id')} running")
+        elif event_type == "agent_complete":
+            display.print_success(f"Agent {data.get('agent_id')} complete")
+        elif event_type == "review_progress":
+            display.print_success(data.get("message", ""))
+        elif event_type == "acceptance_test_iteration":
+            iteration = data.get("iteration", 1)
+            max_iter = data.get("max_iterations", 4)
+            display.print_success(f"Acceptance test iteration {iteration}/{max_iter}")
+        elif event_type == "acceptance_test_fix_start":
+            iteration = data.get("iteration", 1)
+            failed = data.get("failed_count", 0)
+            msg = f"Iteration {iteration}: {failed} tests failed, requesting fix..."
+            display.print_warning(msg)
+        elif event_type == "acceptance_test_fix_complete":
+            iteration = data.get("iteration", 1)
+            display.print_success(f"Iteration {iteration}: Fix applied, re-running tests...")
+        elif event_type == "acceptance_test_max_iterations_reached":
+            iterations = data.get("iterations_used", 4)
+            display.print_error(f"Acceptance tests still failing after {iterations} fix attempts")
 
     try:
         result = asyncio.run(_run_orchestration_resume_async(loop, display, on_progress))

@@ -3,7 +3,7 @@
 Routes parsed commands to appropriate handlers based on type.
 """
 
-from collections.abc import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any, Optional
 
@@ -44,9 +44,9 @@ class AgentRouter:
             default_agent: Optional agent ID to route raw input to. If None,
                           raw input is handled by the raw handler.
         """
-        self._agent_handler: Optional[Callable[[str, str], Awaitable[str]]] = None
-        self._system_handler: Optional[Callable[[str, list[str]], str]] = None
-        self._raw_handler: Optional[Callable[[str], str]] = None
+        self._agent_handler: Callable[[str, str], Awaitable[str]] | None = None
+        self._system_handler: Callable[[str, list[str]], str] | None = None
+        self._raw_handler: Callable[[str], str] | None = None
         self._history: list[dict[str, Any]] = []
         self._history_limit = history_limit
         self._default_agent = default_agent
@@ -84,15 +84,13 @@ class AgentRouter:
 
     def get_default_agent(self) -> Optional[str]:
         """Get the default agent ID if configured.
-        
+
         Returns:
             Default agent ID or None if not configured.
         """
         return self._default_agent
 
-    def register_agent_handler(
-        self, handler: Callable[[str, str], Awaitable[str]]
-    ) -> None:
+    def register_agent_handler(self, handler: Callable[[str, str], Awaitable[str]]) -> None:
         """Register handler for agent commands.
 
         Args:
@@ -100,9 +98,7 @@ class AgentRouter:
         """
         self._agent_handler = handler
 
-    def register_system_handler(
-        self, handler: Callable[[str, list[str]], str]
-    ) -> None:
+    def register_system_handler(self, handler: Callable[[str, list[str]], str]) -> None:
         """Register handler for system commands.
 
         Args:
@@ -162,7 +158,7 @@ class AgentRouter:
 
     async def _route_raw(self, command: Command) -> str:
         """Route raw input.
-        
+
         If a default agent is configured, routes raw input to that agent.
         Otherwise, uses the raw handler.
         """
@@ -174,7 +170,7 @@ class AgentRouter:
                 if self._raw_handler is None:
                     raise RouterError("No handler registered for raw input")
                 return self._raw_handler(command.content)
-            
+
             # Convert to agent command and route
             agent_command = Command(
                 type=CommandType.AGENT,
@@ -184,7 +180,7 @@ class AgentRouter:
             )
             # Route to agent handler
             return await self._route_agent(agent_command)
-        
+
         # Use raw handler for empty input or when no default agent configured
         if self._raw_handler is None:
             raise RouterError("No handler registered for raw input")

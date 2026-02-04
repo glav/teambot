@@ -452,6 +452,7 @@ Before asking any question, check state file:
 * **Problem Definition**: Current situation, problem statement, impact
 * **Functional Requirements**: Specific, testable capabilities
 * **Non-Functional Requirements**: Performance, security, usability standards
+* **Acceptance Test Scenarios**: End-to-end test scenarios that verify feature works (CRITICAL)
 
 ### Quality Requirements
 Each requirement must include:
@@ -460,6 +461,58 @@ Each requirement must include:
 * Link to business goal or user persona
 * Acceptance criteria or success metrics
 * Priority level
+
+### Acceptance Test Scenarios (MANDATORY)
+
+You MUST include an "Acceptance Test Scenarios" section in every specification. These scenarios define concrete, runnable tests that verify the feature works end-to-end from a user's perspective.
+
+**Purpose**: Unit tests validate individual components work in isolation. Acceptance tests verify the **entire user flow** works when components are integrated.
+
+**Format for Each Scenario**:
+
+```markdown
+## Acceptance Test Scenarios
+
+### AT-001: {{Scenario Name}}
+**Description**: {{What user action is being tested}}
+**Preconditions**: {{System state before test}}
+**Steps**:
+1. {{User action 1}}
+2. {{User action 2}}
+3. {{Observable outcome}}
+**Expected Result**: {{What should happen}}
+**Verification**: {{How to confirm success}}
+
+### AT-002: {{Another Scenario}}
+...
+```
+
+**Example - Agent Reference Syntax Feature**:
+
+```markdown
+## Acceptance Test Scenarios
+
+### AT-001: Simple Command Then Reference
+**Description**: User runs a simple agent command, then references that agent's output from another agent
+**Preconditions**: REPL is running, no prior agent outputs
+**Steps**:
+1. User enters: `@pm create a project plan`
+2. Wait for PM to complete and show output
+3. User enters: `@ba review the plan from $pm`
+**Expected Result**: BA agent receives PM's plan as context and reviews it
+**Verification**: BA's response references content from PM's output
+
+### AT-002: Reference While Agent Running
+**Description**: User references an agent that is still running
+**Preconditions**: REPL is running
+**Steps**:
+1. User enters: `@pm create a detailed plan &` (background)
+2. Immediately user enters: `@ba analyze $pm`
+**Expected Result**: BA waits for PM to complete, then receives PM's output
+**Verification**: BA status shows "waiting for @pm" then executes after PM completes
+```
+
+**Why This Matters**: The shared-context feature passed all unit tests but failed in real usage because no acceptance test validated the complete user flow. The unit tests tested individual components (parser, result store, manager) but not how they integrate in the actual REPL loop.
 
 ## Output Modes
 
@@ -485,6 +538,7 @@ Before marking the specification complete, verify:
 * Success metrics are defined and measurable
 * Dependencies and risks are documented
 * Timeline and ownership are clear
+* **Acceptance test scenarios are defined** (CRITICAL - must have at least 2-3 scenarios)
 
 ## Templates
 
@@ -614,6 +668,7 @@ Before completing this step, you MUST verify:
 - [ ] **Technical Stack**: Programming language and frameworks explicitly documented
 - [ ] **Testing Approach**: TDD/Code-First/Hybrid preference recorded in specification
 - [ ] **Testable Requirements**: All functional requirements have measurable acceptance criteria
+- [ ] **Acceptance Test Scenarios**: At least 2-3 end-to-end user flow scenarios defined (CRITICAL)
 - [ ] **State File Updated**: `.agent-tracking/feature-spec-sessions/{{name}}.state.json` reflects current progress
 - [ ] **No Orphan TODOs**: All TODO items have owners and deadlines, or are resolved
 
@@ -624,4 +679,5 @@ VALIDATION_STATUS: PASS | FAIL
 - Sections Complete: X/Y
 - Technical Stack: DEFINED | MISSING
 - Testing Approach: DEFINED | MISSING
+- Acceptance Tests: X scenarios defined | MISSING
 ```

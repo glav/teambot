@@ -1,5 +1,13 @@
 """File-based orchestration for autonomous workflow execution."""
 
+from teambot.orchestration.acceptance_test_executor import (
+    AcceptanceTestExecutor,
+    AcceptanceTestResult,
+    AcceptanceTestScenario,
+    AcceptanceTestStatus,
+    generate_acceptance_test_report,
+    parse_acceptance_tests,
+)
 from teambot.orchestration.execution_loop import ExecutionLoop, ExecutionResult
 from teambot.orchestration.objective_parser import (
     ParsedObjective,
@@ -13,6 +21,11 @@ from teambot.orchestration.parallel_executor import (
     partition_tasks,
 )
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewResult, ReviewStatus
+from teambot.orchestration.stage_config import (
+    StageConfig,
+    StagesConfiguration,
+    load_stages_config,
+)
 from teambot.orchestration.time_manager import TimeManager
 
 __all__ = [
@@ -29,4 +42,13 @@ __all__ = [
     "AgentTask",
     "TaskResult",
     "partition_tasks",
+    "StageConfig",
+    "StagesConfiguration",
+    "load_stages_config",
+    "AcceptanceTestExecutor",
+    "AcceptanceTestResult",
+    "AcceptanceTestScenario",
+    "AcceptanceTestStatus",
+    "generate_acceptance_test_report",
+    "parse_acceptance_tests",
 ]

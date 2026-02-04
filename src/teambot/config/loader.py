@@ -167,8 +167,7 @@ class ConfigLoader:
 
         if default_agent not in seen_ids:
             raise ConfigError(
-                f"Invalid default_agent '{default_agent}'. "
-                f"Agent must be defined in 'agents' list."
+                f"Invalid default_agent '{default_agent}'. Agent must be defined in 'agents' list."
             )
 
     def _validate_overlay(self, overlay: dict[str, Any]) -> None:

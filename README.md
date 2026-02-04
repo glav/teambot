@@ -16,6 +16,7 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 - ⚡ **Parallel Builders** - builder-1 and builder-2 execute concurrently during implementation
 - 🔁 **Review Iteration** - Automatic review cycles with max 4 iterations per stage
 - ➡️ **Pipeline Operator** - Chain tasks with `->` to pass output between agents
+- 🔗 **Shared Context References** - Use `$agent` to reference another agent's output
 - 💾 **State Persistence** - Resume interrupted workflows with `--resume`
 - ⏱️ **Time Limits** - Configurable execution timeout (default 8 hours)
 - 📁 **Shared Context** - Agents collaborate via `.teambot/` directory
@@ -240,10 +241,47 @@ teambot: /cancel 1
 | `@a,b,c task` | Multi-agent parallel, same prompt | `@pm,ba,writer Analyze feature` |
 | `@a task -> @b task` | Pipeline with dependency | `@pm Plan -> @builder-1 Implement` |
 | `@a,b t1 -> @c t2` | Parallel then pipeline | `@pm,ba Analyze -> @builder-1 Build` |
+| `@a task $b` | Reference agent output | `@pm Summarize $ba` |
 | `/tasks` | List all tasks | |
 | `/task <id>` | View task details | `/task 1` |
 | `/cancel <id>` | Cancel task | `/cancel 3` |
 | `/status` | Show agent status | |
+
+### Shared Context References (`$agent`)
+
+Reference another agent's most recent output using `$agent` syntax:
+
+```bash
+# Reference PM's last output
+teambot: @builder-1 Implement based on $pm
+
+# Reference multiple agents
+teambot: @reviewer Check $builder-1 against $pm requirements
+
+# Wait for running task
+teambot: @pm Summarize $ba  # Waits if @ba is still running
+```
+
+**How It Works**:
+1. Parser detects `$agent` references in your prompt
+2. If referenced agent has a running task, waits for completion
+3. Referenced agent's latest output is prepended to your prompt
+4. Your agent receives full context automatically
+
+### Comparing `$ref` vs `->` Syntax
+
+| Feature | `$ref` Syntax | `->` Pipeline |
+|---------|---------------|---------------|
+| **Use Case** | Reference existing output | Chain new tasks |
+| **Example** | `@pm Summarize $ba` | `@ba Analyze -> @pm Summarize` |
+| **Producer Task** | Uses last completed output | Runs new task |
+| **Direction** | Consumer pulls | Producer pushes |
+| **Multiple Sources** | `@pm Use $ba and $writer` | `@ba,writer Analyze -> @pm` |
+| **Best For** | Building on previous work | Designing new workflows |
+
+**When to Use Which**:
+- **`$ref`**: When you want to reference work an agent already completed
+- **`->`**: When you want to define a complete workflow from scratch
 
 ### Split-Pane Interface
 
@@ -382,6 +420,7 @@ Each review stage iterates up to 4 times:
 {
   "teambot_dir": ".teambot",
   "default_agent": "pm",
+  "stages_config": "stages.yaml",
   "agents": [
     {
       "id": "pm",
@@ -436,6 +475,111 @@ If `default_agent` is not set (default behavior), plain text shows a helpful tip
 | `id` | string | Unique agent identifier |
 | `persona` | string | Persona type |
 | `display_name` | string | Human-readable name for UI |
+
+### Stage Configuration (stages.yaml)
+
+The workflow stages are configured in `stages.yaml`. This file defines which agents run at each stage, required artifacts, and exit criteria.
+
+```yaml
+stages:
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas:
+      - business_analyst
+      - ba
+    artifacts:
+      - feature_spec.md
+    exit_criteria:
+      - Complete specification with all required sections
+    optional: false
+
+  SPEC_REVIEW:
+    name: Spec Review
+    description: Review and approve the feature specification
+    work_agent: ba
+    review_agent: reviewer
+    is_review_stage: true
+    artifacts:
+      - spec_review.md
+
+stage_order:
+  - SETUP
+  - BUSINESS_PROBLEM
+  - SPEC
+  - SPEC_REVIEW
+  # ... remaining stages
+
+work_to_review_mapping:
+  SPEC: SPEC_REVIEW
+  PLAN: PLAN_REVIEW
+```
+
+#### Stage Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Display name for the stage |
+| `description` | string | Description of what the stage does |
+| `work_agent` | string | Agent ID for work tasks (e.g., `pm`, `ba`, `builder-1`) |
+| `review_agent` | string \| null | Agent ID for review tasks, or null if no review |
+| `allowed_personas` | list | Personas allowed to work on this stage |
+| `artifacts` | list | Files produced by this stage |
+| `exit_criteria` | list | Conditions that must be met to complete the stage |
+| `optional` | bool | Whether the stage can be skipped (default: false) |
+| `is_review_stage` | bool | Whether this is a review gate stage (default: false) |
+| `parallel_agents` | list | Agents that can run in parallel (e.g., for IMPLEMENTATION) |
+| `prompt_template` | string \| null | Path to SDD prompt template (relative to project root) |
+| `include_objective` | bool | Whether to include objective content in context (default: true) |
+
+#### Prompt Templates
+
+The `prompt_template` field allows stages to use specialized prompt files from the `.agent/commands/sdd/` directory. These prompts provide stage-specific instructions to the AI agent.
+
+**Available SDD Prompts:**
+
+| Stage | Prompt File | Description |
+|-------|-------------|-------------|
+| SETUP | `sdd.0-initialize.prompt.md` | Project initialization |
+| SPEC | `sdd.1-create-feature-spec.prompt.md` | Feature specification creation |
+| SPEC_REVIEW | `sdd.2-review-spec.prompt.md` | Specification review |
+| RESEARCH | `sdd.3-research-feature.prompt.md` | Technical research |
+| TEST_STRATEGY | `sdd.4-determine-test-strategy.prompt.md` | Test approach planning |
+| PLAN | `sdd.5-task-planner-for-feature.prompt.md` | Task breakdown |
+| PLAN_REVIEW | `sdd.6-review-plan.prompt.md` | Plan review |
+| IMPLEMENTATION | `sdd.7-task-implementer-for-feature.prompt.md` | Code implementation |
+| POST_REVIEW | `sdd.8-post-implementation-review.prompt.md` | Final review |
+
+**The `include_objective` Flag:**
+
+Set `include_objective: false` for stages that don't need the objective document in their context (e.g., generic initialization). This keeps the agent prompt focused and reduces token usage.
+
+```yaml
+SETUP:
+  name: Setup
+  prompt_template: .agent/commands/sdd/sdd.0-initialize.prompt.md
+  include_objective: false  # Generic setup doesn't need objective
+
+SPEC:
+  name: Specification
+  prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+  include_objective: true   # Needs objective to create spec
+```
+
+#### Customizing the Workflow
+
+1. Copy `stages.yaml` to your project
+2. Modify stages, agents, or add custom exit criteria
+3. Point to it in `teambot.json`:
+   ```json
+   {
+     "stages_config": "path/to/custom-stages.yaml"
+   }
+   ```
+
+If no `stages.yaml` exists, TeamBot uses built-in defaults.
 
 ---
 

@@ -1,10 +1,9 @@
 """Tests for /overlay command."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from teambot.repl.commands import handle_overlay, SystemCommands
-from teambot.visualization.overlay import OverlayPosition, OverlayRenderer
+from teambot.repl.commands import SystemCommands, handle_overlay
+from teambot.visualization.overlay import OverlayPosition
 
 
 class TestHandleOverlay:

@@ -39,19 +39,100 @@ class ReviewResult:
 
     status: ReviewStatus
     iterations_used: int
+    final_output: str | None = None
     summary: str | None = None
     suggestions: list[str] = field(default_factory=list)
     report_path: Path | None = None
 
 
 class ReviewIterator:
-    """Manages review→feedback→action cycles."""
+    """Manages review→feedback→action cycles with strict verification."""
 
     MAX_ITERATIONS = 4
 
     def __init__(self, sdk_client: Any, teambot_dir: Path):
         self.sdk_client = sdk_client
         self.teambot_dir = teambot_dir
+        self.repo_root = self._find_repo_root()
+
+    def _find_repo_root(self) -> Path | None:
+        """Find the git repository root."""
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return Path(result.stdout.strip())
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return None
+
+    def _gather_evidence(self) -> str:
+        """Gather actual evidence of changes for review verification.
+
+        Returns:
+            String containing git diff, modified files, and recent test results.
+        """
+        import subprocess
+
+        evidence_parts = []
+
+        if not self.repo_root:
+            return "(Unable to gather evidence - not in git repository)"
+
+        # Get git diff (staged and unstaged changes)
+        try:
+            diff_result = subprocess.run(
+                ["git", "diff", "HEAD", "--stat"],
+                capture_output=True,
+                text=True,
+                cwd=self.repo_root,
+                timeout=10,
+            )
+            if diff_result.returncode == 0 and diff_result.stdout.strip():
+                evidence_parts.append("## Git Changes (Summary)")
+                evidence_parts.append("```")
+                evidence_parts.append(diff_result.stdout.strip()[:2000])
+                evidence_parts.append("```")
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # Get list of modified files
+        try:
+            status_result = subprocess.run(
+                ["git", "status", "--short"],
+                capture_output=True,
+                text=True,
+                cwd=self.repo_root,
+                timeout=5,
+            )
+            if status_result.returncode == 0 and status_result.stdout.strip():
+                evidence_parts.append("\n## Modified Files")
+                evidence_parts.append("```")
+                evidence_parts.append(status_result.stdout.strip()[:1000])
+                evidence_parts.append("```")
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # Check for recent test results in artifacts
+        test_results_path = self.teambot_dir / "artifacts" / "test_results.md"
+        if test_results_path.exists():
+            try:
+                content = test_results_path.read_text()[:1500]
+                evidence_parts.append("\n## Recent Test Results")
+                evidence_parts.append(content)
+            except OSError:
+                pass
+
+        if not evidence_parts:
+            return "(No evidence of changes found)"
+
+        return "\n".join(evidence_parts)
 
     async def execute(
         self,
@@ -86,9 +167,12 @@ class ReviewIterator:
                     work_agent, current_context, iteration_history
                 )
 
-                # Execute review
+                # Gather evidence of actual changes for strict review
+                evidence = self._gather_evidence()
+
+                # Execute review with evidence
                 review_output, approved, feedback = await self._execute_review(
-                    review_agent, work_output
+                    review_agent, work_output, evidence
                 )
 
                 iteration_history.append(
@@ -105,15 +189,19 @@ class ReviewIterator:
                     return ReviewResult(
                         status=ReviewStatus.APPROVED,
                         iterations_used=iteration,
+                        final_output=review_output,
                     )
 
                 # Incorporate feedback for next iteration
                 current_context = self._incorporate_feedback(current_context, feedback, work_output)
 
             except asyncio.CancelledError:
+                # Get last review output if available
+                last_output = iteration_history[-1].review_output if iteration_history else None
                 return ReviewResult(
                     status=ReviewStatus.CANCELLED,
                     iterations_used=iteration,
+                    final_output=last_output,
                 )
 
         # Max iterations reached - generate failure report
@@ -132,31 +220,135 @@ class ReviewIterator:
         self,
         agent_id: str,
         work_output: str,
+        evidence: str = "",
     ) -> tuple[str, bool, str | None]:
         """Execute review phase and parse result.
+
+        Args:
+            agent_id: The reviewer agent ID
+            work_output: The work output to review
+            evidence: Actual evidence gathered (git diff, test results)
 
         Returns:
             Tuple of (review_output, approved, feedback)
         """
-        review_prompt = f"Review the following work output:\n\n{work_output}"
+        review_prompt = self._build_strict_review_prompt(work_output, evidence)
         review_output = await self.sdk_client.execute_streaming(agent_id, review_prompt, None)
 
-        # Parse approval from review output
-        approved = self._parse_approval(review_output)
+        # Parse approval from review output (strict mode)
+        approved = self._parse_approval_strict(review_output)
         feedback = self._extract_feedback(review_output) if not approved else None
 
         return review_output, approved, feedback
 
-    def _parse_approval(self, review_output: str) -> bool:
-        """Parse whether review was approved."""
+    def _build_strict_review_prompt(self, work_output: str, evidence: str = "") -> str:
+        """Build a strict review prompt requiring demonstrated proof.
+
+        Args:
+            work_output: The work output to review
+            evidence: Actual evidence gathered from git/tests
+
+        Returns:
+            Review prompt with strict verification requirements
+        """
+        evidence_section = ""
+        if evidence and evidence != "(No evidence of changes found)":
+            evidence_section = f"""
+## Actual Evidence (from git and test artifacts)
+
+The following evidence was automatically gathered. Use this to VERIFY
+the claims made in the work output:
+
+{evidence}
+
+"""
+
+        return f"""# Strict Review Required
+
+You must thoroughly review the following work output and verify it meets
+requirements. You have access to ACTUAL EVIDENCE below - use it to verify claims.
+
+## Work Output to Review
+
+{work_output}
+{evidence_section}
+## Verification Checklist
+
+Before approving, you MUST verify:
+
+1. **Code Changes Exist**: Are there actual code changes shown (not just descriptions)?
+   - Cross-reference with the "Actual Evidence" section if available
+2. **Tests Included**: Are tests written AND shown to pass (actual pytest output)?
+3. **Requirements Met**: Does the work address the original requirements?
+4. **No Placeholders**: Are there any TODO, FIXME, or placeholder comments?
+5. **Completeness**: Is the implementation complete, not partial?
+6. **Evidence Matches Claims**: Do the actual git changes match what was claimed?
+
+## Review Output Format
+
+You MUST use one of these exact formats:
+
+### If APPROVING (all criteria met):
+```
+VERIFIED_APPROVED: [reason]
+
+Verification Evidence:
+- Code changes: [describe what was changed]
+- Tests: [describe test results seen]
+- Requirements: [how each requirement is met]
+- Evidence check: [confirm evidence matches claims]
+```
+
+### If REJECTING (any criteria not met):
+```
+REJECTED: [specific reason]
+
+Issues Found:
+1. [specific issue]
+2. [specific issue]
+
+Required Actions:
+1. [what must be done]
+2. [what must be done]
+```
+
+## CRITICAL RULES
+
+- Do NOT approve work that only describes what should be done
+- Do NOT approve if actual code changes are not shown
+- Do NOT approve if tests are not demonstrated passing
+- Do NOT approve if evidence doesn't match claims
+- REJECT if you cannot verify the claims made in the output
+
+Begin your review now.
+"""
+
+    def _parse_approval_strict(self, review_output: str) -> bool:
+        """Parse whether review was approved using strict criteria.
+
+        STRICT MODE: Requires explicit VERIFIED_APPROVED marker.
+        Default is REJECTED if marker not found.
+        """
         output_lower = review_output.lower()
-        # Check for explicit approval markers
-        if "approved:" in output_lower or "approved!" in output_lower:
+
+        # Check for explicit verified approval marker
+        if "verified_approved:" in output_lower:
             return True
-        if "rejected:" in output_lower or "rejected!" in output_lower:
-            return False
-        # Default to approved if no rejection marker
-        return "reject" not in output_lower
+
+        # Legacy support: explicit approved with evidence section
+        if "approved:" in output_lower and "verification evidence:" in output_lower:
+            return True
+
+        # Everything else is rejected (strict default)
+        return False
+
+    def _parse_approval(self, review_output: str) -> bool:
+        """Parse whether review was approved.
+
+        Deprecated: Use _parse_approval_strict for new code.
+        Kept for backward compatibility.
+        """
+        return self._parse_approval_strict(review_output)
 
     def _extract_feedback(self, review_output: str) -> str:
         """Extract feedback from review output."""
@@ -183,9 +375,13 @@ class ReviewIterator:
         suggestions = self._extract_suggestions(history)
         report_path = self._save_failure_report(stage, summary, suggestions, history)
 
+        # Get final review output from last iteration
+        final_output = history[-1].review_output if history else None
+
         return ReviewResult(
             status=ReviewStatus.FAILED,
             iterations_used=len(history),
+            final_output=final_output,
             summary=summary,
             suggestions=suggestions,
             report_path=report_path,

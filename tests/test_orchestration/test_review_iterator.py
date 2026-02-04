@@ -36,10 +36,13 @@ class TestReviewIterator:
         self, iterator: ReviewIterator, mock_sdk_client: AsyncMock
     ) -> None:
         """Returns APPROVED after first review approves."""
-        # Work output, then review output with approval
+        # Work output, then review output with verified approval
         mock_sdk_client.execute_streaming.side_effect = [
-            "Implementation complete",
-            "APPROVED: Looks good!",
+            "Implementation complete with code changes",
+            (
+                "VERIFIED_APPROVED: All criteria met\n\n"
+                "Verification Evidence:\n- Code changes: Updated module"
+            ),
         ]
 
         result = await iterator.execute(
@@ -60,8 +63,8 @@ class TestReviewIterator:
         mock_sdk_client.execute_streaming.side_effect = [
             "First attempt",
             "REJECTED: Need more detail",
-            "Improved implementation",
-            "APPROVED: Great work!",
+            "Improved implementation with tests",
+            "VERIFIED_APPROVED: All requirements met\n\nVerification Evidence:\n- Tests pass",
         ]
 
         result = await iterator.execute(
@@ -80,10 +83,14 @@ class TestReviewIterator:
     ) -> None:
         """Boundary case: approved on iteration 4."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: Fix A",
-            "Attempt 2", "REJECTED: Fix B",
-            "Attempt 3", "REJECTED: Fix C",
-            "Attempt 4", "APPROVED: Finally!",
+            "Attempt 1",
+            "REJECTED: Fix A",
+            "Attempt 2",
+            "REJECTED: Fix B",
+            "Attempt 3",
+            "REJECTED: Fix C",
+            "Attempt 4",
+            "VERIFIED_APPROVED: Finally\n\nEvidence:\n- All fixed",
         ]
 
         result = await iterator.execute(
@@ -102,10 +109,14 @@ class TestReviewIterator:
     ) -> None:
         """4 rejections → FAILED status."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: Issue 1",
-            "Attempt 2", "REJECTED: Issue 2",
-            "Attempt 3", "REJECTED: Issue 3",
-            "Attempt 4", "REJECTED: Issue 4",
+            "Attempt 1",
+            "REJECTED: Issue 1",
+            "Attempt 2",
+            "REJECTED: Issue 2",
+            "Attempt 3",
+            "REJECTED: Issue 3",
+            "Attempt 4",
+            "REJECTED: Issue 4",
         ]
 
         result = await iterator.execute(
@@ -125,10 +136,14 @@ class TestReviewIterator:
     ) -> None:
         """Failure summary contains all iteration feedback."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt 1", "REJECTED: First issue",
-            "Attempt 2", "REJECTED: Second issue",
-            "Attempt 3", "REJECTED: Third issue",
-            "Attempt 4", "REJECTED: Fourth issue",
+            "Attempt 1",
+            "REJECTED: First issue",
+            "Attempt 2",
+            "REJECTED: Second issue",
+            "Attempt 3",
+            "REJECTED: Third issue",
+            "Attempt 4",
+            "REJECTED: Fourth issue",
         ]
 
         result = await iterator.execute(
@@ -148,10 +163,14 @@ class TestReviewIterator:
     ) -> None:
         """Suggestions from reviewer are extracted."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Attempt", "REJECTED:\n- Add tests\n- Fix imports",
-            "Attempt", "REJECTED:\n- Update docs",
-            "Attempt", "REJECTED:\n- Handle errors",
-            "Attempt", "REJECTED:\n- Final fix",
+            "Attempt",
+            "REJECTED:\n- Add tests\n- Fix imports",
+            "Attempt",
+            "REJECTED:\n- Update docs",
+            "Attempt",
+            "REJECTED:\n- Handle errors",
+            "Attempt",
+            "REJECTED:\n- Final fix",
         ]
 
         result = await iterator.execute(
@@ -173,7 +192,7 @@ class TestReviewIterator:
             "First attempt",
             "REJECTED: Need error handling",
             "Improved with error handling",
-            "APPROVED: Good!",
+            "VERIFIED_APPROVED: Good!\n\nVerification Evidence:\n- Error handling added",
         ]
 
         result = await iterator.execute(
@@ -235,7 +254,8 @@ class TestReviewIterator:
     ) -> None:
         """Progress callback is invoked with iteration info."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "Work", "APPROVED: Good",
+            "Work output with code",
+            "VERIFIED_APPROVED: Good\n\nVerification Evidence:\n- Complete",
         ]
         progress_calls = []
 
@@ -270,10 +290,14 @@ class TestReviewIteratorFailureReport:
     ) -> None:
         """Failure report is saved to .teambot/failures/."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "A1", "REJECTED: R1",
-            "A2", "REJECTED: R2",
-            "A3", "REJECTED: R3",
-            "A4", "REJECTED: R4",
+            "A1",
+            "REJECTED: R1",
+            "A2",
+            "REJECTED: R2",
+            "A3",
+            "REJECTED: R3",
+            "A4",
+            "REJECTED: R4",
         ]
 
         result = await iterator.execute(
@@ -293,10 +317,14 @@ class TestReviewIteratorFailureReport:
     ) -> None:
         """Failure report contains stage information."""
         mock_sdk_client.execute_streaming.side_effect = [
-            "A1", "REJECTED: R1",
-            "A2", "REJECTED: R2",
-            "A3", "REJECTED: R3",
-            "A4", "REJECTED: R4",
+            "A1",
+            "REJECTED: R1",
+            "A2",
+            "REJECTED: R2",
+            "A3",
+            "REJECTED: R3",
+            "A4",
+            "REJECTED: R4",
         ]
 
         result = await iterator.execute(
