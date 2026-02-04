@@ -1,10 +1,12 @@
 {
   "teambot_dir": ".teambot",
+  "default_model": "claude-sonnet-4",
   "default_agent": "pm",
   "agents": [
     {
       "id": "pm",
       "persona": "project_manager",
+      "model": "claude-opus-4.5",
       "display_name": "Project Manager",
       "parallel_capable": false,
       "workflow_stages": [
@@ -16,6 +18,7 @@
     {
       "id": "ba",
       "persona": "business_analyst",
+      "model": "gpt-5.2-codex",
       "display_name": "Business Analyst",
       "parallel_capable": false,
       "workflow_stages": [
@@ -27,6 +30,7 @@
       "id": "writer",
       "persona": "technical_writer",
       "display_name": "Technical Writer",
+      "model": "gpt-5.2-codex",
       "parallel_capable": false,
       "workflow_stages": [
         "documentation"
@@ -35,6 +39,7 @@
     {
       "id": "builder-1",
       "persona": "builder",
+      "model": "claude-opus-4.5",
       "display_name": "Builder (Primary)",
       "parallel_capable": true,
       "workflow_stages": [
@@ -45,6 +50,7 @@
     {
       "id": "builder-2",
       "persona": "builder",
+      "model": "claude-opus-4.5",
       "display_name": "Builder (Secondary)",
       "parallel_capable": true,
       "workflow_stages": [
@@ -55,6 +61,7 @@
     {
       "id": "reviewer",
       "persona": "reviewer",
+      "model": "gpt-5.2-codex",
       "display_name": "Reviewer",
       "parallel_capable": false,
       "workflow_stages": [

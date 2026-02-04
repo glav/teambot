@@ -58,6 +58,29 @@ class TeamBotApp(App):
         self._agent_status = AgentStatusManager()
         # Legacy: Track which agents have running tasks (kept for backward compat)
         self._running_agents: dict[str, str] = {}
+        # Initialize agent models from config
+        self._init_agent_models()
+
+    def _init_agent_models(self) -> None:
+        """Initialize agent models from config.
+
+        Sets the model display for each agent based on:
+        1. Agent-specific model in config
+        2. Global default_model in config
+        """
+        if not self._config:
+            return
+
+        default_model = self._config.get("default_model")
+
+        for agent in self._config.get("agents", []):
+            agent_id = agent.get("id")
+            if not agent_id:
+                continue
+            # Agent-specific model takes priority over default
+            model = agent.get("model") or default_model
+            if model:
+                self._agent_status.set_model(agent_id, model)
 
     def compose(self) -> ComposeResult:
         """Create the split-pane layout."""
@@ -281,8 +304,53 @@ class TeamBotApp(App):
         result = self._commands.dispatch(command.command, command.args or [])
         output.write_system(result.output)
 
+        # Update status panel if /model command succeeded
+        if command.command == "model" and result.success:
+            self._update_model_display(command.args or [])
+
         if result.should_exit:
             self.exit()
+
+    def _update_model_display(self, args: list[str]) -> None:
+        """Update agent status model display after /model command.
+
+        Args:
+            args: Command args [agent_id, model] or [agent_id, 'clear'].
+        """
+        if len(args) < 2:
+            return
+
+        agent_id = args[0].lstrip("@")  # Strip @ prefix if present
+        model = args[1]
+
+        if model.lower() == "clear":
+            # Restore from config
+            config_model = self._get_config_model(agent_id)
+            self._agent_status.set_model(agent_id, config_model)
+        else:
+            self._agent_status.set_model(agent_id, model)
+
+    def _get_config_model(self, agent_id: str) -> str | None:
+        """Get model for agent from config.
+
+        Args:
+            agent_id: Agent identifier.
+
+        Returns:
+            Model from agent config or default_model, or None.
+        """
+        if not self._config:
+            return None
+
+        # Check agent-specific model
+        for agent in self._config.get("agents", []):
+            if agent.get("id") == agent_id:
+                if agent.get("model"):
+                    return agent["model"]
+                break
+
+        # Fall back to default_model
+        return self._config.get("default_model")
 
     async def _handle_cancel_command(self, args: list[str], output) -> None:
         """Handle /cancel command to stop streaming tasks.

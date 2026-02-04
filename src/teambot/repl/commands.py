@@ -124,7 +124,7 @@ def handle_status(args: list[str]) -> CommandResult:
     agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
     lines = ["Agent Status:", ""]
     lines.append(f"  {'Agent':<12} {'Status':<10} {'Model':<20}")
-    lines.append(f"  {'-'*12} {'-'*10} {'-'*20}")
+    lines.append(f"  {'-' * 12} {'-' * 10} {'-' * 20}")
     for agent in agents:
         lines.append(f"  {agent:<12} {'idle':<10} {'(default)':<20}")
 
@@ -214,9 +214,7 @@ def handle_models(args: list[str]) -> CommandResult:
     return CommandResult(output="\n".join(lines))
 
 
-def handle_model(
-    args: list[str], session_overrides: dict[str, str]
-) -> CommandResult:
+def handle_model(args: list[str], session_overrides: dict[str, str]) -> CommandResult:
     """Handle /model command - view or set session model overrides.
 
     Args:
@@ -308,7 +306,7 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
 
     lines = ["Tasks:", ""]
     lines.append(f"  {'ID':<6} {'Agent':<12} {'Model':<15} {'Status':<10} {'Task'}")
-    lines.append(f"  {'-'*6} {'-'*12} {'-'*15} {'-'*10} {'-'*20}")
+    lines.append(f"  {'-' * 6} {'-' * 12} {'-' * 15} {'-' * 10} {'-' * 20}")
     for task in tasks:
         status_icon = {
             TaskStatus.PENDING: "⏳",

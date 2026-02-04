@@ -424,9 +424,7 @@ class TestGlobalDefaultModel:
 
         config_data = {
             "default_model": "claude-sonnet-4",
-            "agents": [
-                {"id": "pm", "persona": "project_manager", "display_name": "PM"}
-            ]
+            "agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}],
         }
         config_file = tmp_path / "teambot.json"
         config_file.write_text(json.dumps(config_data))
@@ -442,9 +440,7 @@ class TestGlobalDefaultModel:
 
         config_data = {
             "default_model": "invalid-model",
-            "agents": [
-                {"id": "pm", "persona": "project_manager", "display_name": "PM"}
-            ]
+            "agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}],
         }
         config_file = tmp_path / "teambot.json"
         config_file.write_text(json.dumps(config_data))
@@ -458,11 +454,7 @@ class TestGlobalDefaultModel:
         """Config without default_model is valid."""
         from teambot.config.loader import ConfigLoader
 
-        config_data = {
-            "agents": [
-                {"id": "pm", "persona": "project_manager", "display_name": "PM"}
-            ]
-        }
+        config_data = {"agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}]}
         config_file = tmp_path / "teambot.json"
         config_file.write_text(json.dumps(config_data))
 
