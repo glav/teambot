@@ -197,7 +197,7 @@ def handle_models(args: list[str]) -> CommandResult:
 
     for model_id in sorted(VALID_MODELS):
         info = MODEL_INFO.get(model_id, {})
-        display_name = info.get("display_name", model_id)
+        display_name = info.get("display", model_id)
         category = info.get("category", "standard")
         categories.setdefault(category, []).append((model_id, display_name))
 
