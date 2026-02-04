@@ -124,7 +124,7 @@ class TeamBotApp(App):
         output.write_streaming_start(agent_id)
 
         try:
-            # For simple single-agent commands WITHOUT references, use direct SDK 
+            # For simple single-agent commands WITHOUT references, use direct SDK
             # streaming for better UX but still track the task via executor's manager.
             # Commands WITH references ($agent) must go through executor for injection.
             if (

@@ -97,16 +97,12 @@ def parse_objective_file(path: Path) -> ParsedObjective:
     )
 
     # Try to find constraints
-    constraints = (
-        _parse_list_section(sections.get("Constraints", ""))
-        or _parse_list_section(sections.get("Key Constraints", ""))
+    constraints = _parse_list_section(sections.get("Constraints", "")) or _parse_list_section(
+        sections.get("Key Constraints", "")
     )
 
     # Try to find context
-    context = (
-        sections.get("Context")
-        or sections.get("Technical Context")
-    )
+    context = sections.get("Context") or sections.get("Technical Context")
 
     return ParsedObjective(
         title=_extract_title(content),
@@ -125,12 +121,12 @@ def _extract_title(content: str) -> str:
     match = re.search(r"^#\s+(?:Objective:\s*)?(.+)$", content, re.MULTILINE)
     if match:
         return match.group(1).strip()
-    
+
     # Try H2 Objective
     match = re.search(r"^##\s+Objective\s*$", content, re.MULTILINE)
     if match:
         return "Objective"
-    
+
     return "Untitled"
 
 
@@ -154,7 +150,7 @@ def _extract_sections(content: str) -> dict[str, str]:
 def _extract_inline_goals(content: str) -> list[str]:
     """Extract goals from inline **Goal**: format."""
     goals = []
-    
+
     # Match **Goal**: or **Goals**: followed by text
     match = re.search(r"\*\*Goals?\*\*:\s*(.+?)(?=\n\n|\n\*\*|\Z)", content, re.DOTALL)
     if match:
@@ -172,19 +168,17 @@ def _extract_inline_goals(content: str) -> list[str]:
                     goals.append(list_match.group(1).strip())
                 elif line and not line.startswith("**"):
                     goals.append(line)
-    
+
     return goals
 
 
 def _extract_inline_criteria(content: str) -> list[SuccessCriterion]:
     """Extract success criteria from inline **Success Criteria**: format."""
     criteria = []
-    
+
     # Match **Success Criteria**: followed by content until next section
     match = re.search(
-        r"\*\*Success Criteria\*\*:\s*\n((?:[-*]\s+\[[ xX]\].+\n?)+)",
-        content,
-        re.MULTILINE
+        r"\*\*Success Criteria\*\*:\s*\n((?:[-*]\s+\[[ xX]\].+\n?)+)", content, re.MULTILINE
     )
     if match:
         criteria_text = match.group(1)
@@ -195,7 +189,7 @@ def _extract_inline_criteria(content: str) -> list[SuccessCriterion]:
                 completed = checkbox_match.group(1).lower() == "x"
                 description = checkbox_match.group(2).strip()
                 criteria.append(SuccessCriterion(description=description, completed=completed))
-    
+
     return criteria
 
 
@@ -226,19 +220,82 @@ def _parse_criteria_section(content: str) -> list[SuccessCriterion]:
 # Common words to skip when deriving feature names
 _SKIP_WORDS = {
     # Articles and conjunctions
-    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "as", "is", "was", "are", "were", "been",
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "but",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "by",
+    "from",
+    "as",
+    "is",
+    "was",
+    "are",
+    "were",
+    "been",
     # Modal verbs
-    "be", "have", "has", "had", "do", "does", "did", "will", "would",
-    "could", "should", "may", "might", "must", "shall", "can", "need",
+    "be",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "shall",
+    "can",
+    "need",
     # Common action verbs (generic)
-    "add", "create", "implement", "build", "make", "update", "fix",
-    "new", "support", "enable", "allow", "enhance", "improve", "change",
+    "add",
+    "create",
+    "implement",
+    "build",
+    "make",
+    "update",
+    "fix",
+    "new",
+    "support",
+    "enable",
+    "allow",
+    "enhance",
+    "improve",
+    "change",
     # Personal pronouns and common sentence starters
-    "i", "we", "you", "it", "this", "that", "these", "those",
-    "like", "want", "so", "when", "if", "then", "also",
+    "i",
+    "we",
+    "you",
+    "it",
+    "this",
+    "that",
+    "these",
+    "those",
+    "like",
+    "want",
+    "so",
+    "when",
+    "if",
+    "then",
+    "also",
     # Generic tech words
-    "solution", "system", "feature", "functionality", "ability",
+    "solution",
+    "system",
+    "feature",
+    "functionality",
+    "ability",
 }
 
 

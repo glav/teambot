@@ -112,9 +112,7 @@ class ExecutionLoop:
         else:
             # Try to load from config path or use defaults
             stages_path = config.get("stages_config")
-            self.stages_config = load_stages_config(
-                Path(stages_path) if stages_path else None
-            )
+            self.stages_config = load_stages_config(Path(stages_path) if stages_path else None)
 
         # Current state
         self.current_stage = WorkflowStage.SETUP
@@ -170,9 +168,7 @@ class ExecutionLoop:
 
                 if stage in self.stages_config.acceptance_test_stages:
                     # Execute acceptance test stage with retry loop
-                    await self._execute_acceptance_test_with_retry(
-                        stage, on_progress
-                    )
+                    await self._execute_acceptance_test_with_retry(stage, on_progress)
                     if not self.acceptance_tests_passed:
                         self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
                         return ExecutionResult.ACCEPTANCE_TEST_FAILED
@@ -304,12 +300,15 @@ class ExecutionLoop:
         self.acceptance_tests_passed = self.acceptance_test_result.all_passed
 
         if on_progress:
-            on_progress("acceptance_test_stage_complete", {
-                "stage": stage.name,
-                "passed": self.acceptance_test_result.passed,
-                "failed": self.acceptance_test_result.failed,
-                "all_passed": self.acceptance_tests_passed,
-            })
+            on_progress(
+                "acceptance_test_stage_complete",
+                {
+                    "stage": stage.name,
+                    "passed": self.acceptance_test_result.passed,
+                    "failed": self.acceptance_test_result.failed,
+                    "all_passed": self.acceptance_tests_passed,
+                },
+            )
 
         return self.acceptance_test_result
 
@@ -346,10 +345,13 @@ class ExecutionLoop:
             self.acceptance_test_iterations += 1
 
             if on_progress:
-                on_progress("acceptance_test_iteration", {
-                    "iteration": self.acceptance_test_iterations,
-                    "max_iterations": max_iterations,
-                })
+                on_progress(
+                    "acceptance_test_iteration",
+                    {
+                        "iteration": self.acceptance_test_iterations,
+                        "max_iterations": max_iterations,
+                    },
+                )
 
             # Run acceptance tests (output will be accumulated separately)
             result = await self._execute_acceptance_test_stage(stage, on_progress)
@@ -388,19 +390,25 @@ class ExecutionLoop:
                 iteration_record["fix_applied"] = False
                 iteration_history.append(iteration_record)
                 if on_progress:
-                    on_progress("acceptance_test_max_iterations_reached", {
-                        "iterations_used": self.acceptance_test_iterations,
-                    })
+                    on_progress(
+                        "acceptance_test_max_iterations_reached",
+                        {
+                            "iterations_used": self.acceptance_test_iterations,
+                        },
+                    )
                 break
 
             # Build context for fix
             fix_context = self._build_acceptance_test_fix_context(result)
 
             if on_progress:
-                on_progress("acceptance_test_fix_start", {
-                    "iteration": self.acceptance_test_iterations,
-                    "failed_count": result.failed,
-                })
+                on_progress(
+                    "acceptance_test_fix_start",
+                    {
+                        "iteration": self.acceptance_test_iterations,
+                        "failed_count": result.failed,
+                    },
+                )
 
             # Ask builder to implement fix
             fix_output = await self._execute_acceptance_test_fix(fix_context, on_progress)
@@ -419,10 +427,13 @@ class ExecutionLoop:
             )
 
             if on_progress:
-                on_progress("acceptance_test_fix_complete", {
-                    "iteration": self.acceptance_test_iterations,
-                    "fix_output_length": len(fix_output),
-                })
+                on_progress(
+                    "acceptance_test_fix_complete",
+                    {
+                        "iteration": self.acceptance_test_iterations,
+                        "fix_output_length": len(fix_output),
+                    },
+                )
 
         # Store the complete history in stage_outputs
         self.stage_outputs[stage] = "\n".join(accumulated_output)
@@ -472,31 +483,39 @@ class ExecutionLoop:
         # Show failed scenarios
         for scenario in test_result.scenarios:
             if scenario.status.value in ("failed", "error"):
-                parts.extend([
-                    f"### {scenario.id}: {scenario.name}",
-                    f"**Failure Reason**: {scenario.failure_reason}",
-                    f"**Expected**: {scenario.expected_result}",
-                    "",
-                ])
+                parts.extend(
+                    [
+                        f"### {scenario.id}: {scenario.name}",
+                        f"**Failure Reason**: {scenario.failure_reason}",
+                        f"**Expected**: {scenario.expected_result}",
+                        "",
+                    ]
+                )
 
         # Include validation output for debugging
         if validation_output:
-            parts.extend([
-                "## Previous Validation Output",
-                "",
-                "This is the output from the last validation run.",
-                "Use this to understand what failed:",
-                "",
-                "```",
-                validation_output[:4000] if len(validation_output) > 4000 else validation_output,
-                "```",
-                "",
-            ])
+            parts.extend(
+                [
+                    "## Previous Validation Output",
+                    "",
+                    "This is the output from the last validation run.",
+                    "Use this to understand what failed:",
+                    "",
+                    "```",
+                    validation_output[:4000]
+                    if len(validation_output) > 4000
+                    else validation_output,
+                    "```",
+                    "",
+                ]
+            )
 
-        parts.extend([
-            "## Feature Specification",
-            "",
-        ])
+        parts.extend(
+            [
+                "## Feature Specification",
+                "",
+            ]
+        )
 
         # Include feature spec
         spec_content = self._find_feature_spec_content()
@@ -505,40 +524,44 @@ class ExecutionLoop:
         else:
             parts.append("(Feature spec not found)")
 
-        parts.extend([
-            "",
-            "## Your Task - CRITICAL",
-            "",
-            "The feature DOES NOT WORK. You must fix the IMPLEMENTATION, not just",
-            "write tests that pass. The acceptance tests validate real user behavior.",
-            "",
-            "1. **Read** the failed test output to understand what's broken",
-            "2. **Find** the implementation code that handles this feature",
-            "3. **Fix** the actual implementation bug (not test expectations)",
-            "4. **Run** `uv run pytest tests/test_acceptance_validation.py -v`",
-            "5. **Show** the actual pytest output proving tests pass",
-            "",
-            "## Verification",
-            "",
-            "After fixing, you MUST include:",
-            "",
-            "1. The code changes you made (show the diff or key changes)",
-            "2. The actual pytest output (copy/paste the terminal output)",
-            "3. A results block:",
-            "",
-            "```acceptance-results",
-        ])
+        parts.extend(
+            [
+                "",
+                "## Your Task - CRITICAL",
+                "",
+                "The feature DOES NOT WORK. You must fix the IMPLEMENTATION, not just",
+                "write tests that pass. The acceptance tests validate real user behavior.",
+                "",
+                "1. **Read** the failed test output to understand what's broken",
+                "2. **Find** the implementation code that handles this feature",
+                "3. **Fix** the actual implementation bug (not test expectations)",
+                "4. **Run** `uv run pytest tests/test_acceptance_validation.py -v`",
+                "5. **Show** the actual pytest output proving tests pass",
+                "",
+                "## Verification",
+                "",
+                "After fixing, you MUST include:",
+                "",
+                "1. The code changes you made (show the diff or key changes)",
+                "2. The actual pytest output (copy/paste the terminal output)",
+                "3. A results block:",
+                "",
+                "```acceptance-results",
+            ]
+        )
 
         for scenario in test_result.scenarios:
             parts.append(f"{scenario.id}: PASSED  # or FAILED - Reason: ...")
 
-        parts.extend([
-            "```",
-            "",
-            "WARNING: If you claim PASSED but the pytest output shows failures,",
-            "or if pytest output is missing, all scenarios will be marked FAILED.",
-            "",
-        ])
+        parts.extend(
+            [
+                "```",
+                "",
+                "WARNING: If you claim PASSED but the pytest output shows failures,",
+                "or if pytest output is missing, all scenarios will be marked FAILED.",
+                "",
+            ]
+        )
 
         return "\n".join(parts)
 
@@ -681,11 +704,13 @@ class ExecutionLoop:
         # Conditionally include objective content based on include_objective flag
         include_objective = stage_config.include_objective if stage_config else True
         if include_objective:
-            parts.extend([
-                f"# Objective: {self.objective.title}",
-                "",
-                "## Goals",
-            ])
+            parts.extend(
+                [
+                    f"# Objective: {self.objective.title}",
+                    "",
+                    "## Goals",
+                ]
+            )
 
             for goal in self.objective.goals:
                 parts.append(f"- {goal}")
@@ -704,13 +729,15 @@ class ExecutionLoop:
                 parts.extend(["", "## Context", self.objective.context])
 
         # Add working directory information
-        parts.extend([
-            "",
-            "## Working Directory",
-            f"All artifacts for this objective should be saved to: `{self.teambot_dir}`",
-            f"- Artifacts directory: `{self.teambot_dir / 'artifacts'}`",
-            f"- Example: `{self.teambot_dir / 'artifacts' / 'feature_spec.md'}`",
-        ])
+        parts.extend(
+            [
+                "",
+                "## Working Directory",
+                f"All artifacts for this objective should be saved to: `{self.teambot_dir}`",
+                f"- Artifacts directory: `{self.teambot_dir / 'artifacts'}`",
+                f"- Example: `{self.teambot_dir / 'artifacts' / 'feature_spec.md'}`",
+            ]
+        )
 
         # Add stage-specific instructions
         stage_meta = STAGE_METADATA.get(stage)
@@ -860,9 +887,7 @@ class ExecutionLoop:
             "acceptance_test_iterations": self.acceptance_test_iterations,
             "acceptance_test_history": self._acceptance_test_history,
             "acceptance_test_summary": (
-                self.acceptance_test_result.summary
-                if self.acceptance_test_result
-                else None
+                self.acceptance_test_result.summary if self.acceptance_test_result else None
             ),
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
         }

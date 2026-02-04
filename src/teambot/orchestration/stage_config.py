@@ -238,9 +238,7 @@ def _get_default_configuration() -> StagesConfiguration:
             is_acceptance_test_stage=is_acceptance_test,
             requires_acceptance_tests_passed=(stage == WorkflowStage.POST_REVIEW),
             parallel_agents=(
-                ["builder-1", "builder-2"]
-                if stage == WorkflowStage.IMPLEMENTATION
-                else None
+                ["builder-1", "builder-2"] if stage == WorkflowStage.IMPLEMENTATION else None
             ),
             prompt_template=None,
         )

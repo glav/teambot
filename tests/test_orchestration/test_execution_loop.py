@@ -182,9 +182,7 @@ class TestExecutionLoopStatePersistence:
         assert "elapsed_seconds" in state
         assert "status" in state
 
-    def test_resume_loads_state(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    def test_resume_loads_state(self, objective_file: Path, teambot_dir: Path) -> None:
         """Resume loads state from file in feature directory."""
         # Create feature subdirectory with state file
         # The objective file has title "Implement User Authentication" -> "user-authentication"
@@ -338,9 +336,7 @@ class TestExecutionLoopStatePersistence:
 class TestExecutionLoopStageProgression:
     """Tests for stage progression logic."""
 
-    def test_get_next_stage_follows_order(
-        self, objective_file: Path, teambot_dir: Path
-    ) -> None:
+    def test_get_next_stage_follows_order(self, objective_file: Path, teambot_dir: Path) -> None:
         """_get_next_stage follows the configured stage order."""
         loop = ExecutionLoop(
             objective_path=objective_file,

@@ -21,10 +21,12 @@ class TestAcceptanceScenarios:
         """User references an agent's output after that agent has completed."""
         # Setup: Create executor with mock SDK
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(side_effect=[
-            "Project Plan:\n1. Setup environment\n2. Create database\n3. Build API",
-            "I will implement based on the plan:\n- Setup environment first",
-        ])
+        mock_sdk.execute = AsyncMock(
+            side_effect=[
+                "Project Plan:\n1. Setup environment\n2. Create database\n3. Build API",
+                "I will implement based on the plan:\n- Setup environment first",
+            ]
+        )
 
         executor = TaskExecutor(sdk_client=mock_sdk)
 
@@ -98,11 +100,13 @@ class TestAcceptanceScenarios:
     async def test_at_003_multiple_references(self):
         """User references multiple agents in one prompt."""
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(side_effect=[
-            "PM Plan: Create user module",
-            "BA Requirements:\n- User login\n- User registration",
-            "Implementing with PM plan and BA requirements",
-        ])
+        mock_sdk.execute = AsyncMock(
+            side_effect=[
+                "PM Plan: Create user module",
+                "BA Requirements:\n- User login\n- User registration",
+                "Implementing with PM plan and BA requirements",
+            ]
+        )
 
         executor = TaskExecutor(sdk_client=mock_sdk)
 
@@ -197,11 +201,13 @@ class TestAcceptanceScenarios:
     async def test_at_007_combined_pipeline_and_reference(self):
         """User combines -> pipeline with $agent reference."""
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(side_effect=[
-            "BA Requirements: User authentication feature",
-            "PM Plan based on BA: 1. Setup auth 2. Create endpoints",
-            "Builder implementing from PM plan",
-        ])
+        mock_sdk.execute = AsyncMock(
+            side_effect=[
+                "BA Requirements: User authentication feature",
+                "PM Plan based on BA: 1. Setup auth 2. Create endpoints",
+                "Builder implementing from PM plan",
+            ]
+        )
 
         executor = TaskExecutor(sdk_client=mock_sdk)
 
@@ -277,10 +283,12 @@ class TestExecutorReferenceIntegration:
     async def test_reference_injection_format(self):
         """Verify the exact format of injected references."""
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(side_effect=[
-            "First output from PM",
-            "Response with context",
-        ])
+        mock_sdk.execute = AsyncMock(
+            side_effect=[
+                "First output from PM",
+                "Response with context",
+            ]
+        )
 
         executor = TaskExecutor(sdk_client=mock_sdk)
 
@@ -304,11 +312,13 @@ class TestExecutorReferenceIntegration:
     async def test_multiple_tasks_same_agent_uses_latest(self):
         """When agent runs multiple times, reference gets latest output."""
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(side_effect=[
-            "First PM output",
-            "Second PM output",
-            "Builder response",
-        ])
+        mock_sdk.execute = AsyncMock(
+            side_effect=[
+                "First PM output",
+                "Second PM output",
+                "Builder response",
+            ]
+        )
 
         executor = TaskExecutor(sdk_client=mock_sdk)
 

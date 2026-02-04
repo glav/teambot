@@ -107,9 +107,7 @@ def teambot_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def teambot_dir_with_spec(
-    tmp_path: Path, sample_feature_spec_content: str
-) -> Path:
+def teambot_dir_with_spec(tmp_path: Path, sample_feature_spec_content: str) -> Path:
     """Create a teambot directory with feature spec.
 
     Creates the spec in the expected location based on the sample objective's

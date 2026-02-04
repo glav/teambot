@@ -139,6 +139,7 @@ class TaskExecutor:
         if command.references:
             # Validate all referenced agents exist
             from teambot.repl.router import VALID_AGENTS
+
             invalid_refs = [ref for ref in command.references if ref not in VALID_AGENTS]
             if invalid_refs:
                 valid_list = ", ".join(sorted(VALID_AGENTS))
@@ -302,6 +303,7 @@ class TaskExecutor:
         if command.references:
             # Validate all referenced agents exist
             from teambot.repl.router import VALID_AGENTS
+
             invalid_refs = [ref for ref in command.references if ref not in VALID_AGENTS]
             if invalid_refs:
                 valid_list = ", ".join(sorted(VALID_AGENTS))
