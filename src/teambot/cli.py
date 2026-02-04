@@ -88,8 +88,12 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     # Show agents
     display.print_header("Configured Agents")
+    default_model = config.get("default_model")
     for agent in config["agents"]:
-        display.add_agent(agent["id"], agent["persona"], agent.get("display_name"))
+        model = agent.get("model") or default_model
+        display.add_agent(
+            agent["id"], agent["persona"], agent.get("display_name"), model=model
+        )
     display.print_status()
 
     return 0
@@ -129,11 +133,14 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     display.print_header("TeamBot Starting")
 
     # Setup agents display
+    default_model = config.get("default_model")
     for agent_config in config["agents"]:
+        model = agent_config.get("model") or default_model
         display.add_agent(
             agent_config["id"],
             agent_config["persona"],
             agent_config.get("display_name"),
+            model=model,
         )
 
     display.print_status()
