@@ -80,7 +80,7 @@ class TaskManager:
         Returns:
             Created Task object.
         """
-        task_id = f"{agent_id}-{uuid.uuid4().hex[:8]}"
+        task_id = uuid.uuid4().hex[:8]
         deps = dependencies or []
 
         task = Task(
