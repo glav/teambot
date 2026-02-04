@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from teambot.config.schema import validate_model
+
 
 class ConfigError(Exception):
     """Raised when configuration is invalid."""
@@ -136,6 +138,10 @@ class ConfigLoader:
         if "default_agent" in config:
             self._validate_default_agent(config["default_agent"], seen_ids)
 
+        # Validate default_model if present
+        if "default_model" in config:
+            self._validate_default_model(config["default_model"])
+
         # Validate overlay config if present
         if "overlay" in config:
             self._validate_overlay(config["overlay"])
@@ -160,6 +166,14 @@ class ConfigLoader:
                 f"Valid personas: {VALID_PERSONAS}"
             )
 
+        # Validate model if present
+        model = agent.get("model")
+        if model is not None and not validate_model(model):
+            raise ConfigError(
+                f"Invalid model '{model}' for agent '{agent_id}'. "
+                f"Use '/models' command to see available models."
+            )
+
     def _validate_default_agent(self, default_agent: str, seen_ids: set[str]) -> None:
         """Validate default_agent configuration."""
         if not isinstance(default_agent, str):
@@ -168,6 +182,17 @@ class ConfigLoader:
         if default_agent not in seen_ids:
             raise ConfigError(
                 f"Invalid default_agent '{default_agent}'. Agent must be defined in 'agents' list."
+            )
+
+    def _validate_default_model(self, default_model: str) -> None:
+        """Validate global default_model configuration."""
+        if not isinstance(default_model, str):
+            raise ConfigError("'default_model' must be a string")
+
+        if not validate_model(default_model):
+            raise ConfigError(
+                f"Invalid default_model '{default_model}'. "
+                f"Use '/models' command to see available models."
             )
 
     def _validate_overlay(self, overlay: dict[str, Any]) -> None:

@@ -64,6 +64,7 @@ class Task:
         result: Result after completion.
         started_at: When task started running.
         completed_at: When task finished.
+        model: AI model to use for this task.
     """
 
     id: str
@@ -76,6 +77,7 @@ class Task:
     result: TaskResult | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    model: str | None = None
 
     @property
     def has_dependencies(self) -> bool:

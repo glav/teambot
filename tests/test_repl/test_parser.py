@@ -346,3 +346,77 @@ class TestParseReferences:
         result = parse_command("@pm Combine $writer with $ba and $reviewer")
 
         assert result.references == ["writer", "ba", "reviewer"]
+
+
+class TestParseModelFlag:
+    """Tests for --model flag parsing."""
+
+    def test_parse_model_flag_long_form(self):
+        """Parse --model flag extracts model."""
+        result = parse_command("@pm --model gpt-5 Create a plan")
+
+        assert result.agent_id == "pm"
+        assert result.model == "gpt-5"
+        assert "Create a plan" in result.content
+
+    def test_parse_model_flag_short_form(self):
+        """Parse -m flag extracts model."""
+        result = parse_command("@pm -m claude-opus-4.5 Review code")
+
+        assert result.model == "claude-opus-4.5"
+        assert "Review code" in result.content
+
+    def test_parse_model_flag_no_task_sets_session(self):
+        """Parse --model without task sets session override."""
+        result = parse_command("@pm --model gpt-5")
+
+        assert result.model == "gpt-5"
+        assert result.content == ""  # Empty content signals session set
+        assert result.is_session_model_set is True
+
+    def test_parse_model_flag_in_multi_agent(self):
+        """Parse --model in multi-agent command."""
+        result = parse_command("@pm,ba --model gpt-5 analyze requirements")
+
+        assert result.model == "gpt-5"
+        assert "pm" in result.agent_ids
+        assert "ba" in result.agent_ids
+
+    def test_parse_model_flag_missing_value_raises(self):
+        """Parse --model without value raises ParseError."""
+        with pytest.raises(ParseError, match="model"):
+            parse_command("@pm --model")
+
+    def test_parse_no_model_flag(self):
+        """Command without --model has model as None."""
+        result = parse_command("@pm Create a plan")
+
+        assert result.model is None
+
+    def test_parse_model_with_background(self):
+        """Parse --model with background operator."""
+        result = parse_command("@pm --model gpt-5 Create a plan &")
+
+        assert result.model == "gpt-5"
+        assert result.background is True
+        assert "Create a plan" in result.content
+
+    def test_command_has_model_field(self):
+        """Test Command dataclass has model field."""
+        cmd = Command(type=CommandType.AGENT)
+
+        assert hasattr(cmd, "model")
+        assert cmd.model is None
+
+    def test_command_has_is_session_model_set_field(self):
+        """Test Command dataclass has is_session_model_set field."""
+        cmd = Command(type=CommandType.AGENT)
+
+        assert hasattr(cmd, "is_session_model_set")
+        assert cmd.is_session_model_set is False
+
+    def test_model_flag_with_hyphenated_model_name(self):
+        """Parse model name with hyphens."""
+        result = parse_command("@pm --model claude-sonnet-4.5 Create plan")
+
+        assert result.model == "claude-sonnet-4.5"

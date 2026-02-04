@@ -450,3 +450,184 @@ description: Reviewer Agent
             # Should return original prompt since agent prompt is empty
             assert result == original_prompt
             assert "<persona>" not in result
+
+
+class TestCopilotSDKClientModel:
+    """Tests for model support in SDK client."""
+
+    @pytest.mark.asyncio
+    async def test_session_config_includes_model(self, mock_sdk_client, tmp_path: Path):
+        """Session config includes model when specified."""
+        from teambot.copilot.agent_loader import AgentLoader
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        # Create empty agents directory
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+        loader = AgentLoader(repo_root=tmp_path)
+
+        captured_config = None
+
+        async def capture_create(config):
+            nonlocal captured_config
+            captured_config = config
+            session = MagicMock()
+            session.session_id = config.get("session_id")
+            return session
+
+        mock_sdk_client.create_session = AsyncMock(side_effect=capture_create)
+
+        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+            with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+                client = CopilotSDKClient()
+                await client.start()
+
+                await client.get_or_create_session("pm", model="gpt-5")
+
+                assert captured_config is not None
+                assert captured_config.get("model") == "gpt-5"
+
+    @pytest.mark.asyncio
+    async def test_session_without_model(self, mock_sdk_client, tmp_path: Path):
+        """Session config omits model when not specified."""
+        from teambot.copilot.agent_loader import AgentLoader
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        # Create empty agents directory
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+        loader = AgentLoader(repo_root=tmp_path)
+
+        captured_config = None
+
+        async def capture_create(config):
+            nonlocal captured_config
+            captured_config = config
+            session = MagicMock()
+            session.session_id = config.get("session_id")
+            return session
+
+        mock_sdk_client.create_session = AsyncMock(side_effect=capture_create)
+
+        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+            with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+                client = CopilotSDKClient()
+                await client.start()
+
+                await client.get_or_create_session("pm")
+
+                assert captured_config is not None
+                assert "model" not in captured_config
+
+    @pytest.mark.asyncio
+    async def test_session_recreated_when_model_changes(self, mock_sdk_client, tmp_path: Path):
+        """Session is recreated when model changes."""
+        from teambot.copilot.agent_loader import AgentLoader
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        # Create empty agents directory
+        agents_dir = tmp_path / ".github" / "agents"
+        agents_dir.mkdir(parents=True)
+        loader = AgentLoader(repo_root=tmp_path)
+
+        configs = []
+
+        async def capture_create(config):
+            configs.append(config.copy())
+            session = MagicMock()
+            session.session_id = config.get("session_id")
+            session._model = config.get("model")
+            session.destroy = AsyncMock()
+            return session
+
+        mock_sdk_client.create_session = AsyncMock(side_effect=capture_create)
+
+        with patch("teambot.copilot.sdk_client.CopilotClient", return_value=mock_sdk_client):
+            with patch("teambot.copilot.sdk_client.get_agent_loader", return_value=loader):
+                client = CopilotSDKClient()
+                await client.start()
+
+                # First call with gpt-5
+                await client.get_or_create_session("pm", model="gpt-5")
+                # Second call with different model should recreate
+                await client.get_or_create_session("pm", model="claude-opus-4.5")
+
+                assert len(configs) == 2
+                assert configs[0].get("model") == "gpt-5"
+                assert configs[1].get("model") == "claude-opus-4.5"
+
+
+class TestResolveModel:
+    """Tests for model resolution logic."""
+
+    def test_inline_model_takes_priority(self):
+        """Inline model takes highest priority."""
+        from teambot.copilot.sdk_client import resolve_model
+
+        result = resolve_model(
+            inline_model="gpt-5",
+            session_overrides={"pm": "claude-opus-4.5"},
+            agent_id="pm",
+            config={"default_model": "gpt-4.1", "agents": [{"id": "pm", "model": "gpt-5.1"}]},
+        )
+        assert result == "gpt-5"
+
+    def test_session_override_second_priority(self):
+        """Session override is second priority."""
+        from teambot.copilot.sdk_client import resolve_model
+
+        result = resolve_model(
+            inline_model=None,
+            session_overrides={"pm": "claude-opus-4.5"},
+            agent_id="pm",
+            config={"default_model": "gpt-4.1", "agents": [{"id": "pm", "model": "gpt-5.1"}]},
+        )
+        assert result == "claude-opus-4.5"
+
+    def test_agent_config_third_priority(self):
+        """Agent config is third priority."""
+        from teambot.copilot.sdk_client import resolve_model
+
+        result = resolve_model(
+            inline_model=None,
+            session_overrides={},
+            agent_id="pm",
+            config={"default_model": "gpt-4.1", "agents": [{"id": "pm", "model": "gpt-5.1"}]},
+        )
+        assert result == "gpt-5.1"
+
+    def test_global_default_fourth_priority(self):
+        """Global default_model is fourth priority."""
+        from teambot.copilot.sdk_client import resolve_model
+
+        result = resolve_model(
+            inline_model=None,
+            session_overrides={},
+            agent_id="pm",
+            config={"default_model": "gpt-4.1", "agents": [{"id": "pm"}]},
+        )
+        assert result == "gpt-4.1"
+
+    def test_returns_none_when_no_model_specified(self):
+        """Returns None when no model is specified anywhere."""
+        from teambot.copilot.sdk_client import resolve_model
+
+        result = resolve_model(
+            inline_model=None,
+            session_overrides={},
+            agent_id="pm",
+            config={"agents": [{"id": "pm"}]},
+        )
+        assert result is None
+
+    def test_agent_not_found_falls_back_to_global(self):
+        """Falls back to global default when agent not in config."""
+        from teambot.copilot.sdk_client import resolve_model
+
+        result = resolve_model(
+            inline_model=None,
+            session_overrides={},
+            agent_id="unknown",
+            config={"default_model": "gpt-4.1", "agents": [{"id": "pm", "model": "gpt-5"}]},
+        )
+        assert result == "gpt-4.1"

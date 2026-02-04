@@ -80,12 +80,15 @@ class TaskExecutor:
         """Get total number of tasks."""
         return self._manager.task_count
 
-    async def _execute_agent_task(self, agent_id: str, prompt: str) -> str:
+    async def _execute_agent_task(
+        self, agent_id: str, prompt: str, model: str | None = None
+    ) -> str:
         """Execute a task via SDK.
 
         Args:
             agent_id: Agent to execute task.
             prompt: Task prompt (already includes persona context).
+            model: Optional model to use for this task.
 
         Returns:
             Output from agent.
@@ -96,9 +99,14 @@ class TaskExecutor:
             def on_chunk(chunk: str):
                 self._on_streaming_chunk(agent_id, chunk)
 
+            # First ensure session is created with the model
+            if model:
+                await self._sdk_client.get_or_create_session(agent_id, model=model)
             return await self._sdk_client.execute_streaming(agent_id, prompt, on_chunk)
         else:
             # Fall back to regular execute
+            if model:
+                await self._sdk_client.get_or_create_session(agent_id, model=model)
             return await self._sdk_client.execute(agent_id, prompt)
 
     async def execute(self, command: Command) -> ExecutionResult:
@@ -162,6 +170,7 @@ class TaskExecutor:
             agent_id=agent_id,
             prompt=prompt,
             background=command.background,
+            model=command.model,
         )
 
         if command.background:
@@ -241,6 +250,7 @@ class TaskExecutor:
                 agent_id=agent_id,
                 prompt=command.content,
                 background=command.background,
+                model=command.model,
             )
             tasks.append(task)
 
@@ -334,6 +344,7 @@ class TaskExecutor:
                     prompt=prompt,
                     dependencies=previous_task_ids.copy(),
                     background=command.background,
+                    model=command.model,
                 )
                 stage_task_ids.append(task.id)
                 all_task_ids.append(task.id)

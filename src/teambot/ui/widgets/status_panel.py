@@ -120,6 +120,14 @@ class StatusPanel(Static):
             indicator = self._get_indicator(status.state)
             line = f"{indicator} {agent_id}"
 
+            # Add model indicator if set
+            if status.model:
+                # Abbreviate model name for display
+                model_short = status.model
+                if len(model_short) > 10:
+                    model_short = model_short[:8] + ".."
+                line += f" [magenta]({model_short})[/magenta]"
+
             # Add task info for active agents (indented on next line)
             if status.state in (AgentState.RUNNING, AgentState.STREAMING):
                 lines.append(line)

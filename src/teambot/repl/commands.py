@@ -1,10 +1,12 @@
 """System commands for TeamBot REPL.
 
-Provides /help, /status, /history, /quit, /tasks, /overlay commands.
+Provides /help, /status, /history, /quit, /tasks, /overlay, /models, /model commands.
 """
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
+
+from teambot.config.schema import MODEL_INFO, VALID_MODELS, validate_model
 
 if TYPE_CHECKING:
     from teambot.tasks.executor import TaskExecutor
@@ -84,7 +86,9 @@ Available commands:
   /help          - Show this help message
   /help agent    - Show agent-specific help
   /help parallel - Show parallel execution help
-  /status        - Show agent status
+  /status        - Show agent status with models
+  /models        - List available AI models
+  /model <a> <m> - Set model for agent in session
   /tasks         - List running/completed tasks
   /task <id>     - View task details
   /cancel <id>   - Cancel pending task
@@ -92,15 +96,14 @@ Available commands:
   /history       - Show command history
   /quit          - Exit interactive mode
 
-Default Agent:
-  If configured in teambot.json with "default_agent", plain text
-  automatically routes to that agent. For example:
-    "default_agent": "pm"   - Plain text routes to @pm
-  Without this config, plain text shows a helpful tip.
+Model Selection:
+  @pm --model gpt-5 Create plan     # Inline model override
+  @pm -m claude-opus-4.5 Review     # Short form
+  /model pm gpt-5                    # Set for session
 
 Examples:
   @pm Create a project plan
-  @builder-1 Implement the login feature
+  @builder-1 --model gpt-5 Implement the login feature
   @pm,ba Analyze requirements        # Multi-agent
   @pm Plan -> @builder-1 Build       # Pipeline
   @pm Create plan &                  # Background
@@ -120,8 +123,10 @@ def handle_status(args: list[str]) -> CommandResult:
     # Basic status without orchestrator
     agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
     lines = ["Agent Status:", ""]
+    lines.append(f"  {'Agent':<12} {'Status':<10} {'Model':<20}")
+    lines.append(f"  {'-'*12} {'-'*10} {'-'*20}")
     for agent in agents:
-        lines.append(f"  {agent:12} - idle")
+        lines.append(f"  {agent:<12} {'idle':<10} {'(default)':<20}")
 
     return CommandResult(output="\n".join(lines))
 
@@ -172,6 +177,99 @@ def handle_quit(args: list[str]) -> CommandResult:
     return CommandResult(output="Goodbye!", should_exit=True)
 
 
+def handle_models(args: list[str]) -> CommandResult:
+    """Handle /models command - list all available models.
+
+    Args:
+        args: Command arguments (unused).
+
+    Returns:
+        CommandResult with list of available models.
+    """
+    lines = ["Available Models:", ""]
+
+    # Group by category
+    categories: dict[str, list[tuple[str, str]]] = {
+        "standard": [],
+        "fast": [],
+        "premium": [],
+    }
+
+    for model_id in sorted(VALID_MODELS):
+        info = MODEL_INFO.get(model_id, {})
+        display_name = info.get("display_name", model_id)
+        category = info.get("category", "standard")
+        categories.setdefault(category, []).append((model_id, display_name))
+
+    for category in ["standard", "fast", "premium"]:
+        if categories.get(category):
+            lines.append(f"  {category.upper()}:")
+            for model_id, display_name in categories[category]:
+                lines.append(f"    {model_id:25} ({display_name})")
+            lines.append("")
+
+    lines.append("Usage: @pm --model <model> <task>")
+    lines.append("       /model <agent> <model>  - Set session model for agent")
+
+    return CommandResult(output="\n".join(lines))
+
+
+def handle_model(
+    args: list[str], session_overrides: dict[str, str]
+) -> CommandResult:
+    """Handle /model command - view or set session model overrides.
+
+    Args:
+        args: [agent_id, model] or [] to view current overrides.
+        session_overrides: Dict to modify with session model settings.
+
+    Returns:
+        CommandResult with model info or confirmation.
+    """
+    if not args:
+        # Show current session overrides
+        if not session_overrides:
+            return CommandResult(
+                output="No session model overrides set.\n"
+                "Use: /model <agent> <model> to set a model for an agent."
+            )
+
+        lines = ["Session Model Overrides:", ""]
+        for agent_id, model in sorted(session_overrides.items()):
+            lines.append(f"  {agent_id:12} -> {model}")
+        lines.append("")
+        lines.append("Use: /model <agent> clear  - to clear an override")
+        return CommandResult(output="\n".join(lines))
+
+    if len(args) < 2:
+        return CommandResult(
+            output="Usage: /model <agent> <model>\n"
+            "       /model <agent> clear  - clear override\n"
+            "       /model                - show current overrides",
+            success=False,
+        )
+
+    agent_id = args[0]
+    model = args[1]
+
+    # Handle clear command
+    if model.lower() == "clear":
+        if agent_id in session_overrides:
+            del session_overrides[agent_id]
+            return CommandResult(output=f"Cleared model override for {agent_id}")
+        return CommandResult(output=f"No model override set for {agent_id}")
+
+    # Validate model
+    if not validate_model(model):
+        return CommandResult(
+            output=f"Invalid model '{model}'. Use /models to see available models.",
+            success=False,
+        )
+
+    session_overrides[agent_id] = model
+    return CommandResult(output=f"Set model for {agent_id} to {model} for this session.")
+
+
 def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> CommandResult:
     """Handle /tasks command.
 
@@ -209,6 +307,8 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
         return CommandResult(output="No tasks.")
 
     lines = ["Tasks:", ""]
+    lines.append(f"  {'ID':<6} {'Agent':<12} {'Model':<15} {'Status':<10} {'Task'}")
+    lines.append(f"  {'-'*6} {'-'*12} {'-'*15} {'-'*10} {'-'*20}")
     for task in tasks:
         status_icon = {
             TaskStatus.PENDING: "⏳",
@@ -219,8 +319,11 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
             TaskStatus.CANCELLED: "🚫",
         }.get(task.status, "?")
 
-        prompt = task.prompt[:40] + "..." if len(task.prompt) > 40 else task.prompt
-        line = f"  {status_icon} #{task.id:4} @{task.agent_id:12} {task.status.value:10} {prompt}"
+        prompt = task.prompt[:30] + "..." if len(task.prompt) > 30 else task.prompt
+        model_display = task.model if task.model else "(default)"
+        if len(model_display) > 15:
+            model_display = model_display[:12] + "..."
+        line = f"  {status_icon} #{task.id:<4} @{task.agent_id:<12} {model_display:<15} {prompt}"
         lines.append(line)
 
     return CommandResult(output="\n".join(lines))
@@ -259,9 +362,11 @@ def handle_task(args: list[str], executor: Optional["TaskExecutor"]) -> CommandR
 
     from teambot.tasks.models import TaskStatus
 
+    model_display = task.model if task.model else "(default)"
     lines = [
         f"Task #{task.id}",
         f"  Agent:   @{task.agent_id}",
+        f"  Model:   {model_display}",
         f"  Status:  {task.status.value}",
         f"  Prompt:  {task.prompt}",
     ]
@@ -411,6 +516,7 @@ class SystemCommands:
         self._executor: TaskExecutor | None = executor
         self._overlay: OverlayRenderer | None = overlay
         self._history: list[dict[str, Any]] = []
+        self._session_model_overrides: dict[str, str] = {}
 
     def set_history(self, history: list[dict[str, Any]]) -> None:
         """Set history reference.
@@ -456,6 +562,8 @@ class SystemCommands:
             "task": self.task,
             "cancel": self.cancel,
             "overlay": self.overlay,
+            "models": self.models,
+            "model": self.model,
         }
 
         handler = handlers.get(command)
@@ -509,3 +617,11 @@ class SystemCommands:
     def overlay(self, args: list[str]) -> CommandResult:
         """Handle /overlay command."""
         return handle_overlay(args, self._overlay)
+
+    def models(self, args: list[str]) -> CommandResult:
+        """Handle /models command."""
+        return handle_models(args)
+
+    def model(self, args: list[str]) -> CommandResult:
+        """Handle /model command."""
+        return handle_model(args, self._session_model_overrides)

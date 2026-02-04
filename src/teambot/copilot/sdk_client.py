@@ -22,6 +22,53 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def resolve_model(
+    inline_model: str | None,
+    session_overrides: dict[str, str],
+    agent_id: str,
+    config: dict[str, Any],
+) -> str | None:
+    """Resolve which model to use for an agent task.
+
+    Priority (highest to lowest):
+    1. Inline override (--model flag)
+    2. Session override (/model command)
+    3. Agent config (teambot.json agent.model)
+    4. Global default (teambot.json default_model)
+    5. None (use SDK default)
+
+    Args:
+        inline_model: Model specified in command (--model).
+        session_overrides: Dict of agent_id -> model for session.
+        agent_id: Agent identifier.
+        config: TeamBot configuration dict.
+
+    Returns:
+        Resolved model name, or None to use SDK default.
+    """
+    # Priority 1: Inline override
+    if inline_model:
+        return inline_model
+
+    # Priority 2: Session override
+    if agent_id in session_overrides:
+        return session_overrides[agent_id]
+
+    # Priority 3: Agent config
+    for agent in config.get("agents", []):
+        if agent.get("id") == agent_id:
+            if agent.get("model"):
+                return agent["model"]
+            break
+
+    # Priority 4: Global default
+    if config.get("default_model"):
+        return config["default_model"]
+
+    # Priority 5: SDK default
+    return None
+
+
 class SDKClientError(Exception):
     """Error raised by SDK client operations."""
 
@@ -107,7 +154,7 @@ class CopilotSDKClient:
 
         self._started = False
 
-    async def get_or_create_session(self, agent_id: str) -> Any:
+    async def get_or_create_session(self, agent_id: str, model: str | None = None) -> Any:
         """Get an existing session or create a new one for an agent.
 
         Configures the session with the agent's custom persona from
@@ -115,6 +162,7 @@ class CopilotSDKClient:
 
         Args:
             agent_id: The agent identifier (e.g., 'pm', 'builder-1').
+            model: Optional model to use for this session.
 
         Returns:
             The SDK session object.
@@ -127,9 +175,18 @@ class CopilotSDKClient:
 
         session_id = f"{self.SESSION_PREFIX}{agent_id}"
 
-        # Return cached session if exists
+        # Return cached session if exists AND model matches
         if session_id in self._sessions:
-            return self._sessions[session_id]
+            existing = self._sessions[session_id]
+            # If model changed, destroy old session and create new one
+            if model and getattr(existing, "_model", None) != model:
+                try:
+                    await existing.destroy()
+                except Exception:
+                    pass  # Best effort cleanup
+                del self._sessions[session_id]
+            else:
+                return existing
 
         # Load agent definition from .github/agents/
         loader = get_agent_loader()
@@ -140,6 +197,10 @@ class CopilotSDKClient:
             "session_id": session_id,
             "streaming": True,
         }
+
+        # Add model if specified
+        if model:
+            session_config["model"] = model
 
         # Add custom agent definition if available
         if agent_def:
@@ -156,6 +217,9 @@ class CopilotSDKClient:
             logger.warning(f"No agent definition found for '{agent_id}', using defaults")
 
         session = await self._client.create_session(session_config)
+
+        # Track model for cache invalidation
+        session._model = model
 
         self._sessions[session_id] = session
         return session

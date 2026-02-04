@@ -115,7 +115,7 @@ class TestTaskManagerExecution:
         """Test that tasks wait for dependencies."""
         executed = []
 
-        async def mock_exec(agent_id, prompt):
+        async def mock_exec(agent_id, prompt, model=None):
             executed.append(agent_id)
             return f"{agent_id} done"
 
@@ -135,7 +135,7 @@ class TestTaskManagerExecution:
         """Test that parent output is injected into dependent task."""
         captured_prompts = []
 
-        async def mock_exec(agent_id, prompt):
+        async def mock_exec(agent_id, prompt, model=None):
             captured_prompts.append(prompt)
             return f"{agent_id} output"
 
@@ -191,7 +191,7 @@ class TestTaskManagerDependencyFailure:
         """Test that dependent task is skipped when parent fails."""
         call_count = 0
 
-        async def failing_exec(agent_id, prompt):
+        async def failing_exec(agent_id, prompt, model=None):
             nonlocal call_count
             call_count += 1
             if agent_id == "pm":
@@ -212,7 +212,7 @@ class TestTaskManagerDependencyFailure:
     async def test_partial_failure_continues(self):
         """Test that partial failure allows continuation."""
 
-        async def partial_exec(agent_id, prompt):
+        async def partial_exec(agent_id, prompt, model=None):
             if agent_id == "builder-1":
                 raise Exception("Builder-1 failed")
             return f"{agent_id} done"
@@ -288,7 +288,7 @@ class TestAgentResults:
         """Test latest result overwrites previous."""
         call_count = {"count": 0}
 
-        async def mock_executor(agent_id, prompt):
+        async def mock_executor(agent_id, prompt, model=None):
             call_count["count"] += 1
             return f"Result {call_count['count']}"
 
@@ -352,7 +352,7 @@ class TestAgentResults:
     async def test_agent_result_stored_on_failure(self):
         """Test failed result is also stored by agent_id."""
 
-        async def failing_executor(agent_id, prompt):
+        async def failing_executor(agent_id, prompt, model=None):
             raise Exception("Task failed")
 
         manager = TaskManager(executor=failing_executor)
