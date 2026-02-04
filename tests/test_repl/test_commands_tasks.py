@@ -1,14 +1,13 @@
 """Tests for new task system commands."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 from teambot.repl.commands import (
-    handle_tasks,
-    handle_task,
+    SystemCommands,
     handle_cancel,
     handle_help,
-    SystemCommands,
+    handle_task,
+    handle_tasks,
 )
 from teambot.tasks.models import Task, TaskResult, TaskStatus
 

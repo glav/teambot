@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import Optional
 
 
 class TaskStatus(Enum):
@@ -45,7 +44,7 @@ class TaskResult:
     task_id: str
     output: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
     completed_at: datetime = field(default_factory=datetime.now)
 
 
@@ -73,9 +72,9 @@ class Task:
     dependencies: list[str] = field(default_factory=list)
     timeout: float = 120.0
     background: bool = False
-    result: Optional[TaskResult] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    result: TaskResult | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     @property
     def has_dependencies(self) -> bool:

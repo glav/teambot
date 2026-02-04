@@ -3,12 +3,10 @@
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Optional
 
 from teambot.tasks.graph import TaskGraph
 from teambot.tasks.models import Task, TaskResult, TaskStatus
 from teambot.tasks.output_injector import OutputInjector
-
 
 # Type for the executor function
 ExecutorFn = Callable[[str, str], Awaitable[str]]
@@ -26,7 +24,7 @@ class TaskManager:
 
     def __init__(
         self,
-        executor: Optional[ExecutorFn] = None,
+        executor: ExecutorFn | None = None,
         max_concurrent: int = 3,
         default_timeout: float = 120.0,
     ):
@@ -47,7 +45,7 @@ class TaskManager:
         self._results: dict[str, TaskResult] = {}
 
         # Semaphore for concurrency control
-        self._semaphore: Optional[asyncio.Semaphore] = None
+        self._semaphore: asyncio.Semaphore | None = None
 
     @property
     def max_concurrent(self) -> int:
@@ -63,8 +61,8 @@ class TaskManager:
         self,
         agent_id: str,
         prompt: str,
-        dependencies: Optional[list[str]] = None,
-        timeout: Optional[float] = None,
+        dependencies: list[str] | None = None,
+        timeout: float | None = None,
         background: bool = False,
     ) -> Task:
         """Create a new task.
@@ -96,7 +94,7 @@ class TaskManager:
 
         return task
 
-    def get_task(self, task_id: str) -> Optional[Task]:
+    def get_task(self, task_id: str) -> Task | None:
         """Get a task by ID.
 
         Args:
@@ -107,7 +105,7 @@ class TaskManager:
         """
         return self._tasks.get(task_id)
 
-    def list_tasks(self, status: Optional[TaskStatus] = None) -> list[Task]:
+    def list_tasks(self, status: TaskStatus | None = None) -> list[Task]:
         """List tasks, optionally filtered by status.
 
         Args:
@@ -176,9 +174,7 @@ class TaskManager:
 
         # Build agent map for nicer headers
         agent_map = {
-            tid: self._tasks[tid].agent_id
-            for tid in task.dependencies
-            if tid in self._tasks
+            tid: self._tasks[tid].agent_id for tid in task.dependencies if tid in self._tasks
         }
 
         return self._injector.inject(
@@ -222,8 +218,7 @@ class TaskManager:
             if not task.is_ready(self._results):
                 # Check if should be skipped due to failed deps
                 deps_failed = all(
-                    self._results.get(d) and not self._results[d].success
-                    for d in task.dependencies
+                    self._results.get(d) and not self._results[d].success for d in task.dependencies
                 )
                 if deps_failed:
                     task.mark_skipped("All parent tasks failed")
@@ -257,7 +252,7 @@ class TaskManager:
         self._results[task_id] = task.result
         return True
 
-    def get_result(self, task_id: str) -> Optional[TaskResult]:
+    def get_result(self, task_id: str) -> TaskResult | None:
         """Get result for a completed task.
 
         Args:

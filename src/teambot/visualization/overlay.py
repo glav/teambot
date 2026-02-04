@@ -220,7 +220,7 @@ class OverlayRenderer:
         """
         old_position = self._state.position
         self._state.position = position
-        
+
         # Update scroll region if switching between top/bottom positions
         if self.is_enabled:
             if old_position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
@@ -230,7 +230,7 @@ class OverlayRenderer:
             elif position in (OverlayPosition.TOP_RIGHT, OverlayPosition.TOP_LEFT):
                 # Moving from bottom to top - set scroll region
                 self._set_scroll_region(OVERLAY_HEIGHT + 2)
-            
+
             self.render()
 
     def _calculate_position(self) -> tuple[int, int]:
@@ -262,7 +262,7 @@ class OverlayRenderer:
         width = 0
         for char in text:
             # East Asian characters and emoji are typically wide
-            if unicodedata.east_asian_width(char) in ('F', 'W'):
+            if unicodedata.east_asian_width(char) in ("F", "W"):
                 width += 2
             else:
                 width += 1
@@ -284,7 +284,7 @@ class OverlayRenderer:
             result = ""
             width = 0
             for char in text:
-                char_width = 2 if unicodedata.east_asian_width(char) in ('F', 'W') else 1
+                char_width = 2 if unicodedata.east_asian_width(char) in ("F", "W") else 1
                 if width + char_width > target_width:
                     break
                 result += char
@@ -310,7 +310,7 @@ class OverlayRenderer:
             agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
             if len(self._state.active_agents) > 3:
                 agents += f" +{len(self._state.active_agents) - 3}"
-            lines.append(f"{spinner} {agents}"[:OVERLAY_WIDTH - 4])
+            lines.append(f"{spinner} {agents}"[: OVERLAY_WIDTH - 4])
 
         # Line 2: Task counts
         running = self._state.running_count
@@ -319,7 +319,7 @@ class OverlayRenderer:
         counts = f"{running}⏳ {pending}⏸ {completed}✓"
         if self._state.failed_count > 0:
             counts += f" {self._state.failed_count}✗"
-        lines.append(f"Tasks: {counts}"[:OVERLAY_WIDTH - 4])
+        lines.append(f"Tasks: {counts}"[: OVERLAY_WIDTH - 4])
 
         return lines
 

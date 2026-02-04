@@ -216,9 +216,7 @@ class TeamBotApp(App):
                 output.write_streaming_chunk(agent_id, chunk)
 
             try:
-                result_text = await self._sdk_client.execute_streaming(
-                    agent_id, content, on_chunk
-                )
+                result_text = await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
                 task.mark_completed(result_text)
                 self._agent_status.set_completed(agent_id)
                 output.finish_streaming(agent_id, success=True)

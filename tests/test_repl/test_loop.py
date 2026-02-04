@@ -1,7 +1,8 @@
 """Tests for REPL loop."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from teambot.repl.loop import REPLLoop
 from teambot.repl.parser import CommandType
@@ -201,7 +202,7 @@ class TestREPLIntegration:
     @pytest.mark.asyncio
     async def test_executor_initialized_when_sdk_unavailable(self):
         """Test executor is initialized even when SDK not available.
-        
+
         This ensures /tasks command works for viewing task history
         even when the SDK is not connected.
         """
@@ -227,7 +228,9 @@ class TestREPLIntegration:
 
         # Verify executor was initialized
         assert repl._executor is not None, "Executor should be initialized"
-        
+
         # Verify executor was set on commands (so /tasks works)
         assert repl._commands._executor is not None, "Commands should have executor"
-        assert repl._commands._executor is repl._executor, "Commands should have same executor instance"
+        assert repl._commands._executor is repl._executor, (
+            "Commands should have same executor instance"
+        )
