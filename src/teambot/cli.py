@@ -238,7 +238,8 @@ def _run_orchestration(
         elif event_type == "acceptance_test_fix_start":
             iteration = data.get("iteration", 1)
             failed = data.get("failed_count", 0)
-            display.print_warning(f"Iteration {iteration}: {failed} tests failed, requesting fix...")
+            msg = f"Iteration {iteration}: {failed} tests failed, requesting fix..."
+            display.print_warning(msg)
         elif event_type == "acceptance_test_fix_complete":
             iteration = data.get("iteration", 1)
             display.print_success(f"Iteration {iteration}: Fix applied, re-running tests...")
@@ -341,7 +342,8 @@ def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleD
         elif event_type == "acceptance_test_fix_start":
             iteration = data.get("iteration", 1)
             failed = data.get("failed_count", 0)
-            display.print_warning(f"Iteration {iteration}: {failed} tests failed, requesting fix...")
+            msg = f"Iteration {iteration}: {failed} tests failed, requesting fix..."
+            display.print_warning(msg)
         elif event_type == "acceptance_test_fix_complete":
             iteration = data.get("iteration", 1)
             display.print_success(f"Iteration {iteration}: Fix applied, re-running tests...")

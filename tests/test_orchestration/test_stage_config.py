@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from teambot.orchestration.stage_config import (
     StageConfig,
     StagesConfiguration,
-    load_stages_config,
-    _parse_configuration,
     _get_default_configuration,
+    _parse_configuration,
+    load_stages_config,
 )
 from teambot.workflow.stages import WorkflowStage
 
@@ -78,7 +79,9 @@ work_to_review_mapping: {}
         assert WorkflowStage.ACCEPTANCE_TEST in config.stages
         assert len(config.stage_order) == 14
 
-    def test_load_from_cwd_stages_yaml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_load_from_cwd_stages_yaml(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Load from stages.yaml in current directory."""
         yaml_content = """
 stages:

@@ -13,7 +13,6 @@ Supports:
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
 
 
 class CommandType(Enum):
@@ -68,7 +67,7 @@ class Command:
     args: list[str] | None = None
     background: bool = False
     is_pipeline: bool = False
-    pipeline: Optional[list[PipelineStage]] = None
+    pipeline: list[PipelineStage] | None = None
     references: list[str] = field(default_factory=list)
 
 

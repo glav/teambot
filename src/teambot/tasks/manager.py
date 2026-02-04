@@ -3,7 +3,6 @@
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import Optional
 
 from teambot.tasks.graph import TaskGraph
 from teambot.tasks.models import Task, TaskResult, TaskStatus
@@ -267,7 +266,7 @@ class TaskManager:
         """
         return self._results.get(task_id)
 
-    def get_agent_result(self, agent_id: str) -> Optional[TaskResult]:
+    def get_agent_result(self, agent_id: str) -> TaskResult | None:
         """Get latest result for an agent.
 
         Args:
@@ -278,7 +277,7 @@ class TaskManager:
         """
         return self._agent_results.get(agent_id)
 
-    def get_running_task_for_agent(self, agent_id: str) -> Optional[Task]:
+    def get_running_task_for_agent(self, agent_id: str) -> Task | None:
         """Get currently running task for an agent.
 
         Args:

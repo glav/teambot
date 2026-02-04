@@ -122,8 +122,8 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
     for stage_name, stage_data in stages_data.items():
         try:
             workflow_stage = WorkflowStage[stage_name]
-        except KeyError:
-            raise ValueError(f"Unknown stage: {stage_name}")
+        except KeyError as err:
+            raise ValueError(f"Unknown stage: {stage_name}") from err
 
         config = StageConfig(
             name=stage_data.get("name", stage_name),
@@ -157,8 +157,8 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
     for name in stage_order_names:
         try:
             stage_order.append(WorkflowStage[name])
-        except KeyError:
-            raise ValueError(f"Unknown stage in stage_order: {name}")
+        except KeyError as err:
+            raise ValueError(f"Unknown stage in stage_order: {name}") from err
 
     # Parse work to review mapping
     mapping_data = data.get("work_to_review_mapping", {})
@@ -168,8 +168,8 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             work_stage = WorkflowStage[work_name]
             review_stage = WorkflowStage[review_name]
             work_to_review[work_stage] = review_stage
-        except KeyError as e:
-            raise ValueError(f"Unknown stage in work_to_review_mapping: {e}")
+        except KeyError as err:
+            raise ValueError(f"Unknown stage in work_to_review_mapping: {err}") from err
 
     return StagesConfiguration(
         stages=stages,
@@ -237,7 +237,11 @@ def _get_default_configuration() -> StagesConfiguration:
             is_review_stage=is_review,
             is_acceptance_test_stage=is_acceptance_test,
             requires_acceptance_tests_passed=(stage == WorkflowStage.POST_REVIEW),
-            parallel_agents=["builder-1", "builder-2"] if stage == WorkflowStage.IMPLEMENTATION else None,
+            parallel_agents=(
+                ["builder-1", "builder-2"]
+                if stage == WorkflowStage.IMPLEMENTATION
+                else None
+            ),
             prompt_template=None,
         )
         stages[stage] = config

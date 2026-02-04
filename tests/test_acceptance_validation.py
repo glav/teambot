@@ -4,13 +4,12 @@ These tests validate the acceptance scenarios using the REAL implementation code
 """
 
 import asyncio
-import pytest
 from unittest.mock import AsyncMock
 
-from teambot.repl.parser import parse_command, Command, CommandType, REFERENCE_PATTERN
-from teambot.tasks.executor import TaskExecutor, ExecutionResult
-from teambot.tasks.manager import TaskManager
-from teambot.tasks.models import Task, TaskResult, TaskStatus
+import pytest
+
+from teambot.repl.parser import REFERENCE_PATTERN, CommandType, parse_command
+from teambot.tasks.executor import TaskExecutor
 
 
 class TestAcceptanceScenarios:
@@ -24,7 +23,7 @@ class TestAcceptanceScenarios:
         mock_sdk = AsyncMock()
         mock_sdk.execute = AsyncMock(side_effect=[
             "Project Plan:\n1. Setup environment\n2. Create database\n3. Build API",
-            "I will implement based on the plan:\n- Setup environment first\n- Then create database",
+            "I will implement based on the plan:\n- Setup environment first",
         ])
 
         executor = TaskExecutor(sdk_client=mock_sdk)
@@ -86,7 +85,7 @@ class TestAcceptanceScenarios:
         cmd2 = parse_command("@builder-1 Implement $pm")
         assert cmd2.references == ["pm"]
 
-        result2 = await executor.execute(cmd2)
+        await executor.execute(cmd2)
 
         # Verify: PM completed before builder started
         assert "pm_end" in call_order
@@ -146,8 +145,8 @@ class TestAcceptanceScenarios:
 
         # Should fail with helpful error
         assert not result.success
-        assert "Unknown agent reference: $nonexistent" in result.error
-        assert "Valid agents:" in result.error
+        assert "Unknown agent ref: $nonexistent" in result.error
+        assert "Valid:" in result.error
         assert "pm" in result.error
         assert "ba" in result.error
 

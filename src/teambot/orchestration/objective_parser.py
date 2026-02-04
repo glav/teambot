@@ -236,7 +236,7 @@ _SKIP_WORDS = {
     "new", "support", "enable", "allow", "enhance", "improve", "change",
     # Personal pronouns and common sentence starters
     "i", "we", "you", "it", "this", "that", "these", "those",
-    "like", "want", "would", "so", "when", "if", "then", "also",
+    "like", "want", "so", "when", "if", "then", "also",
     # Generic tech words
     "solution", "system", "feature", "functionality", "ability",
 }

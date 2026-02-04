@@ -145,7 +145,7 @@ class TaskExecutor:
                 return ExecutionResult(
                     success=False,
                     output="",
-                    error=f"Unknown agent reference: ${invalid_refs[0]}. Valid agents: {valid_list}",
+                    error=f"Unknown agent ref: ${invalid_refs[0]}. Valid: {valid_list}",
                 )
 
             # Wait for any referenced agents that are currently running
@@ -308,7 +308,7 @@ class TaskExecutor:
                 return ExecutionResult(
                     success=False,
                     output="",
-                    error=f"Unknown agent reference: ${invalid_refs[0]}. Valid agents: {valid_list}",
+                    error=f"Unknown agent ref: ${invalid_refs[0]}. Valid: {valid_list}",
                 )
             await self._wait_for_references(command.references)
 

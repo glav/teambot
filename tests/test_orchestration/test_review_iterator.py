@@ -39,7 +39,10 @@ class TestReviewIterator:
         # Work output, then review output with verified approval
         mock_sdk_client.execute_streaming.side_effect = [
             "Implementation complete with code changes",
-            "VERIFIED_APPROVED: All criteria met\n\nVerification Evidence:\n- Code changes: Updated module",
+            (
+                "VERIFIED_APPROVED: All criteria met\n\n"
+                "Verification Evidence:\n- Code changes: Updated module"
+            ),
         ]
 
         result = await iterator.execute(
@@ -83,7 +86,7 @@ class TestReviewIterator:
             "Attempt 1", "REJECTED: Fix A",
             "Attempt 2", "REJECTED: Fix B",
             "Attempt 3", "REJECTED: Fix C",
-            "Attempt 4", "VERIFIED_APPROVED: Finally complete\n\nVerification Evidence:\n- All fixed",
+            "Attempt 4", "VERIFIED_APPROVED: Finally\n\nEvidence:\n- All fixed",
         ]
 
         result = await iterator.execute(

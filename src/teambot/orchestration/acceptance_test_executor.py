@@ -395,11 +395,12 @@ class AcceptanceTestExecutor:
 
                 if all_commands_succeeded:
                     runtime_scenario.status = AcceptanceTestStatus.PASSED
-                    runtime_scenario.actual_result = f"Commands executed successfully: {list(outputs.keys())}"
+                    keys = list(outputs.keys())
+                    runtime_scenario.actual_result = f"Commands executed: {keys}"
                 else:
                     runtime_scenario.status = AcceptanceTestStatus.FAILED
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 runtime_scenario.status = AcceptanceTestStatus.ERROR
                 runtime_scenario.failure_reason = "Runtime validation timed out"
 
@@ -412,9 +413,14 @@ class AcceptanceTestExecutor:
                 })
 
         # Calculate totals
-        passed = sum(1 for s in runtime_results if s.status == AcceptanceTestStatus.PASSED)
-        failed = sum(1 for s in runtime_results if s.status in (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR))
-        skipped = sum(1 for s in runtime_results if s.status == AcceptanceTestStatus.SKIPPED)
+        passed = sum(
+            1 for s in runtime_results if s.status == AcceptanceTestStatus.PASSED
+        )
+        failed_statuses = (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR)
+        failed = sum(1 for s in runtime_results if s.status in failed_statuses)
+        skipped = sum(
+            1 for s in runtime_results if s.status == AcceptanceTestStatus.SKIPPED
+        )
 
         if self.on_progress:
             self.on_progress("runtime_validation_complete", {
@@ -449,7 +455,10 @@ class AcceptanceTestExecutor:
             return True
 
         # Extract key terms (words longer than 4 chars, not common words)
-        common_words = {"should", "would", "could", "must", "will", "have", "been", "that", "this", "with", "from", "agent", "output"}
+        common_words = {
+            "should", "would", "could", "must", "will", "have", "been",
+            "that", "this", "with", "from", "agent", "output"
+        }
         key_terms = [
             word for word in re.findall(r"\b\w{4,}\b", expected)
             if word not in common_words
@@ -507,8 +516,11 @@ class AcceptanceTestExecutor:
             merged_scenarios.append(scenario)
 
         # Recalculate totals
-        passed = sum(1 for s in merged_scenarios if s.status == AcceptanceTestStatus.PASSED)
-        failed = sum(1 for s in merged_scenarios if s.status in (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR))
+        passed = sum(
+            1 for s in merged_scenarios if s.status == AcceptanceTestStatus.PASSED
+        )
+        failed_statuses = (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR)
+        failed = sum(1 for s in merged_scenarios if s.status in failed_statuses)
         skipped = sum(1 for s in merged_scenarios if s.status == AcceptanceTestStatus.SKIPPED)
 
         # Append runtime validation output to main validation output

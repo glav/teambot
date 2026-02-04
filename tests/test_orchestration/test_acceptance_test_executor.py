@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
 from teambot.orchestration.acceptance_test_executor import (
+    AcceptanceTestExecutor,
     AcceptanceTestScenario,
     AcceptanceTestStatus,
-    AcceptanceTestExecutor,
-    parse_acceptance_tests,
     extract_commands_from_steps,
     generate_acceptance_test_report,
+    parse_acceptance_tests,
 )
 
 
@@ -348,7 +349,7 @@ class TestRuntimeValidation:
         # TaskExecutor uses .execute() method
         mock_client.execute.return_value = "Why did the PM cross the road?"
 
-        result = await executor._execute_runtime_validation(mock_client)
+        await executor._execute_runtime_validation(mock_client)
 
         # Verify command was executed via TaskExecutor -> TaskManager -> sdk.execute
         mock_client.execute.assert_called()
@@ -364,8 +365,8 @@ class TestRuntimeValidation:
         executor.load_scenarios()
 
         mock_client = AsyncMock()
-        # Return output that matches expected result keywords ("PM agent responds with output")
-        mock_client.execute.return_value = "PM agent responds with this output: Why did the chicken cross the road?"
+        # Return output that matches expected result keywords
+        mock_client.execute.return_value = "PM agent responds with output"
 
         result = await executor._execute_runtime_validation(mock_client)
 
@@ -384,10 +385,10 @@ class TestRuntimeValidation:
         # TaskExecutor stores PM's output, then BA can reference it
         mock_client.execute.side_effect = [
             "Here's a joke about PMs!",  # PM response - stored by TaskExecutor
-            "Reviewing PM's joke: Here's a joke about PMs! - looks good!",  # BA response
+            "Reviewing PM's joke - looks good!",  # BA response
         ]
 
-        result = await executor._execute_runtime_validation(mock_client)
+        await executor._execute_runtime_validation(mock_client)
 
         # With TaskExecutor, PM's output is stored and BA can access it via $pm
         # The second call should receive the injected PM output
