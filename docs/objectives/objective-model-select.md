@@ -9,7 +9,7 @@
 - Each agent should be able to use a default model or a specific model.
 - Each agent should be able to have a default model specified.
   - For example, 'pm' agent may have Claude opus 4.5 model as the default, 'ba' agent may have GPOT 5.2 Codex as the default
-- Only models supported by the Copilot SDk are supported in teambot.
+- Only models supported by the Copilot SDK are supported in teambot.
 - The model currently being used should be evident in the terminal UI display so it is easy to see which agent has which model assigned to a task.
 - We should be able to list all available models that we can choose from.
 - When doing file based orchestration, we should be able to use different models per agent which will follow whatever the default model is for the agent currently running the file based orchestration task.
