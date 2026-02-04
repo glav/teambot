@@ -273,7 +273,257 @@ class AcceptanceTestExecutor:
             )
 
         # Parse the validation output to determine results
-        return self._parse_validation_results()
+        code_test_result = self._parse_validation_results()
+
+        # NEW: Run runtime validation to verify the feature actually works
+        runtime_result = await self._execute_runtime_validation(sdk_client)
+
+        # Merge results - runtime failures override code test passes
+        return self._merge_validation_results(code_test_result, runtime_result)
+
+    async def _execute_runtime_validation(
+        self,
+        sdk_client,
+    ) -> AcceptanceTestResult:
+        """Execute actual commands from acceptance scenarios to verify runtime behavior.
+
+        This is the critical check that verifies the feature ACTUALLY WORKS,
+        not just that tests pass. It extracts commands from scenario steps
+        and runs them through the SDK client.
+
+        Args:
+            sdk_client: The SDK client to use for executing commands.
+
+        Returns:
+            AcceptanceTestResult with runtime validation results.
+        """
+        if self.on_progress:
+            self.on_progress("runtime_validation_start", {
+                "total_scenarios": len(self.scenarios),
+            })
+
+        runtime_results: list[AcceptanceTestScenario] = []
+
+        for scenario in self.scenarios:
+            # Create a copy for runtime results
+            runtime_scenario = AcceptanceTestScenario(
+                id=f"{scenario.id}-runtime",
+                name=f"{scenario.name} (Runtime)",
+                description=scenario.description,
+                preconditions=scenario.preconditions,
+                steps=scenario.steps,
+                expected_result=scenario.expected_result,
+                verification=scenario.verification,
+            )
+
+            # Extract commands from steps
+            commands = extract_commands_from_steps(scenario.steps)
+
+            if not commands:
+                # No executable commands found - skip runtime validation for this scenario
+                runtime_scenario.status = AcceptanceTestStatus.SKIPPED
+                runtime_scenario.failure_reason = "No executable commands found in steps"
+                runtime_results.append(runtime_scenario)
+                continue
+
+            if self.on_progress:
+                self.on_progress("runtime_scenario_start", {
+                    "scenario_id": scenario.id,
+                    "command_count": len(commands),
+                })
+
+            try:
+                # Execute commands and collect outputs
+                outputs: dict[str, str] = {}
+                all_commands_succeeded = True
+
+                for cmd_info in commands:
+                    cmd = cmd_info["command"]
+                    # Parse agent and task from command like "@pm tell a joke"
+                    parts = cmd.split(maxsplit=1)
+                    if len(parts) < 2:
+                        continue
+
+                    agent_id = parts[0].lstrip("@")
+                    task = parts[1]
+
+                    try:
+                        # Execute the command for real
+                        output = await sdk_client.execute_streaming(
+                            agent_id, task, None
+                        )
+                        outputs[agent_id] = output
+
+                        # Check if this command references another agent's output
+                        # e.g., "@ba review $pm" needs PM's output to be available
+                        if "$" in task:
+                            # Extract referenced agents
+                            ref_pattern = r"\$([a-zA-Z][a-zA-Z0-9-]*)"
+                            refs = re.findall(ref_pattern, task)
+                            for ref_agent in refs:
+                                if ref_agent not in outputs:
+                                    all_commands_succeeded = False
+                                    runtime_scenario.failure_reason = (
+                                        f"Referenced agent ${ref_agent} output not available. "
+                                        f"The feature may not be wired up correctly."
+                                    )
+
+                    except Exception as e:
+                        all_commands_succeeded = False
+                        runtime_scenario.failure_reason = f"Command '{cmd}' failed: {e}"
+                        break
+
+                # Verify expected result if specified
+                if all_commands_succeeded and scenario.expected_result:
+                    # Check if any output contains expected keywords
+                    all_output = " ".join(outputs.values()).lower()
+                    expected_lower = scenario.expected_result.lower()
+
+                    # Extract key verification phrases
+                    # Look for patterns like "should contain X" or "must show Y"
+                    if not self._verify_expected_output(all_output, expected_lower):
+                        all_commands_succeeded = False
+                        runtime_scenario.failure_reason = (
+                            f"Output did not match expected result. "
+                            f"Expected: {scenario.expected_result[:100]}"
+                        )
+
+                if all_commands_succeeded:
+                    runtime_scenario.status = AcceptanceTestStatus.PASSED
+                    runtime_scenario.actual_result = f"Commands executed successfully: {list(outputs.keys())}"
+                else:
+                    runtime_scenario.status = AcceptanceTestStatus.FAILED
+
+            except asyncio.TimeoutError:
+                runtime_scenario.status = AcceptanceTestStatus.ERROR
+                runtime_scenario.failure_reason = "Runtime validation timed out"
+
+            runtime_results.append(runtime_scenario)
+
+            if self.on_progress:
+                self.on_progress("runtime_scenario_complete", {
+                    "scenario_id": scenario.id,
+                    "status": runtime_scenario.status.value,
+                })
+
+        # Calculate totals
+        passed = sum(1 for s in runtime_results if s.status == AcceptanceTestStatus.PASSED)
+        failed = sum(1 for s in runtime_results if s.status in (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR))
+        skipped = sum(1 for s in runtime_results if s.status == AcceptanceTestStatus.SKIPPED)
+
+        if self.on_progress:
+            self.on_progress("runtime_validation_complete", {
+                "passed": passed,
+                "failed": failed,
+                "skipped": skipped,
+            })
+
+        return AcceptanceTestResult(
+            total=len(runtime_results),
+            passed=passed,
+            failed=failed,
+            skipped=skipped,
+            scenarios=runtime_results,
+        )
+
+    def _verify_expected_output(self, actual: str, expected: str) -> bool:
+        """Verify actual output matches expected result description.
+
+        This is a heuristic check - it looks for key terms from the
+        expected result in the actual output.
+
+        Args:
+            actual: The actual output (lowercased).
+            expected: The expected result description (lowercased).
+
+        Returns:
+            True if output appears to match expectations.
+        """
+        # If expected is very short or generic, be lenient
+        if len(expected) < 20:
+            return True
+
+        # Extract key terms (words longer than 4 chars, not common words)
+        common_words = {"should", "would", "could", "must", "will", "have", "been", "that", "this", "with", "from", "agent", "output"}
+        key_terms = [
+            word for word in re.findall(r"\b\w{4,}\b", expected)
+            if word not in common_words
+        ]
+
+        if not key_terms:
+            return True
+
+        # Check if at least 30% of key terms appear in output
+        matches = sum(1 for term in key_terms if term in actual)
+        match_ratio = matches / len(key_terms) if key_terms else 1.0
+
+        return match_ratio >= 0.3
+
+    def _merge_validation_results(
+        self,
+        code_result: AcceptanceTestResult,
+        runtime_result: AcceptanceTestResult,
+    ) -> AcceptanceTestResult:
+        """Merge code-level and runtime validation results.
+
+        Runtime failures override code test passes - if the feature
+        doesn't actually work at runtime, the acceptance test fails.
+
+        Args:
+            code_result: Results from pytest-based validation.
+            runtime_result: Results from runtime command execution.
+
+        Returns:
+            Merged AcceptanceTestResult.
+        """
+        # Build a map of runtime results by base scenario ID
+        runtime_map: dict[str, AcceptanceTestScenario] = {}
+        for scenario in runtime_result.scenarios:
+            # Strip "-runtime" suffix to match original ID
+            base_id = scenario.id.replace("-runtime", "")
+            runtime_map[base_id] = scenario
+
+        # Merge: runtime failure overrides code pass
+        merged_scenarios: list[AcceptanceTestScenario] = []
+        for scenario in code_result.scenarios:
+            runtime_scenario = runtime_map.get(scenario.id)
+
+            if runtime_scenario and runtime_scenario.status == AcceptanceTestStatus.FAILED:
+                # Runtime failed - mark as failed even if code tests passed
+                scenario.status = AcceptanceTestStatus.FAILED
+                scenario.failure_reason = (
+                    f"RUNTIME VALIDATION FAILED: {runtime_scenario.failure_reason} "
+                    f"(Code tests may have passed but feature doesn't work at runtime)"
+                )
+            elif runtime_scenario and runtime_scenario.status == AcceptanceTestStatus.ERROR:
+                scenario.status = AcceptanceTestStatus.ERROR
+                scenario.failure_reason = f"RUNTIME ERROR: {runtime_scenario.failure_reason}"
+
+            merged_scenarios.append(scenario)
+
+        # Recalculate totals
+        passed = sum(1 for s in merged_scenarios if s.status == AcceptanceTestStatus.PASSED)
+        failed = sum(1 for s in merged_scenarios if s.status in (AcceptanceTestStatus.FAILED, AcceptanceTestStatus.ERROR))
+        skipped = sum(1 for s in merged_scenarios if s.status == AcceptanceTestStatus.SKIPPED)
+
+        # Append runtime validation output to main validation output
+        runtime_report = "\n\n## Runtime Validation Results\n\n"
+        for scenario in runtime_result.scenarios:
+            status_emoji = "✅" if scenario.status == AcceptanceTestStatus.PASSED else "❌"
+            runtime_report += f"- {status_emoji} {scenario.id}: {scenario.status.value}"
+            if scenario.failure_reason:
+                runtime_report += f" - {scenario.failure_reason}"
+            runtime_report += "\n"
+
+        self.validation_output += runtime_report
+
+        return AcceptanceTestResult(
+            total=len(merged_scenarios),
+            passed=passed,
+            failed=failed,
+            skipped=skipped,
+            scenarios=merged_scenarios,
+        )
 
     def _build_validation_prompt(self) -> str:
         """Build a prompt asking the builder to validate acceptance scenarios.
