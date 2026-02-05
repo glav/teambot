@@ -1,12 +1,18 @@
 """Task executor - bridges REPL commands to TaskManager."""
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from teambot.repl.parser import Command, CommandType
 from teambot.tasks.manager import TaskManager
 from teambot.tasks.models import Task, TaskStatus
+
+if TYPE_CHECKING:
+    from teambot.ui.agent_state import AgentStatusManager
 
 
 @dataclass
@@ -49,6 +55,10 @@ class TaskExecutor:
         on_task_complete: Callable | None = None,
         on_task_started: Callable | None = None,
         on_streaming_chunk: Callable | None = None,
+        on_stage_change: Callable | None = None,
+        on_stage_output: Callable | None = None,
+        on_pipeline_complete: Callable | None = None,
+        agent_status_manager: AgentStatusManager | None = None,
     ):
         """Initialize executor.
 
@@ -59,11 +69,19 @@ class TaskExecutor:
             on_task_complete: Callback when task completes (for notifications).
             on_task_started: Callback when task starts (for overlay updates).
             on_streaming_chunk: Callback for streaming chunks (agent_id, chunk).
+            on_stage_change: Callback when pipeline stage changes (stage, total, agents).
+            on_stage_output: Callback for intermediate output (agent_id, output).
+            on_pipeline_complete: Callback when pipeline completes (clears progress).
+            agent_status_manager: Optional manager for agent status updates.
         """
         self._sdk_client = sdk_client
         self._on_task_complete = on_task_complete
         self._on_task_started = on_task_started
         self._on_streaming_chunk = on_streaming_chunk
+        self._on_stage_change = on_stage_change
+        self._on_stage_output = on_stage_output
+        self._on_pipeline_complete = on_pipeline_complete
+        self._agent_status = agent_status_manager
 
         # Create manager with our executor function
         self._manager = TaskManager(
@@ -79,6 +97,34 @@ class TaskExecutor:
     def task_count(self) -> int:
         """Get total number of tasks."""
         return self._manager.task_count
+
+    def set_agent_status_manager(self, manager: AgentStatusManager) -> None:
+        """Set the agent status manager for status updates.
+
+        Args:
+            manager: AgentStatusManager instance.
+        """
+        self._agent_status = manager
+
+    def _status_running(self, agent_id: str, task_desc: str) -> None:
+        """Mark agent as running in status manager."""
+        if self._agent_status:
+            self._agent_status.set_running(agent_id, task_desc)
+
+    def _status_completed(self, agent_id: str) -> None:
+        """Mark agent as completed in status manager."""
+        if self._agent_status:
+            self._agent_status.set_completed(agent_id)
+
+    def _status_failed(self, agent_id: str) -> None:
+        """Mark agent as failed in status manager."""
+        if self._agent_status:
+            self._agent_status.set_failed(agent_id)
+
+    def _status_idle(self, agent_id: str) -> None:
+        """Mark agent as idle in status manager."""
+        if self._agent_status:
+            self._agent_status.set_idle(agent_id)
 
     async def _execute_agent_task(
         self, agent_id: str, prompt: str, model: str | None = None
@@ -189,7 +235,18 @@ class TaskExecutor:
             # Execute synchronously
             if self._on_task_started:
                 self._on_task_started(task)
-            result = await self._manager.execute_task(task.id)
+            self._status_running(agent_id, prompt[:40] if prompt else "")
+            try:
+                result = await self._manager.execute_task(task.id)
+                if result.success:
+                    self._status_completed(agent_id)
+                else:
+                    self._status_failed(agent_id)
+            except asyncio.CancelledError:
+                self._status_failed(agent_id)
+                raise
+            finally:
+                self._status_idle(agent_id)
             if self._on_task_complete:
                 self._on_task_complete(task, self._manager.get_result(task.id))
             return ExecutionResult(
@@ -269,26 +326,41 @@ class TaskExecutor:
                 background=True,
             )
         else:
-            # Execute all in parallel and wait
-            await asyncio.gather(
-                *[self._manager.execute_task(t.id) for t in tasks],
-                return_exceptions=True,
-            )
-
-            # Collect results
-            outputs = []
-            all_success = True
-            errors = []
-
+            # Mark all agents as running before parallel execution
             for task in tasks:
-                result = self._manager.get_result(task.id)
-                if result:
-                    if result.success:
-                        outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
-                    else:
-                        all_success = False
-                        errors.append(f"@{task.agent_id}: {result.error}")
-                        outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+                self._status_running(task.agent_id, command.content[:40] if command.content else "")
+
+            try:
+                # Execute all in parallel and wait
+                await asyncio.gather(
+                    *[self._manager.execute_task(t.id) for t in tasks],
+                    return_exceptions=True,
+                )
+
+                # Collect results and update status
+                outputs = []
+                all_success = True
+                errors = []
+
+                for task in tasks:
+                    result = self._manager.get_result(task.id)
+                    if result:
+                        if result.success:
+                            self._status_completed(task.agent_id)
+                            outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
+                        else:
+                            self._status_failed(task.agent_id)
+                            all_success = False
+                            errors.append(f"@{task.agent_id}: {result.error}")
+                            outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+            except asyncio.CancelledError:
+                for task in tasks:
+                    self._status_failed(task.agent_id)
+                raise
+            finally:
+                # Mark all agents as idle
+                for task in tasks:
+                    self._status_idle(task.agent_id)
 
             return ExecutionResult(
                 success=all_success,
@@ -326,6 +398,7 @@ class TaskExecutor:
 
         all_task_ids: list[str] = []
         previous_task_ids: list[str] = []
+        stage_task_map: dict[int, list[str]] = {}  # stage_index -> task_ids
 
         # Create tasks for each stage with dependencies
         for i, stage in enumerate(command.pipeline):
@@ -349,34 +422,85 @@ class TaskExecutor:
                 stage_task_ids.append(task.id)
                 all_task_ids.append(task.id)
 
+            stage_task_map[i] = stage_task_ids
             previous_task_ids = stage_task_ids
+
+        total_stages = len(command.pipeline)
 
         if command.background:
             # Start pipeline in background
-            bg_task = asyncio.create_task(self._run_pipeline_with_callback(all_task_ids))
+            bg_task = asyncio.create_task(
+                self._run_pipeline_with_callback(all_task_ids, stage_task_map, total_stages)
+            )
             for task_id in all_task_ids:
                 self._background_tasks[task_id] = bg_task
 
             return ExecutionResult(
                 success=True,
-                output=f"Pipeline started in background ({len(command.pipeline)} stages)",
+                output=f"Pipeline started in background ({total_stages} stages)",
                 task_ids=all_task_ids,
                 background=True,
             )
         else:
-            # Execute pipeline synchronously
-            await self._manager.execute_all()
-
-            # Get final output
+            # Execute pipeline synchronously with per-task events
             final_outputs = []
             all_success = True
             errors = []
 
-            for task_id in all_task_ids:
-                task = self._manager.get_task(task_id)
-                result = self._manager.get_result(task_id)
+            for stage_index, stage_task_ids in stage_task_map.items():
+                # Notify stage change
+                stage_agents = [self._manager.get_task(tid).agent_id for tid in stage_task_ids]
+                if self._on_stage_change:
+                    self._on_stage_change(stage_index + 1, total_stages, stage_agents)
 
-                if result:
+                # Execute tasks in this stage
+                for task_id in stage_task_ids:
+                    task = self._manager.get_task(task_id)
+                    if not task:
+                        continue
+
+                    # Skip if already terminal (shouldn't happen in fresh pipeline)
+                    if task.status.is_terminal():
+                        if task.result:
+                            if task.result.success:
+                                final_outputs.append(
+                                    f"=== @{task.agent_id} ===\n{task.result.output}"
+                                )
+                            else:
+                                all_success = False
+                        continue
+
+                    # Notify task started
+                    if self._on_task_started:
+                        self._on_task_started(task)
+
+                    # Update status manager
+                    self._status_running(task.agent_id, task.prompt[:40] if task.prompt else "")
+
+                    try:
+                        # Execute the task
+                        result = await self._manager.execute_task(task_id)
+
+                        # Update status based on result
+                        if result.success:
+                            self._status_completed(task.agent_id)
+                        else:
+                            self._status_failed(task.agent_id)
+                    except asyncio.CancelledError:
+                        self._status_failed(task.agent_id)
+                        raise
+                    finally:
+                        self._status_idle(task.agent_id)
+
+                    # Notify task complete
+                    if self._on_task_complete:
+                        self._on_task_complete(task, result)
+
+                    # Emit intermediate output
+                    if self._on_stage_output and result.success:
+                        self._on_stage_output(task.agent_id, result.output)
+
+                    # Collect output
                     if result.success:
                         final_outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
                     else:
@@ -391,6 +515,10 @@ class TaskExecutor:
                                 f"=== @{task.agent_id} ===\n[Failed: {result.error}]"
                             )
 
+            # Signal pipeline completion to clear progress display
+            if self._on_pipeline_complete:
+                self._on_pipeline_complete()
+
             return ExecutionResult(
                 success=all_success,
                 output="\n\n".join(final_outputs),
@@ -404,35 +532,104 @@ class TaskExecutor:
         Args:
             task_id: Task to run.
         """
+        task = self._manager.get_task(task_id)
+        agent_id = task.agent_id if task else None
         try:
             # Notify task started
-            if self._on_task_started:
-                task = self._manager.get_task(task_id)
-                if task:
-                    self._on_task_started(task)
+            if self._on_task_started and task:
+                self._on_task_started(task)
 
-            await self._manager.execute_task(task_id)
+            if agent_id:
+                self._status_running(agent_id, task.prompt[:40] if task and task.prompt else "")
+
+            result = await self._manager.execute_task(task_id)
+
+            if agent_id:
+                if result.success:
+                    self._status_completed(agent_id)
+                else:
+                    self._status_failed(agent_id)
+        except asyncio.CancelledError:
+            if agent_id:
+                self._status_failed(agent_id)
+            raise
         finally:
+            if agent_id:
+                self._status_idle(agent_id)
             if self._on_task_complete:
                 task = self._manager.get_task(task_id)
                 result = self._manager.get_result(task_id)
                 self._on_task_complete(task, result)
 
-    async def _run_pipeline_with_callback(self, task_ids: list[str]) -> None:
-        """Run pipeline tasks and call callback when complete.
+    async def _run_pipeline_with_callback(
+        self, task_ids: list[str], stage_task_map: dict[int, list[str]], total_stages: int
+    ) -> None:
+        """Run pipeline tasks and call callbacks when complete.
 
         Args:
             task_ids: All task IDs in pipeline.
+            stage_task_map: Mapping of stage index to task IDs in that stage.
+            total_stages: Total number of pipeline stages.
         """
         try:
-            await self._manager.execute_all()
-        finally:
+            # Execute pipeline with per-task events (same pattern as sync pipeline)
+            for stage_index, stage_task_ids in stage_task_map.items():
+                # Notify stage change
+                stage_agents = [self._manager.get_task(tid).agent_id for tid in stage_task_ids]
+                if self._on_stage_change:
+                    self._on_stage_change(stage_index + 1, total_stages, stage_agents)
+
+                # Execute tasks in this stage
+                for task_id in stage_task_ids:
+                    task = self._manager.get_task(task_id)
+                    if not task:
+                        continue
+
+                    # Skip if already terminal
+                    if task.status.is_terminal():
+                        continue
+
+                    # Notify task started
+                    if self._on_task_started:
+                        self._on_task_started(task)
+
+                    # Update status manager
+                    self._status_running(task.agent_id, task.prompt[:40] if task.prompt else "")
+
+                    try:
+                        # Execute the task
+                        result = await self._manager.execute_task(task_id)
+
+                        # Update status based on result
+                        if result.success:
+                            self._status_completed(task.agent_id)
+                        else:
+                            self._status_failed(task.agent_id)
+                    except asyncio.CancelledError:
+                        self._status_failed(task.agent_id)
+                        raise
+                    finally:
+                        self._status_idle(task.agent_id)
+
+                    # Notify task complete
+                    if self._on_task_complete:
+                        self._on_task_complete(task, result)
+
+                    # Emit intermediate output
+                    if self._on_stage_output and result.success:
+                        self._on_stage_output(task.agent_id, result.output)
+        except Exception:
+            # Ensure all tasks get completion callbacks even on error
             if self._on_task_complete:
                 for task_id in task_ids:
                     task = self._manager.get_task(task_id)
                     result = self._manager.get_result(task_id)
                     if task and result:
                         self._on_task_complete(task, result)
+        finally:
+            # Signal pipeline completion to clear progress display
+            if self._on_pipeline_complete:
+                self._on_pipeline_complete()
 
     def get_task(self, task_id: str) -> Task | None:
         """Get a task by ID.

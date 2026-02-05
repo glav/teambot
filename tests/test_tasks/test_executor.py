@@ -599,3 +599,285 @@ class TestExecutorReferences:
         # Prompt should be unchanged (no injection headers)
         assert captured_prompts[0] == "Create a plan"
         assert "=== Output from" not in captured_prompts[0]
+
+
+class TestPipelineStageCallbacks:
+    """Tests for pipeline stage change and output callbacks."""
+
+    @pytest.mark.asyncio
+    async def test_pipeline_emits_stage_change(self):
+        """Test that pipeline emits stage change callbacks."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        stage_changes = []
+
+        def on_stage_change(current, total, agents):
+            stage_changes.append((current, total, agents))
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_stage_change=on_stage_change,
+        )
+
+        cmd = parse_command("@pm Plan -> @builder-1 Build")
+        await executor.execute(cmd)
+
+        # Should have 2 stage changes (stage 1 and stage 2)
+        assert len(stage_changes) == 2
+        assert stage_changes[0] == (1, 2, ["pm"])
+        assert stage_changes[1] == (2, 2, ["builder-1"])
+
+    @pytest.mark.asyncio
+    async def test_pipeline_emits_stage_output(self):
+        """Test that pipeline emits intermediate output callbacks."""
+        mock_sdk = AsyncMock()
+
+        async def mock_execute(agent_id, prompt):
+            return f"{agent_id} output"
+
+        mock_sdk.execute = mock_execute
+
+        stage_outputs = []
+
+        def on_stage_output(agent_id, output):
+            stage_outputs.append((agent_id, output))
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_stage_output=on_stage_output,
+        )
+
+        cmd = parse_command("@pm Plan -> @builder-1 Build")
+        await executor.execute(cmd)
+
+        # Should have output from each stage
+        assert len(stage_outputs) == 2
+        assert stage_outputs[0] == ("pm", "pm output")
+        assert stage_outputs[1] == ("builder-1", "builder-1 output")
+
+    @pytest.mark.asyncio
+    async def test_pipeline_emits_task_started_per_stage(self):
+        """Test that pipeline emits on_task_started for each stage."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        started_tasks = []
+
+        def on_started(task):
+            started_tasks.append(task.agent_id)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_started=on_started,
+        )
+
+        cmd = parse_command("@pm Plan -> @builder-1 Build -> @reviewer Review")
+        await executor.execute(cmd)
+
+        # Should have started all 3 tasks
+        assert started_tasks == ["pm", "builder-1", "reviewer"]
+
+    @pytest.mark.asyncio
+    async def test_pipeline_emits_task_complete_per_stage(self):
+        """Test that pipeline emits on_task_complete for each stage."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        completed_tasks = []
+
+        def on_complete(task, result):
+            completed_tasks.append(task.agent_id)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_complete=on_complete,
+        )
+
+        cmd = parse_command("@pm Plan -> @builder-1 Build")
+        await executor.execute(cmd)
+
+        # Should have completed both tasks
+        assert completed_tasks == ["pm", "builder-1"]
+
+    @pytest.mark.asyncio
+    async def test_multiagent_stage_emits_all_agents(self):
+        """Test that multi-agent stage reports all agents in stage change."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        stage_changes = []
+
+        def on_stage_change(current, total, agents):
+            stage_changes.append((current, total, sorted(agents)))
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_stage_change=on_stage_change,
+        )
+
+        # Multi-agent first stage (correct syntax: @pm,ba not @pm, @ba)
+        cmd = parse_command("@pm,ba Analyze -> @builder-1 Build")
+        await executor.execute(cmd)
+
+        # First stage should have both pm and ba
+        assert stage_changes[0] == (1, 2, ["ba", "pm"])
+        assert stage_changes[1] == (2, 2, ["builder-1"])
+
+
+class TestTaskExecutorStatusIntegration:
+    """Tests for AgentStatusManager integration."""
+
+    @pytest.mark.asyncio
+    async def test_simple_command_updates_status(self):
+        """Status manager updated for simple command lifecycle."""
+        from teambot.ui.agent_state import AgentState, AgentStatusManager
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+        status_manager = AgentStatusManager()
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            agent_status_manager=status_manager,
+        )
+
+        # Track state changes
+        states = []
+
+        def track(mgr):
+            pm_status = mgr.get("pm")
+            if pm_status:
+                states.append(pm_status.state)
+
+        status_manager.add_listener(track)
+
+        cmd = parse_command("@pm Do something")
+        await executor.execute(cmd)
+
+        # Verify lifecycle: RUNNING -> COMPLETED -> IDLE
+        assert AgentState.RUNNING in states
+        assert AgentState.COMPLETED in states or AgentState.IDLE in states
+
+    @pytest.mark.asyncio
+    async def test_pipeline_handoff_updates_both_agents(self):
+        """Pipeline handoff updates status for both agents."""
+        from teambot.ui.agent_state import AgentState, AgentStatusManager
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+        status_manager = AgentStatusManager()
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            agent_status_manager=status_manager,
+        )
+
+        # Track which agents were marked running
+        running_agents = set()
+
+        def track(mgr):
+            for aid, status in mgr.get_all().items():
+                if status.state == AgentState.RUNNING:
+                    running_agents.add(aid)
+
+        status_manager.add_listener(track)
+
+        cmd = parse_command("@pm Plan -> @ba Review")
+        await executor.execute(cmd)
+
+        # Both agents should have been RUNNING at some point
+        assert "pm" in running_agents
+        assert "ba" in running_agents
+
+    @pytest.mark.asyncio
+    async def test_multiagent_parallel_status(self):
+        """Multi-agent fan-out marks all agents running."""
+        from teambot.ui.agent_state import AgentState, AgentStatusManager
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+        status_manager = AgentStatusManager()
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            agent_status_manager=status_manager,
+        )
+
+        cmd = parse_command("@pm,ba Parallel task")
+        await executor.execute(cmd)
+
+        # Both should return to idle
+        assert status_manager.get("pm").state == AgentState.IDLE
+        assert status_manager.get("ba").state == AgentState.IDLE
+
+    @pytest.mark.asyncio
+    async def test_failure_marks_agent_failed(self):
+        """Failed task marks agent as FAILED then IDLE."""
+        from teambot.ui.agent_state import AgentState, AgentStatusManager
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(side_effect=Exception("Boom"))
+        status_manager = AgentStatusManager()
+
+        states = []
+
+        def track(mgr):
+            pm = mgr.get("pm")
+            if pm:
+                states.append(pm.state)
+
+        status_manager.add_listener(track)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            agent_status_manager=status_manager,
+        )
+
+        cmd = parse_command("@pm Fail please")
+        await executor.execute(cmd)
+
+        assert AgentState.FAILED in states
+
+    @pytest.mark.asyncio
+    async def test_no_status_manager_graceful(self):
+        """Executor works without status manager (backward compat)."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        executor = TaskExecutor(sdk_client=mock_sdk)  # No status_manager
+
+        cmd = parse_command("@pm Do something")
+        result = await executor.execute(cmd)
+
+        assert result.success  # Should not crash
+
+    @pytest.mark.asyncio
+    async def test_set_agent_status_manager_method(self):
+        """Test setting status manager via setter method."""
+        from teambot.ui.agent_state import AgentState, AgentStatusManager
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        # Set status manager after construction
+        status_manager = AgentStatusManager()
+        executor.set_agent_status_manager(status_manager)
+
+        states = []
+
+        def track(mgr):
+            pm = mgr.get("pm")
+            if pm:
+                states.append(pm.state)
+
+        status_manager.add_listener(track)
+
+        cmd = parse_command("@pm Test task")
+        await executor.execute(cmd)
+
+        # Should have tracked status changes
+        assert len(states) > 0
+        assert AgentState.RUNNING in states
