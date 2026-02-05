@@ -156,7 +156,9 @@ class TestOutputPaneAcceptanceScenarios:
         pane.write_task_complete("builder-1", "Starting implementation")
 
         # Should have: PM header, PM content, handoff separator, builder header, builder content
-        assert len(written_lines) == 5, f"Expected 5 lines, got {len(written_lines)}: {written_lines}"
+        assert len(written_lines) == 5, (
+            f"Expected 5 lines, got {len(written_lines)}: {written_lines}"
+        )
         # Line 0: PM header
         assert "@pm" in written_lines[0]
         # Line 1: PM content with indent
@@ -277,8 +279,8 @@ def example():
         pane._indent_stack = []
 
         pane.write_task_complete("pm", "Success")  # ✓
-        pane.write_task_error("pm", "Error")       # ✗
-        pane.write_streaming_start("pm")           # ⟳
+        pane.write_task_error("pm", "Error")  # ✗
+        pane.write_streaming_start("pm")  # ⟳
 
         # All lines should contain [blue] for PM's color
         # (either in header or indent bar)

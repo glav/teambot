@@ -479,9 +479,7 @@ class TaskExecutor:
                         if task.result:
                             if task.result.success:
                                 header = format_agent_header(task.agent_id, task.id)
-                                final_outputs.append(
-                                    f"{header}\n{task.result.output}"
-                                )
+                                final_outputs.append(f"{header}\n{task.result.output}")
                             else:
                                 all_success = False
                         continue
@@ -523,14 +521,10 @@ class TaskExecutor:
                     else:
                         all_success = False
                         if task.status == TaskStatus.SKIPPED:
-                            final_outputs.append(
-                                f"{header}\n[Skipped: {result.error}]"
-                            )
+                            final_outputs.append(f"{header}\n[Skipped: {result.error}]")
                         else:
                             errors.append(f"@{task.agent_id}: {result.error}")
-                            final_outputs.append(
-                                f"{header}\n[Failed: {result.error}]"
-                            )
+                            final_outputs.append(f"{header}\n[Failed: {result.error}]")
 
             # Signal pipeline completion to clear progress display
             if self._on_pipeline_complete:

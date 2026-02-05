@@ -47,9 +47,7 @@ class OutputInjector:
             if result is None:
                 # Parent result missing
                 header = self._format_header(agent_name, dep_id)
-                sections.append(
-                    f"{header}\n[Output not available - task result missing]\n"
-                )
+                sections.append(f"{header}\n[Output not available - task result missing]\n")
             elif not result.success:
                 # Parent failed
                 error_msg = result.error or "Unknown error"

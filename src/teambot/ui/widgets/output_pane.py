@@ -82,11 +82,11 @@ class OutputPane(RichLog):
         to_color, to_icon = get_agent_style(to_agent)
         separator_line = f"[dim]{'─' * 40}[/dim]"
         label = f"[{to_color}]→ {to_icon} @{to_agent}[/{to_color}]"
-        
+
         # Add to_agent to indent stack for nested display
         if to_agent not in self._indent_stack:
             self._indent_stack.append(to_agent)
-        
+
         # Write separator with current indent stack (excluding new agent)
         if len(self._indent_stack) > 1:
             # Use parent agents for indent on separator
@@ -114,8 +114,7 @@ class OutputPane(RichLog):
 
         # Format header with persona color
         self.write(
-            f"[dim]{timestamp}[/dim] [green]✓[/green] "
-            f"[{color}]{icon} @{agent_id}[/{color}]:"
+            f"[dim]{timestamp}[/dim] [green]✓[/green] [{color}]{icon} @{agent_id}[/{color}]:"
         )
         # Format content with colored indent (using full stack for nesting)
         if result.strip():
@@ -141,10 +140,7 @@ class OutputPane(RichLog):
         self._last_agent_id = agent_id
 
         # Format header with persona color
-        self.write(
-            f"[dim]{timestamp}[/dim] [red]✗[/red] "
-            f"[{color}]{icon} @{agent_id}[/{color}]:"
-        )
+        self.write(f"[dim]{timestamp}[/dim] [red]✗[/red] [{color}]{icon} @{agent_id}[/{color}]:")
         # Format error content with colored indent (using full stack for nesting)
         if error.strip():
             indent_agents = self._get_indent_agents(agent_id)
