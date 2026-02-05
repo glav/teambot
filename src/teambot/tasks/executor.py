@@ -329,8 +329,10 @@ class TaskExecutor:
                 background=True,
             )
         else:
-            # Mark all agents as running before parallel execution
+            # Notify task started and mark all agents as running before parallel execution
             for task in tasks:
+                if self._on_task_started:
+                    self._on_task_started(task)
                 self._status_running(task.agent_id, command.content[:40] if command.content else "")
 
             try:
@@ -356,6 +358,10 @@ class TaskExecutor:
                             all_success = False
                             errors.append(f"@{task.agent_id}: {result.error}")
                             outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+                        
+                        # Notify task complete
+                        if self._on_task_complete:
+                            self._on_task_complete(task, result)
             except asyncio.CancelledError:
                 for task in tasks:
                     self._status_failed(task.agent_id)

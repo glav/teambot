@@ -701,6 +701,52 @@ class TestPipelineStageCallbacks:
         assert completed_tasks == ["pm", "builder-1"]
 
     @pytest.mark.asyncio
+    async def test_multiagent_fanout_emits_task_started(self):
+        """Test that multi-agent fan-out emits on_task_started for each agent."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        started_tasks = []
+
+        def on_started(task):
+            started_tasks.append(task.agent_id)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_started=on_started,
+        )
+
+        # Pure multi-agent fan-out (no pipeline operator)
+        cmd = parse_command("@pm,ba Analyze requirements")
+        await executor.execute(cmd)
+
+        # Should have started both tasks
+        assert sorted(started_tasks) == ["ba", "pm"]
+
+    @pytest.mark.asyncio
+    async def test_multiagent_fanout_emits_task_complete(self):
+        """Test that multi-agent fan-out emits on_task_complete for each agent."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        completed_tasks = []
+
+        def on_complete(task, result):
+            completed_tasks.append(task.agent_id)
+
+        executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            on_task_complete=on_complete,
+        )
+
+        # Pure multi-agent fan-out (no pipeline operator)
+        cmd = parse_command("@pm,ba Analyze requirements")
+        await executor.execute(cmd)
+
+        # Should have completed both tasks
+        assert sorted(completed_tasks) == ["ba", "pm"]
+
+    @pytest.mark.asyncio
     async def test_multiagent_stage_emits_all_agents(self):
         """Test that multi-agent stage reports all agents in stage change."""
         mock_sdk = AsyncMock()
