@@ -153,10 +153,64 @@ class TestPersonaColors:
             "project_manager",
             "business_analyst",
             "technical_writer",
-            "builder",
+            "builder_primary",
+            "builder_secondary",
             "reviewer",
         ]
 
         for persona in expected_personas:
             assert persona in PERSONA_COLORS
             assert PERSONA_COLORS[persona] is not None
+
+
+class TestAgentStyling:
+    """Tests for agent styling constants and helper."""
+
+    def test_all_agents_have_personas(self):
+        """All 6 agent IDs have persona mappings."""
+        from teambot.visualization.console import AGENT_PERSONAS
+
+        expected_agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
+        for agent_id in expected_agents:
+            assert agent_id in AGENT_PERSONAS
+
+    def test_all_agents_have_icons(self):
+        """All 6 agent IDs have icon mappings."""
+        from teambot.visualization.console import AGENT_ICONS
+
+        expected_agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
+        for agent_id in expected_agents:
+            assert agent_id in AGENT_ICONS
+
+    def test_get_agent_style_pm_returns_blue_and_clipboard(self):
+        """get_agent_style returns blue color and clipboard icon for PM."""
+        from teambot.visualization.console import get_agent_style
+
+        color, icon = get_agent_style("pm")
+        assert color == "blue"
+        assert icon == "📋"
+
+    def test_get_agent_style_all_agents(self):
+        """All agents return correct color and icon."""
+        from teambot.visualization.console import get_agent_style
+
+        expected = {
+            "pm": ("blue", "📋"),
+            "ba": ("cyan", "📊"),
+            "writer": ("magenta", "📝"),
+            "builder-1": ("green", "🔨"),
+            "builder-2": ("yellow", "🔨"),
+            "reviewer": ("red", "🔍"),
+        }
+        for agent_id, (expected_color, expected_icon) in expected.items():
+            color, icon = get_agent_style(agent_id)
+            assert color == expected_color, f"{agent_id} color mismatch"
+            assert icon == expected_icon, f"{agent_id} icon mismatch"
+
+    def test_get_agent_style_unknown_agent_returns_default(self):
+        """Unknown agent returns default styling."""
+        from teambot.visualization.console import get_agent_style
+
+        color, icon = get_agent_style("unknown-agent")
+        assert color == "white"
+        assert icon == "●"

@@ -1,5 +1,6 @@
 """Output injector for passing parent task outputs to dependent tasks."""
 
+from teambot.tasks.formatting import format_agent_header, format_your_task_header
 from teambot.tasks.models import TaskResult
 
 
@@ -45,25 +46,21 @@ class OutputInjector:
 
             if result is None:
                 # Parent result missing
-                sections.append(
-                    f"=== Output from @{agent_name} (task {dep_id}) ===\n"
-                    f"[Output not available - task result missing]\n"
-                )
+                header = self._format_header(agent_name, dep_id)
+                sections.append(f"{header}\n[Output not available - task result missing]\n")
             elif not result.success:
                 # Parent failed
                 error_msg = result.error or "Unknown error"
-                sections.append(
-                    f"=== Output from @{agent_name} (task {dep_id}) ===\n"
-                    f"[Task failed: {error_msg}]\n"
-                )
+                header = self._format_header(agent_name, dep_id)
+                sections.append(f"{header}\n[Task failed: {error_msg}]\n")
             else:
                 # Parent succeeded
-                sections.append(
-                    f"=== Output from @{agent_name} (task {dep_id}) ===\n{result.output}\n"
-                )
+                header = self._format_header(agent_name, dep_id)
+                sections.append(f"{header}\n{result.output}\n")
 
-        # Add the task's own prompt
-        sections.append(f"=== Your Task ===\n{prompt}")
+        # Add the task's own prompt with distinct styling
+        your_task_header = self._format_your_task_header()
+        sections.append(f"{your_task_header}\n{prompt}")
 
         return "\n".join(sections)
 
@@ -89,3 +86,23 @@ class OutputInjector:
             return parts[0]
 
         return task_id
+
+    def _format_header(self, agent_name: str, task_id: str) -> str:
+        """Format a styled header for agent output.
+
+        Args:
+            agent_name: The agent identifier (e.g., 'pm', 'builder-1').
+            task_id: The task identifier.
+
+        Returns:
+            Formatted header string with color markup, icon, and delimiter.
+        """
+        return format_agent_header(agent_name, task_id)
+
+    def _format_your_task_header(self) -> str:
+        """Format the 'Your Task' section header.
+
+        Returns:
+            Formatted header string with distinct styling.
+        """
+        return format_your_task_header()

@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from teambot.repl.parser import Command, CommandType
+from teambot.tasks.formatting import format_agent_header
 from teambot.tasks.manager import TaskManager
 from teambot.tasks.models import Task, TaskStatus
 
@@ -350,14 +351,15 @@ class TaskExecutor:
                 for task in tasks:
                     result = self._manager.get_result(task.id)
                     if result:
+                        header = format_agent_header(task.agent_id, task.id)
                         if result.success:
                             self._status_completed(task.agent_id)
-                            outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
+                            outputs.append(f"{header}\n{result.output}")
                         else:
                             self._status_failed(task.agent_id)
                             all_success = False
                             errors.append(f"@{task.agent_id}: {result.error}")
-                            outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
+                            outputs.append(f"{header}\n[Failed: {result.error}]")
 
                         # Notify task complete
                         if self._on_task_complete:
@@ -476,9 +478,8 @@ class TaskExecutor:
                     if task.status.is_terminal():
                         if task.result:
                             if task.result.success:
-                                final_outputs.append(
-                                    f"=== @{task.agent_id} ===\n{task.result.output}"
-                                )
+                                header = format_agent_header(task.agent_id, task.id)
+                                final_outputs.append(f"{header}\n{task.result.output}")
                             else:
                                 all_success = False
                         continue
@@ -514,19 +515,16 @@ class TaskExecutor:
                         self._on_stage_output(task.agent_id, result.output)
 
                     # Collect output
+                    header = format_agent_header(task.agent_id, task.id)
                     if result.success:
-                        final_outputs.append(f"=== @{task.agent_id} ===\n{result.output}")
+                        final_outputs.append(f"{header}\n{result.output}")
                     else:
                         all_success = False
                         if task.status == TaskStatus.SKIPPED:
-                            final_outputs.append(
-                                f"=== @{task.agent_id} ===\n[Skipped: {result.error}]"
-                            )
+                            final_outputs.append(f"{header}\n[Skipped: {result.error}]")
                         else:
                             errors.append(f"@{task.agent_id}: {result.error}")
-                            final_outputs.append(
-                                f"=== @{task.agent_id} ===\n[Failed: {result.error}]"
-                            )
+                            final_outputs.append(f"{header}\n[Failed: {result.error}]")
 
             # Signal pipeline completion to clear progress display
             if self._on_pipeline_complete:

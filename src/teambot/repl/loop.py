@@ -17,7 +17,7 @@ from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor
 from teambot.tasks.models import Task, TaskResult
 from teambot.ui.agent_state import AgentStatusManager
-from teambot.visualization.overlay import OverlayRenderer
+from teambot.visualization.overlay import OverlayPosition, OverlayRenderer
 
 
 class REPLLoop:
@@ -63,8 +63,21 @@ class REPLLoop:
         # Task executor for parallel execution
         self._executor: TaskExecutor | None = None
 
-        # Status overlay
-        self._overlay = OverlayRenderer(console=self._console, enabled=enable_overlay)
+        # Status overlay - load position from config if provided
+        overlay_position = OverlayPosition.TOP_RIGHT  # default
+        if config and "overlay" in config:
+            overlay_config = config["overlay"]
+            if "position" in overlay_config:
+                try:
+                    overlay_position = OverlayPosition(overlay_config["position"])
+                except ValueError:
+                    pass  # Use default if invalid
+            if "enabled" in overlay_config:
+                enable_overlay = overlay_config["enabled"]
+
+        self._overlay = OverlayRenderer(
+            console=self._console, position=overlay_position, enabled=enable_overlay
+        )
         self._commands.set_overlay(self._overlay)
 
         # Wire up handlers

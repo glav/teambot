@@ -275,8 +275,10 @@ class TestModelCommand:
         commands = SystemCommands()
         result = commands.dispatch("model", ["invalid-agent-xyz", "gpt-5"])
 
-        # Should still work - we don't validate agent IDs strictly
-        assert result.success is True
+        # Should fail - we validate agent IDs exist
+        assert result.success is False
+        assert "Invalid agent" in result.output
+        assert "invalid-agent-xyz" in result.output
 
     def test_model_invalid_model(self):
         """'/model pm invalid' shows error for invalid model."""
