@@ -358,7 +358,7 @@ class TaskExecutor:
                             all_success = False
                             errors.append(f"@{task.agent_id}: {result.error}")
                             outputs.append(f"=== @{task.agent_id} ===\n[Failed: {result.error}]")
-                        
+
                         # Notify task complete
                         if self._on_task_complete:
                             self._on_task_complete(task, result)
