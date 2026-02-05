@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -13,6 +14,8 @@ from teambot.tasks.models import Task, TaskStatus
 
 if TYPE_CHECKING:
     from teambot.ui.agent_state import AgentStatusManager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -618,7 +621,9 @@ class TaskExecutor:
                     # Emit intermediate output
                     if self._on_stage_output and result.success:
                         self._on_stage_output(task.agent_id, result.output)
-        except Exception:
+        except Exception as e:
+            # Log the exception to aid debugging
+            logger.error("Pipeline execution failed with exception: %s", e, exc_info=True)
             # Ensure all tasks get completion callbacks even on error
             if self._on_task_complete:
                 for task_id in task_ids:
@@ -626,6 +631,8 @@ class TaskExecutor:
                     result = self._manager.get_result(task_id)
                     if task and result:
                         self._on_task_complete(task, result)
+            # Re-raise to avoid masking critical errors
+            raise
         finally:
             # Signal pipeline completion to clear progress display
             if self._on_pipeline_complete:
