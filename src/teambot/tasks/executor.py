@@ -458,7 +458,11 @@ class TaskExecutor:
 
             for stage_index, stage_task_ids in stage_task_map.items():
                 # Notify stage change
-                stage_agents = [t.agent_id for tid in stage_task_ids if (t := self._manager.get_task(tid)) is not None]
+                stage_agents = [
+                    t.agent_id
+                    for tid in stage_task_ids
+                    if (t := self._manager.get_task(tid)) is not None
+                ]
                 if self._on_stage_change:
                     self._on_stage_change(stage_index + 1, total_stages, stage_agents)
 
@@ -584,7 +588,11 @@ class TaskExecutor:
             # Execute pipeline with per-task events (same pattern as sync pipeline)
             for stage_index, stage_task_ids in stage_task_map.items():
                 # Notify stage change
-                stage_agents = [t.agent_id for tid in stage_task_ids if (t := self._manager.get_task(tid)) is not None]
+                stage_agents = [
+                    t.agent_id
+                    for tid in stage_task_ids
+                    if (t := self._manager.get_task(tid)) is not None
+                ]
                 if self._on_stage_change:
                     self._on_stage_change(stage_index + 1, total_stages, stage_agents)
 
