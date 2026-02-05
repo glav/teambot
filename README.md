@@ -17,6 +17,8 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 - 💬 **Interactive REPL** - Ad-hoc tasks with pipelines and multi-agent mode
 - ⚙️ **Configurable** - Custom stages, models, and workflows
 
+![Screenshot](./docs/guides/teambot-shot1.png)
+
 ## Prerequisites
 
 - Python 3.12+
