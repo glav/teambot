@@ -153,7 +153,8 @@ class TestPersonaColors:
             "project_manager",
             "business_analyst",
             "technical_writer",
-            "builder",
+            "builder_primary",
+            "builder_secondary",
             "reviewer",
         ]
 
@@ -196,10 +197,10 @@ class TestAgentStyling:
         expected = {
             "pm": ("blue", "📋"),
             "ba": ("cyan", "📊"),
-            "writer": ("green", "📝"),
-            "builder-1": ("yellow", "🔨"),
+            "writer": ("magenta", "📝"),
+            "builder-1": ("green", "🔨"),
             "builder-2": ("yellow", "🔨"),
-            "reviewer": ("magenta", "🔍"),
+            "reviewer": ("red", "🔍"),
         }
         for agent_id, (expected_color, expected_icon) in expected.items():
             color, icon = get_agent_style(agent_id)
