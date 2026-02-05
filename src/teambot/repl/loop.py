@@ -16,6 +16,7 @@ from teambot.repl.parser import CommandType, ParseError, parse_command
 from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor
 from teambot.tasks.models import Task, TaskResult
+from teambot.ui.agent_state import AgentStatusManager
 from teambot.visualization.overlay import OverlayRenderer
 
 
@@ -158,6 +159,29 @@ class REPLLoop:
         """
         self._overlay.on_task_started(task)
 
+    def _on_stage_change(self, current: int, total: int, agents: list[str]) -> None:
+        """Callback when pipeline stage changes.
+
+        Args:
+            current: Current stage number (1-indexed).
+            total: Total number of stages.
+            agents: List of agent IDs in the current stage.
+        """
+        self._overlay.on_pipeline_stage_change(current, total, agents)
+
+    def _on_pipeline_complete(self) -> None:
+        """Callback when pipeline completes."""
+        self._overlay.clear_pipeline_progress()
+
+    def _on_stage_output(self, agent_id: str, output: str) -> None:
+        """Callback for intermediate stage output.
+
+        Args:
+            agent_id: Agent that produced the output.
+            output: The output text.
+        """
+        self._overlay.print_with_overlay(f"\n[dim]─── @{agent_id} ───[/dim]\n{output}")
+
     def _handle_raw_input(self, content: str) -> str:
         """Handle raw (non-command) input.
 
@@ -239,10 +263,15 @@ class REPLLoop:
 
         # Initialize task executor (always, even if SDK not connected)
         # This allows /tasks command to work for viewing task history
+        self._agent_status = AgentStatusManager()
         self._executor = TaskExecutor(
             sdk_client=self._sdk_client,
             on_task_complete=self._on_task_complete,
             on_task_started=self._on_task_started,
+            on_stage_change=self._on_stage_change,
+            on_stage_output=self._on_stage_output,
+            on_pipeline_complete=self._on_pipeline_complete,
+            agent_status_manager=self._agent_status,
         )
         self._commands.set_executor(self._executor)
 
@@ -280,9 +309,12 @@ class REPLLoop:
                     try:
                         # Check if this is an advanced agent command
                         if command.type == CommandType.AGENT and (
-                            command.is_pipeline or len(command.agent_ids) > 1 or command.background
+                            command.is_pipeline
+                            or len(command.agent_ids) > 1
+                            or command.background
+                            or command.references  # Has $ref dependencies
                         ):
-                            # Use task executor for parallel/pipeline/background
+                            # Use task executor for parallel/pipeline/background/references
                             result = await self._handle_advanced_command(command)
                             self._console.print(result)
                         else:

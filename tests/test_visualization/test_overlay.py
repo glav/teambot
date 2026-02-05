@@ -480,3 +480,92 @@ class TestPrintWithOverlay:
                         mock_clear.assert_called_once()
                         console.print.assert_called_once_with("Hello")
                         mock_render.assert_called_once()
+
+
+class TestPipelineProgress:
+    """Tests for pipeline progress tracking."""
+
+    def test_set_pipeline_progress(self):
+        """Test setting pipeline progress."""
+        with patch.object(OverlayRenderer, "_check_terminal_support", return_value=True):
+            with patch("shutil.get_terminal_size", return_value=(80, 24)):
+                with patch("sys.stdout.write"):
+                    with patch("sys.stdout.flush"):
+                        renderer = OverlayRenderer()
+
+                        renderer.set_pipeline_progress(1, 3, ["pm", "ba"])
+
+                        assert renderer.state.pipeline_stage == (1, 3)
+                        assert renderer.state.pipeline_stage_agents == ["pm", "ba"]
+
+    def test_clear_pipeline_progress(self):
+        """Test clearing pipeline progress."""
+        with patch.object(OverlayRenderer, "_check_terminal_support", return_value=True):
+            with patch("shutil.get_terminal_size", return_value=(80, 24)):
+                with patch("sys.stdout.write"):
+                    with patch("sys.stdout.flush"):
+                        renderer = OverlayRenderer()
+                        renderer._state.pipeline_stage = (2, 3)
+                        renderer._state.pipeline_stage_agents = ["builder-1"]
+
+                        renderer.clear_pipeline_progress()
+
+                        assert renderer.state.pipeline_stage is None
+                        assert renderer.state.pipeline_stage_agents == []
+
+    def test_on_pipeline_stage_change(self):
+        """Test pipeline stage change handler."""
+        with patch.object(OverlayRenderer, "_check_terminal_support", return_value=True):
+            with patch("shutil.get_terminal_size", return_value=(80, 24)):
+                with patch("sys.stdout.write"):
+                    with patch("sys.stdout.flush"):
+                        renderer = OverlayRenderer()
+
+                        renderer.on_pipeline_stage_change(2, 3, ["builder-1"])
+
+                        assert renderer.state.pipeline_stage == (2, 3)
+                        assert renderer.state.pipeline_stage_agents == ["builder-1"]
+
+    def test_pipeline_stage_clears_old_agents(self):
+        """Test that stage change clears agents from previous stage."""
+        with patch.object(OverlayRenderer, "_check_terminal_support", return_value=True):
+            with patch("shutil.get_terminal_size", return_value=(80, 24)):
+                with patch("sys.stdout.write"):
+                    with patch("sys.stdout.flush"):
+                        renderer = OverlayRenderer()
+                        # Set up as if pm was active from stage 1
+                        renderer._state.active_agents = ["pm"]
+
+                        # Transition to stage 2 with builder-1
+                        renderer.set_pipeline_progress(2, 2, ["builder-1"])
+
+                        # pm should be removed from active_agents
+                        assert "pm" not in renderer.state.active_agents
+
+    def test_pipeline_stage_shown_in_content(self):
+        """Test pipeline stage shown in content instead of Tasks prefix."""
+        with patch.object(OverlayRenderer, "_check_terminal_support", return_value=True):
+            renderer = OverlayRenderer()
+            renderer._state.pipeline_stage = (2, 3)
+            renderer._state.pipeline_stage_agents = ["builder-1"]
+            renderer._state.active_agents = ["builder-1"]
+            renderer._state.running_count = 1
+
+            lines = renderer._build_content()
+
+            assert "Stage 2/3" in lines[1]
+            assert "Tasks:" not in lines[1]
+
+    def test_is_idle_false_during_pipeline(self):
+        """Test is_idle returns False when pipeline is active."""
+        state = OverlayState()
+        state.pipeline_stage = (1, 2)
+
+        assert state.is_idle() is False
+
+    def test_is_idle_true_after_pipeline_cleared(self):
+        """Test is_idle returns True after pipeline cleared."""
+        state = OverlayState()
+        state.pipeline_stage = None
+
+        assert state.is_idle() is True

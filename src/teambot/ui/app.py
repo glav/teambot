@@ -56,6 +56,9 @@ class TeamBotApp(App):
         self._pending_tasks: set[asyncio.Task] = set()
         # Centralized agent status manager
         self._agent_status = AgentStatusManager()
+        # Wire status manager to executor if provided
+        if self._executor:
+            self._executor.set_agent_status_manager(self._agent_status)
         # Legacy: Track which agents have running tasks (kept for backward compat)
         self._running_agents: dict[str, str] = {}
         # Initialize agent models from config

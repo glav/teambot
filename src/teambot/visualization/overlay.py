@@ -55,6 +55,9 @@ class OverlayState:
         completed_count: Number of completed tasks.
         failed_count: Number of failed tasks.
         spinner_frame: Current spinner animation frame.
+        pipeline_stage: Current pipeline stage (current, total) or None.
+        pipeline_stage_agents: Agents in the current pipeline stage.
+        handoff_in_progress: Whether a handoff transition is in progress.
     """
 
     enabled: bool = True
@@ -67,10 +70,19 @@ class OverlayState:
     waiting_count: int = 0
     waiting_for: dict[str, str] = field(default_factory=dict)  # agent -> waiting_for_agent
     spinner_frame: int = 0
+    pipeline_stage: tuple[int, int] | None = None  # (current, total)
+    pipeline_stage_agents: list[str] = field(default_factory=list)
+    previous_stage_agents: list[str] = field(default_factory=list)
+    handoff_in_progress: bool = False
 
     def is_idle(self) -> bool:
         """Check if no tasks are running."""
-        return self.running_count == 0 and self.waiting_count == 0 and len(self.active_agents) == 0
+        return (
+            self.running_count == 0
+            and self.waiting_count == 0
+            and len(self.active_agents) == 0
+            and self.pipeline_stage is None
+        )
 
     def total_tasks(self) -> int:
         """Get total task count."""
@@ -312,6 +324,14 @@ class OverlayRenderer:
             if self._state.waiting_count > 0:
                 waiting = ", ".join(f"@{a}→@{w}" for a, w in self._state.waiting_for.items())
                 lines.append(f"⏳ {waiting}"[: OVERLAY_WIDTH - 4])
+            elif self._state.handoff_in_progress and self._state.previous_stage_agents:
+                # Show handoff transition: previous agent → new agent
+                spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
+                prev_agents = self._state.previous_stage_agents
+                curr_agents = self._state.pipeline_stage_agents
+                prev = "@" + prev_agents[0] if prev_agents else ""
+                curr = "@" + curr_agents[0] if curr_agents else ""
+                lines.append(f"{spinner} {prev} → {curr}"[: OVERLAY_WIDTH - 4])
             else:
                 spinner = SPINNER_FRAMES[self._state.spinner_frame % len(SPINNER_FRAMES)]
                 agents = ", ".join(f"@{a}" for a in self._state.active_agents[:3])
@@ -319,17 +339,25 @@ class OverlayRenderer:
                     agents += f" +{len(self._state.active_agents) - 3}"
                 lines.append(f"{spinner} {agents}"[: OVERLAY_WIDTH - 4])
 
-        # Line 2: Task counts
+        # Line 2: Task counts with optional pipeline stage
         running = self._state.running_count
         pending = self._state.pending_count
         completed = self._state.completed_count
         waiting = self._state.waiting_count
+
+        # Show pipeline stage if active, otherwise show "Tasks:" prefix
+        if self._state.pipeline_stage:
+            current, total = self._state.pipeline_stage
+            prefix = f"Stage {current}/{total} "
+        else:
+            prefix = "Tasks: "
+
         counts = f"{running}⏳ {pending}⏸ {completed}✓"
         if waiting > 0:
             counts += f" {waiting}⏱"
         if self._state.failed_count > 0:
             counts += f" {self._state.failed_count}✗"
-        lines.append(f"Tasks: {counts}"[: OVERLAY_WIDTH - 4])
+        lines.append(f"{prefix}{counts}"[: OVERLAY_WIDTH - 4])
 
         return lines
 
@@ -493,6 +521,10 @@ class OverlayRenderer:
         self._state.running_count += 1
         if self._state.pending_count > 0:
             self._state.pending_count -= 1
+        # Clear handoff indicator when new stage task actually starts
+        if self._state.handoff_in_progress:
+            self._state.handoff_in_progress = False
+            self._state.previous_stage_agents = []
         self.render()
 
     def on_task_completed(self, task, result) -> None:
@@ -521,3 +553,51 @@ class OverlayRenderer:
         """
         self._state.pending_count += 1
         self.render()
+
+    def set_pipeline_progress(self, current: int, total: int, agents: list[str]) -> None:
+        """Set pipeline progress and current stage agents.
+
+        Args:
+            current: Current stage number (1-indexed).
+            total: Total number of stages.
+            agents: List of agent IDs in the current stage.
+        """
+        # Mark handoff if transitioning between stages
+        if self._state.pipeline_stage is not None:
+            old_current, _ = self._state.pipeline_stage
+            if current != old_current:
+                # Store previous stage agents for handoff display
+                self._state.previous_stage_agents = self._state.active_agents.copy()
+                self._state.handoff_in_progress = True
+
+        self._state.pipeline_stage = (current, total)
+        self._state.pipeline_stage_agents = agents.copy()
+
+        # Clear previous stage's agents from active list and add new ones
+        # Remove agents NOT in the new stage
+        self._state.active_agents = [a for a in self._state.active_agents if a in agents]
+
+        self.render()
+
+        # Note: handoff_in_progress is cleared when the new stage task starts
+        # (via on_task_started) or when pipeline completes (via clear_pipeline_progress)
+
+    def clear_pipeline_progress(self) -> None:
+        """Clear pipeline progress tracking."""
+        self._state.pipeline_stage = None
+        self._state.pipeline_stage_agents = []
+        self._state.previous_stage_agents = []
+        self._state.handoff_in_progress = False
+        self.render()
+
+    def on_pipeline_stage_change(self, stage_num: int, total: int, agents: list[str]) -> None:
+        """Handle pipeline stage transition.
+
+        Clears previous stage agents and sets up new stage.
+
+        Args:
+            stage_num: New stage number (1-indexed).
+            total: Total number of stages.
+            agents: List of agent IDs in the new stage.
+        """
+        self.set_pipeline_progress(stage_num, total, agents)
