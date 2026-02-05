@@ -22,7 +22,10 @@ teambot/
 │   ├── visualization/        # Rich console display
 │   └── workflow/             # 13-stage workflow state machine
 ├── tests/                    # Test suite (192 tests, 88% coverage)
-├── docs/feature-specs/       # Feature specifications
+├── docs/
+│   ├── guides/               # User documentation (10 guides)
+│   ├── feature-specs/        # Feature specifications
+│   └── objectives/           # Objective file examples
 ├── .agent-tracking/          # SDD workflow artifacts
 └── teambot.json              # Default configuration
 ```
