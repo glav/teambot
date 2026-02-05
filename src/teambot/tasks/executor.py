@@ -329,7 +329,7 @@ class TaskExecutor:
                 background=True,
             )
         else:
-            # Notify all tasks starting
+            # Notify task started and mark all agents as running before parallel execution
             for task in tasks:
                 if self._on_task_started:
                     self._on_task_started(task)
