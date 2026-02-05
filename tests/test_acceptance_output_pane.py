@@ -4,15 +4,13 @@ These tests validate acceptance scenarios using REAL implementation code.
 Each test corresponds to an acceptance scenario (AT-XXX).
 """
 
-import pytest
-
+from teambot.ui.widgets.output_pane import OutputPane
 from teambot.visualization.console import (
-    AGENT_PERSONAS,
     AGENT_ICONS,
+    AGENT_PERSONAS,
     PERSONA_COLORS,
     get_agent_style,
 )
-from teambot.ui.widgets.output_pane import OutputPane
 
 
 class TestOutputPaneAcceptanceScenarios:
@@ -61,7 +59,6 @@ class TestOutputPaneAcceptanceScenarios:
         written_lines = []
 
         # Capture what gets written by patching write
-        original_write = pane.write
         pane.write = lambda text: written_lines.append(text)
 
         pane.write_task_complete("pm", "Creating project plan...")
@@ -308,7 +305,7 @@ class TestAgentStyleIntegration:
 
     def test_persona_to_color_mapping_is_complete(self):
         """All personas defined in AGENT_PERSONAS have colors."""
-        for agent_id, persona in AGENT_PERSONAS.items():
+        for _agent_id, persona in AGENT_PERSONAS.items():
             assert persona in PERSONA_COLORS, f"Persona {persona} missing from PERSONA_COLORS"
 
     def test_all_agents_have_icons(self):
