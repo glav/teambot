@@ -31,11 +31,12 @@ class TestOutputPane:
             with patch.object(pane, "scroll_end"):
                 pane.write_task_complete("pm", "Plan created")
 
-                mock_write.assert_called_once()
-                call_arg = mock_write.call_args[0][0]
-                assert "✓" in call_arg
-                assert "@pm" in call_arg
-                assert "Plan created" in call_arg
+                # Header and content are now separate writes
+                assert mock_write.call_count == 2
+                all_calls = "".join(c[0][0] for c in mock_write.call_args_list)
+                assert "✓" in all_calls
+                assert "@pm" in all_calls
+                assert "Plan created" in all_calls
 
     def test_write_task_error_format(self):
         """write_task_error has correct format with X."""
@@ -47,11 +48,12 @@ class TestOutputPane:
             with patch.object(pane, "scroll_end"):
                 pane.write_task_error("pm", "Failed to connect")
 
-                mock_write.assert_called_once()
-                call_arg = mock_write.call_args[0][0]
-                assert "✗" in call_arg
-                assert "@pm" in call_arg
-                assert "Failed to connect" in call_arg
+                # Header and content are now separate writes
+                assert mock_write.call_count == 2
+                all_calls = "".join(c[0][0] for c in mock_write.call_args_list)
+                assert "✗" in all_calls
+                assert "@pm" in all_calls
+                assert "Failed to connect" in all_calls
 
     def test_write_info_format(self):
         """write_info has correct format with info icon."""
@@ -128,8 +130,9 @@ class TestOutputPane:
                     method = getattr(pane, method_name)
                     method(*args)
 
-                    call_arg = mock_write.call_args[0][0]
-                    assert re.search(timestamp_pattern, call_arg), (
+                    # Check first call for timestamp (header call)
+                    first_call = mock_write.call_args_list[0][0][0]
+                    assert re.search(timestamp_pattern, first_call), (
                         f"{method_name} should include timestamp"
                     )
 
@@ -188,14 +191,15 @@ class TestOutputPaneStreaming:
             with patch.object(pane, "scroll_end"):
                 pane.write_streaming_start("pm")
                 pane.write_streaming_chunk("pm", "Hello ")
-                pane.write_streaming_chunk("pm", "World!")
+                pane.write_streaming_chunk("pm", "World!\n")
                 pane.finish_streaming("pm")
 
-                # Last call should have the complete content
-                last_call = mock_write.call_args_list[-1][0][0]
-                assert "Hello World!" in last_call
-                assert "✓" in last_call  # Success indicator
-                assert "@pm" in last_call
+                # Content is written via streaming chunks, completion shows status
+                all_calls = "".join(c[0][0] for c in mock_write.call_args_list)
+                assert "Hello" in all_calls
+                assert "World!" in all_calls
+                assert "✓" in all_calls  # Success indicator
+                assert "@pm" in all_calls
 
     def test_finish_streaming_cleans_up_state(self):
         """finish_streaming cleans up streaming state."""
@@ -281,16 +285,241 @@ class TestOutputPaneStreaming:
                 pane.write_streaming_start("pm")
                 pane.write_streaming_start("builder-1")
 
-                pane.write_streaming_chunk("pm", "PM says hi")
-                pane.write_streaming_chunk("builder-1", "Builder says hello")
+                pane.write_streaming_chunk("pm", "PM says hi\n")
+                pane.write_streaming_chunk("builder-1", "Builder says hello\n")
 
                 pane.finish_streaming("pm")
                 pane.finish_streaming("builder-1")
 
                 # Check both agents got their content
-                calls = [c[0][0] for c in mock_write.call_args_list]
-                pm_call = [c for c in calls if "@pm" in c and "PM says hi" in c]
-                builder_call = [c for c in calls if "@builder-1" in c and "Builder says hello" in c]
+                all_calls = "".join(c[0][0] for c in mock_write.call_args_list)
+                assert "PM says hi" in all_calls
+                assert "Builder says hello" in all_calls
+                assert "@pm" in all_calls
+                assert "@builder-1" in all_calls
 
-                assert len(pm_call) >= 1
-                assert len(builder_call) >= 1
+
+class TestOutputPaneWrap:
+    """Tests for word wrap configuration."""
+
+    def test_outputpane_wrap_enabled_by_default(self):
+        """OutputPane has wrap enabled by default."""
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+        # RichLog stores wrap setting internally
+        assert pane.wrap is True
+
+
+class TestHandoffDetection:
+    """Tests for agent handoff separator functionality."""
+
+    def test_check_handoff_returns_false_for_first_message(self):
+        """First message has no previous agent, so no handoff."""
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+        pane._last_agent_id = None
+
+        result = pane._check_handoff("pm")
+
+        assert result is False
+
+    def test_check_handoff_returns_false_for_same_agent(self):
+        """Same agent continuing does not trigger handoff."""
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+        pane._last_agent_id = "pm"
+
+        result = pane._check_handoff("pm")
+
+        assert result is False
+
+    def test_check_handoff_returns_true_for_different_agent(self):
+        """Different agent triggers handoff."""
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+        pane._last_agent_id = "pm"
+
+        result = pane._check_handoff("builder-1")
+
+        assert result is True
+
+    def test_handoff_separator_contains_divider_line(self):
+        """Handoff separator contains horizontal divider."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+
+        with patch.object(pane, "write") as mock_write:
+            pane._write_handoff_separator("pm", "builder-1")
+
+            call_arg = mock_write.call_args[0][0]
+            assert "─" in call_arg
+
+    def test_handoff_separator_shows_new_agent(self):
+        """Handoff separator shows new agent icon and ID."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+
+        with patch.object(pane, "write") as mock_write:
+            pane._write_handoff_separator("pm", "builder-1")
+
+            call_arg = mock_write.call_args[0][0]
+            assert "@builder-1" in call_arg
+            assert "🔨" in call_arg
+
+
+class TestAgentStyledOutput:
+    """Tests for persona-styled output methods."""
+
+    def test_write_task_complete_uses_persona_color(self):
+        """write_task_complete applies persona color to agent ID."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+
+        with patch.object(pane, "write") as mock_write:
+            with patch.object(pane, "scroll_end"):
+                pane.write_task_complete("pm", "Plan created")
+
+                # Header call contains agent ID and icon
+                calls = [c[0][0] for c in mock_write.call_args_list]
+                header_call = [c for c in calls if "@pm" in c][0]
+                assert "[blue]" in header_call
+                assert "📋" in header_call
+                # Content call has colored indent
+                content_call = [c for c in calls if "Plan created" in c][0]
+                assert "[blue]│" in content_call or "[blue]|" in content_call
+
+    def test_write_task_complete_includes_icon(self):
+        """write_task_complete includes agent icon."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+
+        with patch.object(pane, "write") as mock_write:
+            with patch.object(pane, "scroll_end"):
+                pane.write_task_complete("builder-1", "Code complete")
+
+                calls = [c[0][0] for c in mock_write.call_args_list]
+                header_call = [c for c in calls if "@builder-1" in c][0]
+                assert "🔨" in header_call
+
+    def test_write_task_complete_triggers_handoff_separator(self):
+        """write_task_complete shows separator on agent change."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+        pane._last_agent_id = "pm"
+
+        with patch.object(pane, "write") as mock_write:
+            with patch.object(pane, "scroll_end"):
+                pane.write_task_complete("builder-1", "Code complete")
+
+                # Should have 3 write calls: separator + header + content
+                assert mock_write.call_count == 3
+                separator_call = mock_write.call_args_list[0][0][0]
+                assert "─" in separator_call
+
+    def test_write_task_error_uses_persona_color(self):
+        """write_task_error applies persona color to agent ID."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+
+        with patch.object(pane, "write") as mock_write:
+            with patch.object(pane, "scroll_end"):
+                pane.write_task_error("reviewer", "Review failed")
+
+                calls = [c[0][0] for c in mock_write.call_args_list]
+                header_call = [c for c in calls if "@reviewer" in c][0]
+                # Reviewer has red color
+                assert "[red]" in header_call
+                assert "🔍" in header_call
+
+    def test_streaming_start_uses_persona_color(self):
+        """write_streaming_start applies persona color."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+
+        with patch.object(pane, "write") as mock_write:
+            with patch.object(pane, "scroll_end"):
+                pane.write_streaming_start("ba")
+
+                calls = [c[0][0] for c in mock_write.call_args_list]
+                main_call = [c for c in calls if "streaming" in c][0]
+                assert "[cyan]" in main_call
+                assert "📊" in main_call
+
+    def test_finish_streaming_uses_persona_color(self):
+        """finish_streaming applies persona color."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        pane = OutputPane()
+        pane._streaming_buffers["writer"] = ["Documentation complete"]
+        pane._streaming_starts["writer"] = "12:00:00"
+
+        with patch.object(pane, "write") as mock_write:
+            with patch.object(pane, "scroll_end"):
+                pane.finish_streaming("writer", success=True)
+
+                calls = [c[0][0] for c in mock_write.call_args_list]
+                # Look for the completion status line which has the agent styling
+                main_call = [c for c in calls if "@writer" in c][0]
+                assert "[magenta]" in main_call  # Writer color
+                assert "📝" in main_call
+
+    def test_all_six_agents_get_correct_icon_and_color(self):
+        """All 6 MVP agents get their correct icon and color in output."""
+        from unittest.mock import patch
+
+        from teambot.ui.widgets.output_pane import OutputPane
+
+        # Expected styling for each agent
+        expected_styles = {
+            "pm": {"color": "blue", "icon": "📋"},
+            "ba": {"color": "cyan", "icon": "📊"},
+            "writer": {"color": "magenta", "icon": "📝"},
+            "builder-1": {"color": "green", "icon": "🔨"},
+            "builder-2": {"color": "yellow", "icon": "🔨"},
+            "reviewer": {"color": "red", "icon": "🔍"},
+        }
+
+        for agent_id, expected in expected_styles.items():
+            pane = OutputPane()
+
+            with patch.object(pane, "write") as mock_write:
+                with patch.object(pane, "scroll_end"):
+                    pane.write_task_complete(agent_id, f"Task by {agent_id}")
+
+                    calls = [c[0][0] for c in mock_write.call_args_list]
+                    # Header call contains agent ID and icon
+                    header_call = [c for c in calls if f"@{agent_id}" in c][0]
+
+                    assert f"[{expected['color']}]" in header_call, (
+                        f"{agent_id} should have [{expected['color']}], got: {header_call}"
+                    )
+                    assert expected["icon"] in header_call, (
+                        f"{agent_id} should have {expected['icon']}, got: {header_call}"
+                    )

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
 from teambot.config.schema import MODEL_INFO, VALID_MODELS, validate_model
+from teambot.repl.router import VALID_AGENTS
 
 if TYPE_CHECKING:
     from teambot.tasks.executor import TaskExecutor
@@ -249,6 +250,14 @@ def handle_model(args: list[str], session_overrides: dict[str, str]) -> CommandR
 
     agent_id = args[0]
     model = args[1]
+
+    # Validate agent ID exists
+    if agent_id not in VALID_AGENTS:
+        valid_agents = ", ".join(sorted(VALID_AGENTS))
+        return CommandResult(
+            output=f"Invalid agent '{agent_id}'. Valid agents: {valid_agents}",
+            success=False,
+        )
 
     # Handle clear command
     if model.lower() == "clear":

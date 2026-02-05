@@ -14,9 +14,10 @@ class TestOutputInjectorSingleParent:
 
         result = injector.inject("Do something with this", parent_results, ["t1"])
 
-        assert "=== Output from @" in result
+        assert "━━━" in result  # New delimiter style
+        assert "@t1" in result  # Agent mention
         assert "Parent output here" in result
-        assert "=== Your Task ===" in result
+        assert "🎯 Your Task" in result  # New styled task header
         assert "Do something with this" in result
 
     def test_inject_preserves_order(self):
@@ -47,7 +48,7 @@ class TestOutputInjectorMultipleParents:
 
         assert "Output from builder-1" in result
         assert "Output from builder-2" in result
-        assert "=== Your Task ===" in result
+        assert "🎯 Your Task" in result  # New styled task header
         assert "Review all" in result
 
     def test_inject_multiple_parents_order(self):
