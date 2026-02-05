@@ -623,8 +623,7 @@ class TaskExecutor:
                         self._on_stage_output(task.agent_id, result.output)
         except Exception as e:
             # Log the exception to aid debugging
-            logger.error(f"Pipeline execution failed with exception: {e}", exc_info=True)
-            
+            logger.error("Pipeline execution failed with exception: %s", e, exc_info=True)
             # Ensure all tasks get completion callbacks even on error
             if self._on_task_complete:
                 for task_id in task_ids:
@@ -632,7 +631,6 @@ class TaskExecutor:
                     result = self._manager.get_result(task_id)
                     if task and result:
                         self._on_task_complete(task, result)
-            
             # Re-raise to avoid masking critical errors
             raise
         finally:
