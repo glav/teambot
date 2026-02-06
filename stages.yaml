@@ -1,10 +1,114 @@
+# =============================================================================
 # TeamBot Stage Configuration
+# =============================================================================
 #
-# This file defines the 14-stage prescriptive workflow for TeamBot orchestration.
+# This file defines the workflow stages for TeamBot orchestration.
 # Each stage specifies which agents run, what artifacts are produced, and exit criteria.
 #
 # To customize the workflow, copy this file and point to it in teambot.json:
 #   "stages_config": "path/to/custom-stages.yaml"
+#
+# =============================================================================
+# SCHEMA REFERENCE
+# =============================================================================
+#
+# Stage Fields:
+#   name              - Display name for the stage (default: stage key)
+#   description       - What this stage does (default: "")
+#   work_agent        - Agent that executes work (see AGENT SEMANTICS below) (default: null)
+#   review_agent      - Agent that performs review (review stages only) (default: null)
+#   allowed_personas  - Personas allowed at this stage; enforced via is_persona_allowed()
+#                       in state_machine.py (default: [])
+#   artifacts         - Files produced (see ARTIFACT STORAGE below) (default: [])
+#   exit_criteria     - Completion conditions (informational) (default: [])
+#   optional          - Whether stage can be skipped (default: false)
+#   is_review_stage   - Triggers review iteration loop (default: false)
+#   is_acceptance_test_stage - Triggers acceptance test handling (default: false)
+#   requires_acceptance_tests_passed - Blocks if acceptance tests failed (default: false)
+#   parallel_agents   - Agents that can run in parallel (default: null)
+#   prompt_template   - Path to SDD prompt file (relative to repo root) (default: null)
+#   include_objective - Include objective content in agent context (default: true)
+#
+# =============================================================================
+# AGENT FIELD SEMANTICS
+# =============================================================================
+#
+# The meaning of work_agent and review_agent depends on stage type:
+#
+# WORK STAGES (is_review_stage: false):
+#   work_agent   = Agent that executes the stage work
+#   review_agent = Not used (should be null)
+#
+# REVIEW STAGES (is_review_stage: true):
+#   work_agent   = Agent that addresses feedback and makes revisions
+#   review_agent = Agent that reviews work and approves/rejects
+#
+# Review stages iterate up to 4 times:
+#   1. work_agent executes or revises based on feedback
+#   2. review_agent reviews and provides feedback
+#   3. If not approved, work_agent addresses feedback
+#   4. Repeat until approved or max iterations reached
+#
+# Example: In SPEC_REVIEW stage:
+#   work_agent: ba        → Business Analyst revises the spec
+#   review_agent: reviewer → Reviewer approves or requests changes
+#
+# =============================================================================
+# ARTIFACT STORAGE
+# =============================================================================
+#
+# Artifacts listed in the 'artifacts' field are stored at:
+#
+#   {teambot_dir}/{feature_name}/artifacts/{artifact_filename}
+#
+# Where:
+#   teambot_dir  = .teambot (or custom path from teambot.json "teambot_dir")
+#   feature_name = Derived from objective file (## Feature Name or filename)
+#
+# Example:
+#   Objective: objectives/add-user-login.md
+#   Feature name: add-user-login
+#   Artifact: feature_spec.md
+#   Full path: .teambot/add-user-login/artifacts/feature_spec.md
+#
+# =============================================================================
+# REVIEW STAGE MAPPING
+# =============================================================================
+#
+# Two related but distinct concepts control review behavior:
+#
+# 1. is_review_stage (per-stage field):
+#    - Enables the review iteration loop for that stage
+#    - When true, ReviewIterator handles the stage execution
+#
+# 2. work_to_review_mapping (global mapping at end of file):
+#    - Defines which review stage follows each work stage
+#    - Used for navigation and workflow sequencing
+#
+# These are NOT redundant - a stage can be in work_to_review_mapping
+# without being a review stage itself (e.g., ACCEPTANCE_TEST → POST_REVIEW).
+#
+# =============================================================================
+# VALIDATION RULES
+# =============================================================================
+#
+# WORK STAGES (is_review_stage: false):
+#   - Must have work_agent set (non-null)
+#   - review_agent should be null
+#   - allowed_personas must include work_agent's persona
+#
+# REVIEW STAGES (is_review_stage: true):
+#   - Must have both work_agent and review_agent set
+#   - work_agent handles revisions based on feedback
+#   - review_agent performs approval/rejection
+#   - allowed_personas must include review_agent's persona
+#
+# TERMINAL STAGE (COMPLETE):
+#   - work_agent and review_agent should be null
+#   - allowed_personas should be empty
+#   - No artifacts produced
+#
+# =============================================================================
 
 stages:
   SETUP:
@@ -34,7 +138,7 @@ stages:
       - project_manager
       - pm
     artifacts:
-      - problem_statement.md
+      - problem_statement.md  # → .teambot/{feature}/artifacts/problem_statement.md
     exit_criteria:
       - Clear problem definition with measurable goals
     optional: true  # May be skipped for small changes
@@ -52,7 +156,7 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - feature_spec.md
+      - feature_spec.md  # → .teambot/{feature}/artifacts/feature_spec.md
     exit_criteria:
       - Complete specification with all required sections
     optional: false
@@ -69,7 +173,7 @@ stages:
       - project_manager
       - pm
     artifacts:
-      - spec_review.md
+      - spec_review.md  # → .teambot/{feature}/artifacts/spec_review.md
     exit_criteria:
       - Specification approved or revision feedback provided
     optional: false
@@ -88,7 +192,7 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - research.md
+      - research.md  # → .teambot/{feature}/artifacts/research.md
     exit_criteria:
       - Research document with implementation recommendations
     optional: false
@@ -105,7 +209,7 @@ stages:
       - developer
       - reviewer
     artifacts:
-      - test_strategy.md
+      - test_strategy.md  # → .teambot/{feature}/artifacts/test_strategy.md
     exit_criteria:
       - Test strategy document with approach per component
     optional: false
@@ -123,7 +227,7 @@ stages:
       - builder
       - developer
     artifacts:
-      - implementation_plan.md
+      - implementation_plan.md  # → .teambot/{feature}/artifacts/implementation_plan.md
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
@@ -140,7 +244,7 @@ stages:
       - project_manager
       - pm
     artifacts:
-      - plan_review.md
+      - plan_review.md  # → .teambot/{feature}/artifacts/plan_review.md
     exit_criteria:
       - Plan approved or revision feedback provided
     optional: false
@@ -175,7 +279,7 @@ stages:
     allowed_personas:
       - reviewer
     artifacts:
-      - impl_review.md
+      - impl_review.md  # → .teambot/{feature}/artifacts/impl_review.md
     exit_criteria:
       - Implementation approved or revision feedback provided
     optional: false
@@ -196,7 +300,7 @@ stages:
       - developer
       - reviewer
     artifacts:
-      - test_results.md
+      - test_results.md  # → .teambot/{feature}/artifacts/test_results.md
     exit_criteria:
       - All tests passing
       - Coverage targets met
@@ -217,7 +321,7 @@ stages:
       - builder
       - developer
     artifacts:
-      - acceptance_test_results.md
+      - acceptance_test_results.md  # → .teambot/{feature}/artifacts/acceptance_test_results.md
     exit_criteria:
       - All acceptance test scenarios executed
       - All acceptance tests passing
@@ -240,7 +344,7 @@ stages:
       - pm
       - reviewer
     artifacts:
-      - post_review.md
+      - post_review.md  # → .teambot/{feature}/artifacts/post_review.md
     exit_criteria:
       - All success criteria validated
       - Acceptance tests verified as passing
@@ -283,6 +387,9 @@ stage_order:
   - COMPLETE
 
 # Mapping of work stages to their review stages
+# Note: This defines NAVIGATION (which review follows which work stage).
+# The is_review_stage flag on each stage controls EXECUTION BEHAVIOR.
+# See header documentation for full explanation of the distinction.
 work_to_review_mapping:
   SPEC: SPEC_REVIEW
   PLAN: PLAN_REVIEW

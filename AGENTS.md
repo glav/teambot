@@ -137,6 +137,10 @@ IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
 - Copilot CLI handles authentication separately
 - History files in `.teambot/` may contain task details - review before sharing
 
+## Clean commits
+- When commiting or changing code, always ensure properly linted code by running:
+- `uv run ruff format -- .` as part of the process.
+
 ## Troubleshooting
 
 - If Copilot CLI not found: Install from https://githubnext.com/projects/copilot-cli/
