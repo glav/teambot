@@ -22,6 +22,7 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 
 ### Autonomous mode
 ![Screenshot](./docs/guides/teambot-shot2.png)
+![Screenshot](./docs/guides/teambot-shot3.png)
 
 ## Prerequisites
 
