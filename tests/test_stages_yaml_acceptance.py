@@ -7,7 +7,6 @@ the REAL implementation code.
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -154,24 +153,3 @@ class TestStagesYamlAcceptanceScenarios:
         # Verify work_to_review_mapping
         assert stages_config.work_to_review_mapping[WorkflowStage.SPEC] == WorkflowStage.SPEC_REVIEW
         assert stages_config.work_to_review_mapping[WorkflowStage.PLAN] == WorkflowStage.PLAN_REVIEW
-
-        # Run stage config tests to verify backward compatibility
-        result = subprocess.run(
-            [
-                "uv",
-                "run",
-                "pytest",
-                "tests/test_orchestration/test_stage_config.py",
-                "-v",
-                "--tb=short",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        # Check that all tests passed
-        assert result.returncode == 0, (
-            f"Stage config tests failed:\n{result.stdout}\n{result.stderr}"
-        )
-        assert "passed" in result.stdout, f"Expected tests to pass. Output:\n{result.stdout}"
