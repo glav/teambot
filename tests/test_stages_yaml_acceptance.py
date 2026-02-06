@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 from teambot.orchestration.stage_config import load_stages_config
-from teambot.workflow.state_machine import WorkflowStateMachine
 from teambot.workflow.stages import WorkflowStage
+from teambot.workflow.state_machine import WorkflowStateMachine
 
 
 class TestStagesYamlAcceptanceScenarios:
@@ -59,7 +59,8 @@ class TestStagesYamlAcceptanceScenarios:
             "is_persona_allowed" in allowed_personas_line
             or "state_machine" in allowed_personas_line
         ), (
-            f"Should reference is_persona_allowed() or state_machine.py. Found: {allowed_personas_line}"
+            "Should reference is_persona_allowed() or state_machine.py. "
+            f"Found: {allowed_personas_line}"
         )
 
         # Verify the actual method exists in the real implementation

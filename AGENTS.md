@@ -139,7 +139,7 @@ IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
 
 ## Clean commits
 - When commiting or changing code, always ensure properly linted code by running:
-- `uv run ruff format -- .` as part of the process.
+- `uv run ruff format -- .` and `v run ruff check . --fix` as part of the process.
 
 ## Troubleshooting
 
