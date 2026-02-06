@@ -138,7 +138,7 @@ IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
 - History files in `.teambot/` may contain task details - review before sharing
 
 ## Clean commits
-- When commiting or changing code, always ensure properly linted code by running:
+- When committing or changing code, always ensure properly linted code by running:
 - `uv run ruff format -- .` and `uv run ruff check . --fix` as part of the process.
 
 ## Troubleshooting
