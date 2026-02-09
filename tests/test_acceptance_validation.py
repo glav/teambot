@@ -11,19 +11,15 @@ import json
 import re
 from io import StringIO
 
-import pytest
 from rich.console import Console
 from rich.panel import Panel
 
 from teambot.visualization.animation import (
-    AGENT_ORDER,
     LOGO_COLOR_MAP,
     TEAMBOT_LOGO,
-    TEAMBOT_LOGO_ASCII,
     StartupAnimation,
     play_startup_animation,
 )
-from teambot.visualization.console import AGENT_COLORS
 
 
 class TestAcceptanceScenarios:
@@ -403,8 +399,8 @@ class TestAcceptanceScenarios:
         rendered = output.getvalue()
         lines = rendered.strip().split("\n")
 
-        agent_lines = [l for l in lines if "Agent pm started" in l]
-        status_lines = [l for l in lines if "Status: running" in l]
+        agent_lines = [line for line in lines if "Agent pm started" in line]
+        status_lines = [line for line in lines if "Status: running" in line]
 
         assert len(agent_lines) == 1, "Agent message should appear exactly once"
         assert len(status_lines) == 1, "Status message should appear exactly once"
