@@ -605,7 +605,7 @@ class SystemCommands:
         orchestrator: Any = None,
         executor: Optional["TaskExecutor"] = None,
         overlay: Optional["OverlayRenderer"] = None,
-        router=None,
+        router: Optional["AgentRouter"] = None,
     ):
         """Initialize system commands.
 
@@ -646,7 +646,7 @@ class SystemCommands:
         """
         self._overlay = overlay
 
-    def set_router(self, router) -> None:
+    def set_router(self, router: "AgentRouter | None") -> None:
         """Set agent router for agent switching commands.
 
         Args:
