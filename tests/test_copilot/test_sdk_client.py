@@ -833,6 +833,140 @@ class TestCopilotSDKClientSessionRetry:
             # Should only have tried to create session once (no retry)
             assert mock_client.create_session.call_count == 1
 
+    @pytest.mark.asyncio
+    async def test_blocking_mode_retries_on_session_not_found(
+        self, mock_sdk_response, monkeypatch
+    ):
+        """Test that execute() in blocking mode (TEAMBOT_STREAMING=false) retries on session not found."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        # Set environment variable to disable streaming
+        monkeypatch.setenv("TEAMBOT_STREAMING", "false")
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+
+            # First session raises "Session not found" on send_and_wait
+            first_session = MagicMock()
+            first_session.send_and_wait = AsyncMock(
+                side_effect=Exception("JSON-RPC Error -32603: Session not found: teambot-pm")
+            )
+            first_session.destroy = AsyncMock()
+
+            # Second session works
+            from types import SimpleNamespace
+
+            second_session = MagicMock()
+            second_session.send_and_wait = AsyncMock(
+                return_value=SimpleNamespace(data=SimpleNamespace(content="Retry success"))
+            )
+            second_session.destroy = AsyncMock()
+
+            call_count = [0]
+
+            async def create_session(config):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return first_session
+                return second_session
+
+            mock_client.create_session = AsyncMock(side_effect=create_session)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            result = await client.execute("pm", "Create a plan")
+            assert result == "Retry success"
+            assert mock_client.create_session.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_blocking_mode_retry_fails_on_second_attempt(
+        self, mock_sdk_response, monkeypatch
+    ):
+        """Test that execute() in blocking mode raises error when retry also fails."""
+        from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
+
+        # Set environment variable to disable streaming
+        monkeypatch.setenv("TEAMBOT_STREAMING", "false")
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+
+            # First session raises "Session not found"
+            first_session = MagicMock()
+            first_session.send_and_wait = AsyncMock(
+                side_effect=Exception("JSON-RPC Error -32603: Session not found: teambot-pm")
+            )
+            first_session.destroy = AsyncMock()
+
+            # Second session also fails but with a different error
+            second_session = MagicMock()
+            second_session.send_and_wait = AsyncMock(
+                side_effect=Exception("Rate limit exceeded")
+            )
+            second_session.destroy = AsyncMock()
+
+            call_count = [0]
+
+            async def create_session(config):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return first_session
+                return second_session
+
+            mock_client.create_session = AsyncMock(side_effect=create_session)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            with pytest.raises(SDKClientError, match="SDK error: Rate limit exceeded"):
+                await client.execute("pm", "Create a plan")
+            
+            assert mock_client.create_session.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_blocking_mode_does_not_retry_on_other_errors(
+        self, mock_sdk_response, monkeypatch
+    ):
+        """Test that execute() in blocking mode does not retry on non-session-not-found errors."""
+        from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
+
+        # Set environment variable to disable streaming
+        monkeypatch.setenv("TEAMBOT_STREAMING", "false")
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+
+            # Session raises a non-session-not-found error
+            session = MagicMock()
+            session.send_and_wait = AsyncMock(
+                side_effect=Exception("Rate limit exceeded")
+            )
+            session.destroy = AsyncMock()
+
+            mock_client.create_session = AsyncMock(return_value=session)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            with pytest.raises(SDKClientError, match="SDK error: Rate limit exceeded"):
+                await client.execute("pm", "Create a plan")
+            
+            # Should only have tried to create session once (no retry)
+            assert mock_client.create_session.call_count == 1
+
     def test_is_session_not_found_detects_error(self):
         """Test _is_session_not_found detection."""
         from teambot.copilot.sdk_client import CopilotSDKClient
