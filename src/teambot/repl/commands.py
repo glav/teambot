@@ -646,7 +646,7 @@ class SystemCommands:
         """
         self._overlay = overlay
 
-    def set_router(self, router: "AgentRouter | None") -> None:
+    def set_router(self, router: Optional["AgentRouter"]) -> None:
         """Set agent router for agent switching commands.
 
         Args:
