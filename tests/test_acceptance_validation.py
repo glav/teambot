@@ -39,7 +39,7 @@ class TestAcceptanceScenarios:
 
         all_styles: set[str] = set()
         for text_obj, _delay in frames:
-            for span in text_obj._spans:
+            for span in text_obj.spans:
                 if span.style:
                     all_styles.add(str(span.style))
 
@@ -350,7 +350,7 @@ class TestAcceptanceScenarios:
         line = TEAMBOT_LOGO[0]
         result = anim._colorize_logo_line(line, LOGO_COLOR_MAP)
 
-        assert len(result._spans) == 0, "Expected no style spans in no-color mode"
+        assert len(result.spans) == 0, "Expected no style spans in no-color mode"
         assert result.plain == line
 
     def test_at_007_ascii_fallback_for_non_utf8(self):
