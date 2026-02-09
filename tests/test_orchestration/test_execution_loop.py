@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -233,6 +235,146 @@ class TestExecutionLoopStatePersistence:
 
         assert WorkflowStage.SPEC in loop.stage_outputs
         assert "Feature specification" in loop.stage_outputs[WorkflowStage.SPEC]
+
+    def test_resume_from_root_dir_finds_feature_state(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume from root .teambot/ dir discovers feature subdirectory state."""
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            "objective_file": str(objective_file),
+            "current_stage": "IMPLEMENTATION",
+            "elapsed_seconds": 200.0,
+            "max_seconds": 28800,
+            "status": "error",
+            "feature_name": "user-authentication",
+            "stage_outputs": {"SPEC": "Spec content"},
+            "acceptance_tests_passed": True,
+            "acceptance_test_iterations": 2,
+            "acceptance_test_history": [
+                {"iteration": 1, "passed": 0, "failed": 3},
+                {"iteration": 2, "passed": 3, "failed": 0},
+            ],
+        }
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(json.dumps(state))
+
+        # Pass root teambot dir (not feature dir) — this is what the CLI does
+        loop = ExecutionLoop.resume(teambot_dir, {})
+
+        assert loop.current_stage == WorkflowStage.IMPLEMENTATION
+        assert loop.time_manager._prior_elapsed == 200.0
+        assert WorkflowStage.SPEC in loop.stage_outputs
+        # Verify acceptance test fields are restored
+        assert loop.acceptance_tests_passed is True
+        assert loop.acceptance_test_iterations == 2
+        assert len(loop._acceptance_test_history) == 2
+        assert loop._acceptance_test_history[0]["iteration"] == 1
+        assert loop._acceptance_test_history[1]["passed"] == 3
+
+    def test_resume_from_root_dir_picks_latest(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume from root dir picks the most recently modified state file."""
+        # Create two feature directories with state files
+        old_dir = teambot_dir / "old-feature"
+        old_dir.mkdir(parents=True, exist_ok=True)
+        old_state = {
+            "objective_file": str(objective_file),
+            "current_stage": "SPEC",
+            "elapsed_seconds": 10.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+        }
+        old_state_file = old_dir / "orchestration_state.json"
+        old_state_file.write_text(json.dumps(old_state))
+
+        new_dir = teambot_dir / "user-authentication"
+        new_dir.mkdir(parents=True, exist_ok=True)
+        new_state = {
+            "objective_file": str(objective_file),
+            "current_stage": "PLAN",
+            "elapsed_seconds": 50.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+        }
+        new_state_file = new_dir / "orchestration_state.json"
+        new_state_file.write_text(json.dumps(new_state))
+
+        # Explicitly set mtimes to ensure old_state_file is older than new_state_file
+        current_time = time.time()
+        os.utime(old_state_file, (current_time - 100, current_time - 100))
+        os.utime(new_state_file, (current_time, current_time))
+
+        loop = ExecutionLoop.resume(teambot_dir, {})
+        assert loop.current_stage == WorkflowStage.PLAN
+
+    def test_resume_restores_acceptance_test_fields(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume restores acceptance test fields from state."""
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create state with acceptance test data
+        state = {
+            "objective_file": str(objective_file),
+            "current_stage": "POST_REVIEW",
+            "elapsed_seconds": 300.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+            "acceptance_tests_passed": True,
+            "acceptance_test_iterations": 3,
+            "acceptance_test_history": [
+                {"iteration": 1, "passed": 2, "failed": 1, "total": 3, "all_passed": False},
+                {"iteration": 2, "passed": 2, "failed": 1, "total": 3, "all_passed": False},
+                {"iteration": 3, "passed": 3, "failed": 0, "total": 3, "all_passed": True},
+            ],
+        }
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(json.dumps(state))
+
+        loop = ExecutionLoop.resume(feature_dir, {})
+
+        # Assert acceptance test fields are properly restored
+        assert loop.acceptance_tests_passed is True
+        assert loop.acceptance_test_iterations == 3
+        assert len(loop._acceptance_test_history) == 3
+        assert loop._acceptance_test_history[0]["iteration"] == 1
+        assert loop._acceptance_test_history[0]["all_passed"] is False
+        assert loop._acceptance_test_history[2]["iteration"] == 3
+        assert loop._acceptance_test_history[2]["all_passed"] is True
+
+    def test_resume_defaults_acceptance_test_fields_when_missing(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume sets default values for acceptance test fields if not in state."""
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create state without acceptance test fields (old state file format)
+        state = {
+            "objective_file": str(objective_file),
+            "current_stage": "IMPLEMENTATION",
+            "elapsed_seconds": 100.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+        }
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(json.dumps(state))
+
+        loop = ExecutionLoop.resume(feature_dir, {})
+
+        # Assert acceptance test fields have default values
+        assert loop.acceptance_tests_passed is False
+        assert loop.acceptance_test_iterations == 0
+        assert loop._acceptance_test_history == []
 
     @pytest.mark.asyncio
     async def test_save_state_status_cancelled(

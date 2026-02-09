@@ -224,6 +224,23 @@ class CopilotSDKClient:
         self._sessions[session_id] = session
         return session
 
+    def _invalidate_session(self, agent_id: str) -> None:
+        """Remove a cached session so it will be recreated on next use.
+
+        Args:
+            agent_id: The agent identifier.
+        """
+        session_id = f"{self.SESSION_PREFIX}{agent_id}"
+        if session_id in self._sessions:
+            del self._sessions[session_id]
+            logger.info(f"Invalidated stale session for '{agent_id}'")
+
+    @staticmethod
+    def _is_session_not_found(error: Exception) -> bool:
+        """Check if an error indicates a stale/expired server-side session."""
+        msg = str(error).lower()
+        return "session not found" in msg
+
     def _build_prompt_with_persona(self, agent_id: str, user_prompt: str) -> str:
         """Build a prompt that includes the agent's persona context.
 
@@ -276,13 +293,24 @@ User request: {user_prompt}"""
         if os.environ.get("TEAMBOT_STREAMING", "").lower() == "false":
             # Fallback to blocking mode - inject persona here
             full_prompt = self._build_prompt_with_persona(agent_id, prompt)
-            session = await self.get_or_create_session(agent_id)
             try:
+                session = await self.get_or_create_session(agent_id)
                 response = await session.send_and_wait({"prompt": full_prompt, "timeout": timeout})
                 return response.data.content
             except TimeoutError as e:
                 raise SDKClientError(f"Request timed out after {timeout}s") from e
             except Exception as e:
+                if self._is_session_not_found(e):
+                    logger.warning(f"Session expired for '{agent_id}', recreating and retrying")
+                    self._invalidate_session(agent_id)
+                    try:
+                        session = await self.get_or_create_session(agent_id)
+                        response = await session.send_and_wait(
+                            {"prompt": full_prompt, "timeout": timeout}
+                        )
+                        return response.data.content
+                    except Exception as retry_e:
+                        raise SDKClientError(f"SDK error: {retry_e}") from retry_e
                 raise SDKClientError(f"SDK error: {e}") from e
 
         # Use streaming (default) - persona injection happens in execute_streaming
@@ -298,6 +326,8 @@ User request: {user_prompt}"""
 
         Sends prompt and streams response chunks via callback.
         Does not timeout - runs until completion or cancellation.
+        Automatically retries once with a fresh session if the server
+        reports the session as expired/not found.
 
         Args:
             agent_id: The agent identifier.
@@ -313,6 +343,22 @@ User request: {user_prompt}"""
         if not self._started:
             raise SDKClientError("Client not started - call start() first")
 
+        try:
+            return await self._execute_streaming_once(agent_id, prompt, on_chunk)
+        except SDKClientError as e:
+            if self._is_session_not_found(e):
+                logger.warning(f"Session expired for '{agent_id}', recreating and retrying")
+                self._invalidate_session(agent_id)
+                return await self._execute_streaming_once(agent_id, prompt, on_chunk)
+            raise
+
+    async def _execute_streaming_once(
+        self,
+        agent_id: str,
+        prompt: str,
+        on_chunk: Callable[[str], None] | None = None,
+    ) -> str:
+        """Execute a single streaming attempt (no retry)."""
         session = await self.get_or_create_session(agent_id)
 
         # Inject agent persona into the prompt
@@ -378,7 +424,10 @@ User request: {user_prompt}"""
         try:
             # Send prompt with persona context (non-blocking)
             logger.debug(f"Sending prompt to {agent_id}: {prompt[:50]}...")
-            await session.send({"prompt": full_prompt})
+            try:
+                await session.send({"prompt": full_prompt})
+            except Exception as e:
+                raise SDKClientError(f"Send failed: {e}") from e
 
             # Wait for completion with a very long timeout (30 min)
             # This is a safety net - streaming should complete naturally

@@ -54,6 +54,24 @@ class TestCLIParser:
 
         assert args.verbose is True
 
+    def test_parser_accepts_no_animation_flag(self):
+        """Parser recognizes --no-animation flag."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--no-animation", "run", "obj.md"])
+
+        assert args.no_animation is True
+
+    def test_no_animation_flag_defaults_false(self):
+        """--no-animation defaults to False when not provided."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md"])
+
+        assert args.no_animation is False
+
 
 class TestCLIInit:
     """Tests for init command."""

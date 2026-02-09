@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
+from teambot.visualization.animation import play_startup_animation
 from teambot.visualization.console import ConsoleDisplay
 
 if TYPE_CHECKING:
@@ -35,6 +36,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument("--no-animation", action="store_true", help="Disable startup animation")
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -87,7 +89,12 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     display.print_success(f"Created directory: {teambot_dir}")
 
     # Show agents
-    display.print_header("Configured Agents")
+    play_startup_animation(
+        console=display.console,
+        config=None,
+        no_animation_flag=getattr(args, "no_animation", False),
+        version=__version__,
+    )
     default_model = config.get("default_model")
     for agent in config["agents"]:
         model = agent.get("model") or default_model
@@ -116,7 +123,12 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     # Resume mode
     if getattr(args, "resume", False):
-        return _run_orchestration_resume(config, teambot_dir, display)
+        return _run_orchestration_resume(
+            config,
+            teambot_dir,
+            display,
+            no_animation=getattr(args, "no_animation", False),
+        )
 
     # Load objective if provided
     objective = None
@@ -128,7 +140,12 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             return 1
         objective = objective_path.read_text()
 
-    display.print_header("TeamBot Starting")
+    play_startup_animation(
+        console=display.console,
+        config=config,
+        no_animation_flag=getattr(args, "no_animation", False),
+        version=__version__,
+    )
 
     # Setup agents display
     default_model = config.get("default_model")
@@ -296,13 +313,20 @@ async def _run_orchestration_resume_async(
         await sdk_client.stop()
 
 
-def _run_orchestration_resume(config: dict, teambot_dir: Path, display: ConsoleDisplay) -> int:
+def _run_orchestration_resume(
+    config: dict, teambot_dir: Path, display: ConsoleDisplay, no_animation: bool = False
+) -> int:
     """Resume interrupted orchestration."""
     import signal
 
     from teambot.orchestration import ExecutionLoop, ExecutionResult
 
-    display.print_header("TeamBot Resuming")
+    play_startup_animation(
+        console=display.console,
+        config=config,
+        no_animation_flag=no_animation,
+        version=__version__,
+    )
 
     try:
         loop = ExecutionLoop.resume(teambot_dir, config)

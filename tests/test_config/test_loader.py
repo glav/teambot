@@ -462,3 +462,53 @@ class TestGlobalDefaultModel:
         config = loader.load(config_file)
 
         assert config.get("default_model") is None
+
+
+class TestAnimationConfig:
+    """Tests for show_startup_animation config validation."""
+
+    def test_show_startup_animation_default_true(self, tmp_path):
+        """Missing show_startup_animation defaults to True."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["show_startup_animation"] is True
+
+    def test_show_startup_animation_validates_bool(self, tmp_path):
+        """Valid boolean show_startup_animation passes validation."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "show_startup_animation": False,
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["show_startup_animation"] is False
+
+    def test_invalid_show_startup_animation_raises_error(self, tmp_path):
+        """Non-boolean show_startup_animation raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "show_startup_animation": "yes",
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'show_startup_animation' must be a boolean"):
+            loader.load(config_file)
