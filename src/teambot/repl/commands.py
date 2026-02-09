@@ -332,12 +332,12 @@ def handle_use_agent(args: list[str], router) -> CommandResult:
     )
 
 
-def handle_reset_agent(args: list[str], router) -> CommandResult:
+def handle_reset_agent(args: list[str], router: "AgentRouter | None" = None) -> CommandResult:
     """Handle /reset-agent command - reset default agent to config value.
 
     Args:
         args: Command arguments (unused).
-        router: AgentRouter instance for mutation.
+        router: Optional AgentRouter instance for mutation.
 
     Returns:
         CommandResult with confirmation.
