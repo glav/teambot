@@ -899,8 +899,11 @@ class ExecutionLoop:
         """Resume from saved state.
 
         Args:
-            teambot_dir: The feature-specific teambot directory containing
-                        orchestration_state.json (e.g., .teambot/user-auth/)
+            teambot_dir: Either the root teambot directory (.teambot/) or a
+                        feature-specific subdirectory (.teambot/user-auth/).
+                        If the root is given, the most recently modified
+                        orchestration_state.json across subdirectories is used.
+            config: TeamBot configuration dict.
 
         Returns:
             ExecutionLoop ready to continue execution
@@ -909,7 +912,11 @@ class ExecutionLoop:
 
         state_file = teambot_dir / "orchestration_state.json"
 
+        # If not found directly, scan subdirectories for state files
         if not state_file.exists():
+            state_file = cls._find_latest_state_file(teambot_dir)
+
+        if state_file is None or not state_file.exists():
             raise ValueError("No orchestration state to resume")
 
         state = json.loads(state_file.read_text())
@@ -918,7 +925,8 @@ class ExecutionLoop:
 
         # Get the parent teambot dir (feature dir's parent)
         # since __init__ will append the feature name again
-        parent_teambot_dir = teambot_dir.parent
+        feature_dir = state_file.parent
+        parent_teambot_dir = feature_dir.parent
 
         loop = cls(
             objective_path=objective_path,
@@ -934,4 +942,25 @@ class ExecutionLoop:
         for stage_name, output in state.get("stage_outputs", {}).items():
             loop.stage_outputs[WorkflowStage[stage_name]] = output
 
+        # Restore acceptance test state
+        loop.acceptance_tests_passed = state.get("acceptance_tests_passed", False)
+        loop.acceptance_test_iterations = state.get("acceptance_test_iterations", 0)
+        loop._acceptance_test_history = state.get("acceptance_test_history", [])
+
         return loop
+
+    @staticmethod
+    def _find_latest_state_file(teambot_dir: Path) -> Path | None:
+        """Find the most recently modified orchestration_state.json in subdirs.
+
+        Args:
+            teambot_dir: Root teambot directory to scan.
+
+        Returns:
+            Path to the newest state file, or None if none found.
+        """
+        candidates = list(teambot_dir.glob("*/orchestration_state.json"))
+        if not candidates:
+            return None
+        # Return the most recently modified state file
+        return max(candidates, key=lambda p: p.stat().st_mtime)

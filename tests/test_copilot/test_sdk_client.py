@@ -631,3 +631,236 @@ class TestResolveModel:
             config={"default_model": "gpt-4.1", "agents": [{"id": "pm", "model": "gpt-5"}]},
         )
         assert result == "gpt-4.1"
+
+
+class TestCopilotSDKClientSessionRetry:
+    """Tests for automatic session retry on stale/expired sessions."""
+
+    @pytest.mark.asyncio
+    async def test_streaming_retries_on_session_not_found_from_send(
+        self, mock_event_types, mock_event_data
+    ):
+        """Test that execute_streaming retries when session.send raises session not found."""
+        import asyncio
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        sessions = []
+
+        def make_session():
+            session = MagicMock()
+            session._handlers = []
+            session.send = AsyncMock()
+            session.destroy = AsyncMock()
+            session.session_id = f"teambot-pm-{len(sessions)}"
+
+            def on(handler):
+                session._handlers.append(handler)
+                return (
+                    lambda: session._handlers.remove(handler)
+                    if handler in session._handlers
+                    else None
+                )
+
+            session.on = on
+            sessions.append(session)
+            return session
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+
+            # First session raises "Session not found" on send
+            first_session = make_session()
+            first_session.send = AsyncMock(
+                side_effect=Exception("JSON-RPC Error -32603: Session not found: teambot-pm")
+            )
+
+            # Second session works
+            async def successful_send(msg):
+                await asyncio.sleep(0.01)
+                from types import SimpleNamespace
+
+                for h in sessions[-1]._handlers:
+                    h(
+                        SimpleNamespace(
+                            type="ASSISTANT_MESSAGE_DELTA",
+                            data=SimpleNamespace(delta_content="Retry success"),
+                        )
+                    )
+                for h in sessions[-1]._handlers:
+                    h(SimpleNamespace(type="SESSION_IDLE", data=None))
+
+            second_session = make_session()
+            second_session.send = AsyncMock(side_effect=successful_send)
+
+            call_count = [0]
+
+            async def create_session(config):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    return first_session
+                return second_session
+
+            mock_client.create_session = AsyncMock(side_effect=create_session)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            result = await client.execute_streaming("pm", "Create a plan")
+            assert result == "Retry success"
+            assert mock_client.create_session.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_streaming_retries_on_session_not_found_from_event(
+        self, mock_event_types, mock_event_data
+    ):
+        """Test that execute_streaming retries when error event contains session not found."""
+        import asyncio
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        sessions = []
+        attempt = [0]
+
+        def make_session():
+            session = MagicMock()
+            session._handlers = []
+            session.send = AsyncMock()
+            session.destroy = AsyncMock()
+            session.session_id = f"teambot-pm-{len(sessions)}"
+
+            def on(handler):
+                session._handlers.append(handler)
+                return (
+                    lambda: session._handlers.remove(handler)
+                    if handler in session._handlers
+                    else None
+                )
+
+            session.on = on
+            sessions.append(session)
+            return session
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+
+            async def create_session(config):
+                s = make_session()
+                current_attempt = attempt[0]
+                attempt[0] += 1
+
+                async def send_with_events(msg):
+                    await asyncio.sleep(0.01)
+                    from types import SimpleNamespace
+
+                    if current_attempt == 0:
+                        event = SimpleNamespace(
+                            type="SESSION_ERROR",
+                            data=SimpleNamespace(
+                                error_type="SessionError",
+                                message="Session not found: teambot-pm",
+                            ),
+                        )
+                        for h in s._handlers:
+                            h(event)
+                    else:
+                        for h in s._handlers:
+                            h(
+                                SimpleNamespace(
+                                    type="ASSISTANT_MESSAGE_DELTA",
+                                    data=SimpleNamespace(delta_content="Fixed"),
+                                )
+                            )
+                        for h in s._handlers:
+                            h(SimpleNamespace(type="SESSION_IDLE", data=None))
+
+                s.send = AsyncMock(side_effect=send_with_events)
+                return s
+
+            mock_client.create_session = AsyncMock(side_effect=create_session)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            result = await client.execute_streaming("pm", "Do something")
+            assert result == "Fixed"
+
+    @pytest.mark.asyncio
+    async def test_streaming_does_not_retry_on_other_errors(
+        self, mock_event_types, mock_event_data
+    ):
+        """Test that non-session-not-found errors are not retried."""
+        from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+
+            session = MagicMock()
+            session._handlers = []
+            session.send = AsyncMock(side_effect=Exception("Rate limit exceeded"))
+            session.destroy = AsyncMock()
+
+            def on(handler):
+                session._handlers.append(handler)
+                return (
+                    lambda: session._handlers.remove(handler)
+                    if handler in session._handlers
+                    else None
+                )
+
+            session.on = on
+
+            mock_client.create_session = AsyncMock(return_value=session)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            with pytest.raises(SDKClientError, match="Send failed: Rate limit exceeded"):
+                await client.execute_streaming("pm", "Hello")
+
+            # Should only have tried to create session once (no retry)
+            assert mock_client.create_session.call_count == 1
+
+    def test_is_session_not_found_detects_error(self):
+        """Test _is_session_not_found detection."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        assert CopilotSDKClient._is_session_not_found(
+            Exception("JSON-RPC Error -32603: Session not found: teambot-pm")
+        )
+        assert CopilotSDKClient._is_session_not_found(Exception("session not found"))
+        assert not CopilotSDKClient._is_session_not_found(Exception("Rate limit exceeded"))
+        assert not CopilotSDKClient._is_session_not_found(Exception("Timeout error"))
+
+    def test_invalidate_session_removes_from_cache(self):
+        """Test _invalidate_session removes session from cache."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        client = CopilotSDKClient()
+        client._sessions["teambot-pm"] = MagicMock()
+        client._sessions["teambot-builder-1"] = MagicMock()
+
+        client._invalidate_session("pm")
+
+        assert "teambot-pm" not in client._sessions
+        assert "teambot-builder-1" in client._sessions
+
+    def test_invalidate_session_noop_if_not_cached(self):
+        """Test _invalidate_session is safe when session not in cache."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        client = CopilotSDKClient()
+        # Should not raise
+        client._invalidate_session("nonexistent")

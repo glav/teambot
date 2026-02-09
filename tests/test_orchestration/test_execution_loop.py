@@ -234,6 +234,69 @@ class TestExecutionLoopStatePersistence:
         assert WorkflowStage.SPEC in loop.stage_outputs
         assert "Feature specification" in loop.stage_outputs[WorkflowStage.SPEC]
 
+    def test_resume_from_root_dir_finds_feature_state(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume from root .teambot/ dir discovers feature subdirectory state."""
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        state = {
+            "objective_file": str(objective_file),
+            "current_stage": "IMPLEMENTATION",
+            "elapsed_seconds": 200.0,
+            "max_seconds": 28800,
+            "status": "error",
+            "feature_name": "user-authentication",
+            "stage_outputs": {"SPEC": "Spec content"},
+        }
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(json.dumps(state))
+
+        # Pass root teambot dir (not feature dir) — this is what the CLI does
+        loop = ExecutionLoop.resume(teambot_dir, {})
+
+        assert loop.current_stage == WorkflowStage.IMPLEMENTATION
+        assert loop.time_manager._prior_elapsed == 200.0
+        assert WorkflowStage.SPEC in loop.stage_outputs
+
+    def test_resume_from_root_dir_picks_latest(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume from root dir picks the most recently modified state file."""
+        import time
+
+        # Create two feature directories with state files
+        old_dir = teambot_dir / "old-feature"
+        old_dir.mkdir(parents=True, exist_ok=True)
+        old_state = {
+            "objective_file": str(objective_file),
+            "current_stage": "SPEC",
+            "elapsed_seconds": 10.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+        }
+        (old_dir / "orchestration_state.json").write_text(json.dumps(old_state))
+
+        # Small delay to ensure different mtime
+        time.sleep(0.05)
+
+        new_dir = teambot_dir / "user-authentication"
+        new_dir.mkdir(parents=True, exist_ok=True)
+        new_state = {
+            "objective_file": str(objective_file),
+            "current_stage": "PLAN",
+            "elapsed_seconds": 50.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+        }
+        (new_dir / "orchestration_state.json").write_text(json.dumps(new_state))
+
+        loop = ExecutionLoop.resume(teambot_dir, {})
+        assert loop.current_stage == WorkflowStage.PLAN
+
     @pytest.mark.asyncio
     async def test_save_state_status_cancelled(
         self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock

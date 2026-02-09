@@ -146,6 +146,11 @@ class ConfigLoader:
         if "overlay" in config:
             self._validate_overlay(config["overlay"])
 
+        # Validate animation config if present
+        if "show_startup_animation" in config:
+            if not isinstance(config["show_startup_animation"], bool):
+                raise ConfigError("'show_startup_animation' must be a boolean")
+
     def _validate_agent(self, agent: dict[str, Any], seen_ids: set[str]) -> None:
         """Validate a single agent configuration."""
         if "id" not in agent:
@@ -233,3 +238,7 @@ class ConfigLoader:
             overlay["enabled"] = True
         if "position" not in overlay:
             overlay["position"] = "top-right"
+
+        # Apply animation defaults
+        if "show_startup_animation" not in config:
+            config["show_startup_animation"] = True
