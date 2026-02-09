@@ -29,9 +29,7 @@ class TestAcceptanceScenarios:
 
     def test_at_001_convergence_frames_use_all_six_agent_colors(self):
         """Convergence animation uses all 6 agent colors."""
-        console = Console(
-            file=StringIO(), force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=StringIO(), force_terminal=True, color_system="truecolor", width=80)
         anim = StartupAnimation(console=console, version="0.1.0")
 
         frames = anim._generate_convergence_frames()
@@ -56,9 +54,7 @@ class TestAcceptanceScenarios:
 
     def test_at_001_convergence_dots_converge_to_center(self):
         """Agent dots converge from edges to center over frames."""
-        console = Console(
-            file=StringIO(), force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=StringIO(), force_terminal=True, color_system="truecolor", width=80)
         anim = StartupAnimation(console=console, version="0.1.0")
 
         frames = anim._generate_convergence_frames()
@@ -95,9 +91,7 @@ class TestAcceptanceScenarios:
 
     def test_at_001_logo_reveal_produces_colored_wordmark(self):
         """Logo reveal frames progressively show the colored TeamBot wordmark."""
-        console = Console(
-            file=StringIO(), force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=StringIO(), force_terminal=True, color_system="truecolor", width=80)
         anim = StartupAnimation(console=console, version="0.1.0")
 
         frames = anim._generate_logo_frames()
@@ -108,25 +102,19 @@ class TestAcceptanceScenarios:
 
     def test_at_001_animation_duration_within_range(self):
         """Total animation frames yield 3–4 second duration."""
-        console = Console(
-            file=StringIO(), force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=StringIO(), force_terminal=True, color_system="truecolor", width=80)
         anim = StartupAnimation(console=console, version="0.1.0")
 
         convergence = anim._generate_convergence_frames()
         logo = anim._generate_logo_frames()
 
         total_delay = sum(d for _, d in convergence) + sum(d for _, d in logo)
-        assert 2.5 <= total_delay <= 4.0, (
-            f"Animation duration {total_delay}s not in 2.5–4.0s range"
-        )
+        assert 2.5 <= total_delay <= 4.0, f"Animation duration {total_delay}s not in 2.5–4.0s range"
 
     def test_at_001_final_banner_contains_version_string(self):
         """Final banner displays version string after animation."""
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
         anim = StartupAnimation(console=console, version="0.1.0")
 
         banner = anim._final_banner()
@@ -152,9 +140,7 @@ class TestAcceptanceScenarios:
         monkeypatch.setattr("teambot.cli.play_startup_animation", tracking_play)
 
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
         from teambot.visualization.console import ConsoleDisplay
 
         display = ConsoleDisplay()
@@ -210,9 +196,7 @@ class TestAcceptanceScenarios:
     def test_at_003_no_animation_flag_shows_static_banner(self):
         """--no-animation flag shows static banner instead of animation."""
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
 
         play_startup_animation(
             console=console,
@@ -238,9 +222,7 @@ class TestAcceptanceScenarios:
     def test_at_004_config_false_shows_static_banner(self):
         """show_startup_animation=false shows static banner instead of animation."""
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
 
         play_startup_animation(
             console=console,
@@ -273,9 +255,7 @@ class TestAcceptanceScenarios:
     def test_at_005_flag_overrides_config_enabled(self):
         """--no-animation flag overrides config show_startup_animation=true."""
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
 
         # Config says animate, but flag says no → static banner
         play_startup_animation(
@@ -294,10 +274,13 @@ class TestAcceptanceScenarios:
         console = Console(file=StringIO(), force_terminal=True, width=80)
         anim = StartupAnimation(console=console)
 
-        assert anim._is_explicitly_disabled(
-            config={"show_startup_animation": True},
-            no_animation_flag=True,
-        ) is True
+        assert (
+            anim._is_explicitly_disabled(
+                config={"show_startup_animation": True},
+                no_animation_flag=True,
+            )
+            is True
+        )
 
     # -- AT-006: Auto-Disable in Non-TTY Environment --
 
@@ -386,9 +369,7 @@ class TestAcceptanceScenarios:
     def test_at_008_animation_output_is_self_contained(self):
         """Animation produces clean output that doesn't corrupt subsequent prints."""
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
 
         anim = StartupAnimation(console=console, version="0.1.0")
         anim._show_static_banner()
@@ -407,9 +388,7 @@ class TestAcceptanceScenarios:
 
     def test_at_008_final_banner_is_rich_panel(self):
         """Final banner is a Rich Panel (proper renderable)."""
-        console = Console(
-            file=StringIO(), force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=StringIO(), force_terminal=True, color_system="truecolor", width=80)
         anim = StartupAnimation(console=console, version="0.1.0")
 
         banner = anim._final_banner()
@@ -418,9 +397,7 @@ class TestAcceptanceScenarios:
     def test_at_008_disabled_animation_shows_static_banner(self):
         """Disabled animation shows static banner, then subsequent output works."""
         output = StringIO()
-        console = Console(
-            file=output, force_terminal=True, color_system="truecolor", width=80
-        )
+        console = Console(file=output, force_terminal=True, color_system="truecolor", width=80)
 
         play_startup_animation(
             console=console,

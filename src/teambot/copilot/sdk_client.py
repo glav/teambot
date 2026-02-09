@@ -301,9 +301,7 @@ User request: {user_prompt}"""
                 raise SDKClientError(f"Request timed out after {timeout}s") from e
             except Exception as e:
                 if self._is_session_not_found(e):
-                    logger.warning(
-                        f"Session expired for '{agent_id}', recreating and retrying"
-                    )
+                    logger.warning(f"Session expired for '{agent_id}', recreating and retrying")
                     self._invalidate_session(agent_id)
                     try:
                         session = await self.get_or_create_session(agent_id)
@@ -349,9 +347,7 @@ User request: {user_prompt}"""
             return await self._execute_streaming_once(agent_id, prompt, on_chunk)
         except SDKClientError as e:
             if self._is_session_not_found(e):
-                logger.warning(
-                    f"Session expired for '{agent_id}', recreating and retrying"
-                )
+                logger.warning(f"Session expired for '{agent_id}', recreating and retrying")
                 self._invalidate_session(agent_id)
                 return await self._execute_streaming_once(agent_id, prompt, on_chunk)
             raise
