@@ -39,7 +39,7 @@ class TestAcceptanceScenarios:
 
         all_styles: set[str] = set()
         for text_obj, _delay in frames:
-            for span in text_obj._spans:
+            for span in text_obj.spans:
                 if span.style:
                     all_styles.add(str(span.style))
 
