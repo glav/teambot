@@ -285,3 +285,35 @@ class TestAgentStatusManagerModel:
 
         manager.set_model("pm", "gpt-5")
         assert len(notified) == 1
+
+
+class TestAgentStatusManagerDefaultAgent:
+    """Tests for default agent tracking in AgentStatusManager."""
+
+    def test_set_default_agent_stores_value(self):
+        """set_default_agent() stores the value."""
+        manager = AgentStatusManager()
+        manager.set_default_agent("builder-1")
+        assert manager.get_default_agent() == "builder-1"
+
+    def test_set_default_agent_notifies_listeners(self):
+        """set_default_agent() triggers listener notification."""
+        manager = AgentStatusManager()
+        notified = []
+        manager.add_listener(lambda m: notified.append(True))
+        manager.set_default_agent("builder-1")
+        assert len(notified) == 1
+
+    def test_set_same_default_does_not_notify(self):
+        """Setting same default does not trigger notification."""
+        manager = AgentStatusManager()
+        manager.set_default_agent("pm")
+        notified = []
+        manager.add_listener(lambda m: notified.append(True))
+        manager.set_default_agent("pm")  # Same value
+        assert len(notified) == 0
+
+    def test_get_default_agent_initially_none(self):
+        """get_default_agent() returns None initially."""
+        manager = AgentStatusManager()
+        assert manager.get_default_agent() is None

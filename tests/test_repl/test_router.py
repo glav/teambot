@@ -298,3 +298,56 @@ class TestRouterWithDefaultAgent:
         assert len(history) == 1
         assert history[0]["agent_id"] == "pm"
         assert history[0]["content"] == "Create a plan"
+
+
+class TestRouterDefaultAgentMutation:
+    """Tests for runtime default agent switching on AgentRouter."""
+
+    def test_set_default_agent_changes_default(self):
+        """set_default_agent() updates get_default_agent() return value."""
+        router = AgentRouter(default_agent="pm")
+        router.set_default_agent("builder-1")
+        assert router.get_default_agent() == "builder-1"
+
+    def test_set_default_agent_to_none_clears_default(self):
+        """set_default_agent(None) clears the default agent."""
+        router = AgentRouter(default_agent="pm")
+        router.set_default_agent(None)
+        assert router.get_default_agent() is None
+
+    def test_set_default_agent_invalid_raises_router_error(self):
+        """set_default_agent() with invalid ID raises RouterError."""
+        router = AgentRouter(default_agent="pm")
+        with pytest.raises(RouterError, match="Unknown agent 'invalid'"):
+            router.set_default_agent("invalid")
+
+    def test_config_default_preserved_after_set(self):
+        """get_config_default_agent() returns original after set_default_agent()."""
+        router = AgentRouter(default_agent="pm")
+        router.set_default_agent("builder-1")
+        assert router.get_config_default_agent() == "pm"
+
+    async def test_raw_input_routes_to_new_default_after_set(self):
+        """After set_default_agent(), raw input routes to new default."""
+        router = AgentRouter(default_agent="pm")
+        mock_handler = AsyncMock(return_value="OK")
+        router.register_agent_handler(mock_handler)
+        router.register_raw_handler(MagicMock())
+        router.set_default_agent("builder-1")
+        await router.route(Command(type=CommandType.RAW, content="hello"))
+        mock_handler.assert_called_once_with("builder-1", "hello")
+
+    async def test_explicit_agent_unaffected_by_default_change(self):
+        """@agent directives still route to specified agent after set_default_agent()."""
+        router = AgentRouter(default_agent="pm")
+        mock_handler = AsyncMock(return_value="OK")
+        router.register_agent_handler(mock_handler)
+        router.set_default_agent("builder-1")
+        cmd = Command(
+            type=CommandType.AGENT,
+            agent_id="reviewer",
+            agent_ids=["reviewer"],
+            content="check",
+        )
+        await router.route(cmd)
+        mock_handler.assert_called_once_with("reviewer", "check")
