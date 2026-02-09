@@ -11,9 +11,21 @@ import json
 import re
 from io import StringIO
 
+import pytest
 from rich.console import Console
 from rich.panel import Panel
 
+from teambot.repl.commands import (
+    SystemCommands,
+    handle_help,
+    handle_reset_agent,
+    handle_status,
+    handle_use_agent,
+)
+from teambot.repl.parser import CommandType, parse_command
+from teambot.repl.router import VALID_AGENTS, AgentRouter
+from teambot.ui.agent_state import AgentStatusManager
+from teambot.ui.widgets.status_panel import StatusPanel
 from teambot.visualization.animation import (
     LOGO_COLOR_MAP,
     TEAMBOT_LOGO,
@@ -418,20 +430,6 @@ class TestAcceptanceScenarios:
 # ═══════════════════════════════════════════════════════════════════════
 # Default Agent Switching — Acceptance Tests
 # ═══════════════════════════════════════════════════════════════════════
-
-import pytest
-
-from teambot.repl.commands import (
-    SystemCommands,
-    handle_help,
-    handle_reset_agent,
-    handle_status,
-    handle_use_agent,
-)
-from teambot.repl.parser import Command, CommandType, parse_command
-from teambot.repl.router import AgentRouter, VALID_AGENTS
-from teambot.ui.agent_state import AgentStatusManager
-from teambot.ui.widgets.status_panel import StatusPanel
 
 
 class TestDefaultAgentSwitchingAcceptance:

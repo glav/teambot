@@ -5,18 +5,16 @@ each acceptance scenario from the feature specification.
 """
 
 import pytest
-from unittest.mock import AsyncMock
 
 from teambot.repl.commands import (
-    CommandResult,
     SystemCommands,
     handle_help,
     handle_reset_agent,
     handle_status,
     handle_use_agent,
 )
-from teambot.repl.parser import Command, CommandType, parse_command
-from teambot.repl.router import AgentRouter, VALID_AGENTS
+from teambot.repl.parser import CommandType, parse_command
+from teambot.repl.router import VALID_AGENTS, AgentRouter
 from teambot.ui.agent_state import AgentStatusManager
 from teambot.ui.widgets.status_panel import StatusPanel
 
