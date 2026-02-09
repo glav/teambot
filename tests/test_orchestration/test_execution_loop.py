@@ -251,6 +251,12 @@ class TestExecutionLoopStatePersistence:
             "status": "error",
             "feature_name": "user-authentication",
             "stage_outputs": {"SPEC": "Spec content"},
+            "acceptance_tests_passed": True,
+            "acceptance_test_iterations": 2,
+            "acceptance_test_history": [
+                {"iteration": 1, "passed": 0, "failed": 3},
+                {"iteration": 2, "passed": 3, "failed": 0},
+            ],
         }
         state_file = feature_dir / "orchestration_state.json"
         state_file.write_text(json.dumps(state))
@@ -261,6 +267,12 @@ class TestExecutionLoopStatePersistence:
         assert loop.current_stage == WorkflowStage.IMPLEMENTATION
         assert loop.time_manager._prior_elapsed == 200.0
         assert WorkflowStage.SPEC in loop.stage_outputs
+        # Verify acceptance test fields are restored
+        assert loop.acceptance_tests_passed is True
+        assert loop.acceptance_test_iterations == 2
+        assert len(loop._acceptance_test_history) == 2
+        assert loop._acceptance_test_history[0]["iteration"] == 1
+        assert loop._acceptance_test_history[1]["passed"] == 3
 
     def test_resume_from_root_dir_picks_latest(
         self, objective_file: Path, teambot_dir: Path
@@ -300,6 +312,69 @@ class TestExecutionLoopStatePersistence:
 
         loop = ExecutionLoop.resume(teambot_dir, {})
         assert loop.current_stage == WorkflowStage.PLAN
+
+    def test_resume_restores_acceptance_test_fields(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume restores acceptance test fields from state."""
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create state with acceptance test data
+        state = {
+            "objective_file": str(objective_file),
+            "current_stage": "POST_REVIEW",
+            "elapsed_seconds": 300.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+            "acceptance_tests_passed": True,
+            "acceptance_test_iterations": 3,
+            "acceptance_test_history": [
+                {"iteration": 1, "passed": 2, "failed": 1, "total": 3, "all_passed": False},
+                {"iteration": 2, "passed": 2, "failed": 1, "total": 3, "all_passed": False},
+                {"iteration": 3, "passed": 3, "failed": 0, "total": 3, "all_passed": True},
+            ],
+        }
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(json.dumps(state))
+
+        loop = ExecutionLoop.resume(feature_dir, {})
+
+        # Assert acceptance test fields are properly restored
+        assert loop.acceptance_tests_passed is True
+        assert loop.acceptance_test_iterations == 3
+        assert len(loop._acceptance_test_history) == 3
+        assert loop._acceptance_test_history[0]["iteration"] == 1
+        assert loop._acceptance_test_history[0]["all_passed"] is False
+        assert loop._acceptance_test_history[2]["iteration"] == 3
+        assert loop._acceptance_test_history[2]["all_passed"] is True
+
+    def test_resume_defaults_acceptance_test_fields_when_missing(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Resume sets default values for acceptance test fields if not in state."""
+        feature_dir = teambot_dir / "user-authentication"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create state without acceptance test fields (old state file format)
+        state = {
+            "objective_file": str(objective_file),
+            "current_stage": "IMPLEMENTATION",
+            "elapsed_seconds": 100.0,
+            "max_seconds": 28800,
+            "status": "paused",
+            "stage_outputs": {},
+        }
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(json.dumps(state))
+
+        loop = ExecutionLoop.resume(feature_dir, {})
+
+        # Assert acceptance test fields have default values
+        assert loop.acceptance_tests_passed is False
+        assert loop.acceptance_test_iterations == 0
+        assert loop._acceptance_test_history == []
 
     @pytest.mark.asyncio
     async def test_save_state_status_cancelled(
