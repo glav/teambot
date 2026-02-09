@@ -264,6 +264,7 @@ class TestExecutionLoopStatePersistence:
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
         """Resume from root dir picks the most recently modified state file."""
+        import os
         import time
 
         # Create two feature directories with state files
@@ -277,10 +278,8 @@ class TestExecutionLoopStatePersistence:
             "status": "paused",
             "stage_outputs": {},
         }
-        (old_dir / "orchestration_state.json").write_text(json.dumps(old_state))
-
-        # Small delay to ensure different mtime
-        time.sleep(0.05)
+        old_state_file = old_dir / "orchestration_state.json"
+        old_state_file.write_text(json.dumps(old_state))
 
         new_dir = teambot_dir / "user-authentication"
         new_dir.mkdir(parents=True, exist_ok=True)
@@ -292,7 +291,13 @@ class TestExecutionLoopStatePersistence:
             "status": "paused",
             "stage_outputs": {},
         }
-        (new_dir / "orchestration_state.json").write_text(json.dumps(new_state))
+        new_state_file = new_dir / "orchestration_state.json"
+        new_state_file.write_text(json.dumps(new_state))
+
+        # Explicitly set mtimes to ensure old_state_file is older than new_state_file
+        current_time = time.time()
+        os.utime(old_state_file, (current_time - 100, current_time - 100))
+        os.utime(new_state_file, (current_time, current_time))
 
         loop = ExecutionLoop.resume(teambot_dir, {})
         assert loop.current_stage == WorkflowStage.PLAN
