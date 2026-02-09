@@ -605,7 +605,7 @@ class SystemCommands:
         orchestrator: Any = None,
         executor: Optional["TaskExecutor"] = None,
         overlay: Optional["OverlayRenderer"] = None,
-        router=None,
+        router: "AgentRouter | None" = None,
     ):
         """Initialize system commands.
 
