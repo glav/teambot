@@ -247,3 +247,59 @@ class TestStatusPanelGitBranch:
         lines = content.split("\n")
         assert lines[0] != ""
         assert "(" not in lines[0]  # No branch parentheses
+
+
+class TestStatusPanelDefaultIndicator:
+    """Tests for default agent indicator in status panel."""
+
+    def test_default_agent_shows_indicator(self):
+        """Default agent shows ★ indicator."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        manager.set_default_agent("pm")
+        panel = StatusPanel(manager)
+
+        content = panel._format_status()
+        # pm line should have star indicator
+        assert "★" in content
+
+    def test_default_agent_shows_default_label(self):
+        """Idle default agent shows 'default' label instead of 'idle'."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        manager.set_default_agent("pm")
+        panel = StatusPanel(manager)
+
+        content = panel._format_status()
+        assert "default" in content
+
+    def test_non_default_agent_shows_idle(self):
+        """Non-default idle agents show 'idle' label."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        manager.set_default_agent("pm")
+        panel = StatusPanel(manager)
+
+        content = panel._format_status()
+        # Other agents should still show idle
+        assert "[dim]idle[/dim]" in content
+
+    def test_indicator_moves_when_default_changes(self):
+        """Indicator moves to new default agent."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        manager.set_default_agent("pm")
+        panel = StatusPanel(manager)
+
+        # Change default to builder-1
+        manager.set_default_agent("builder-1")
+        content = panel._format_status()
+
+        # Find line with builder-1 — should have star
+        lines = content.split("\n")
+        builder_line = [line for line in lines if "builder-1" in line][0]
+        assert "★" in builder_line

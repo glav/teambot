@@ -1,0 +1,96 @@
+{
+  "specFile": ".teambot/default-agent-switching/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-09T03:29:00Z",
+  "currentPhase": "specification-complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "success-metrics",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries",
+    "existing-patterns",
+    "key-constraints"
+  ],
+  "answeredQuestions": {
+    "product-name": "Runtime Default Agent Switching for TeamBot",
+    "target-users": "REPL users, split-pane UI users, power users running long sessions",
+    "core-problem": "Users must prefix every non-default agent message with @agent, creating repetitive friction",
+    "success-metrics": "11 success criteria defined covering commands, UI, errors, compatibility, and tests",
+    "technical-stack": "Python, pytest with pytest-mock",
+    "testing-approach": "Follow existing pytest + pytest-mock patterns",
+    "scope-boundaries": "Session-scoped only; no config mutation; no new agents; no alias support",
+    "existing-patterns": "AgentRouter.default_agent, SystemCommands dispatch, StatusPanel listener, ConfigLoader validation",
+    "key-constraints": "Must work in both REPL and split-pane UI; must not break @agent directives"
+  },
+  "referencesProcessed": [
+    {
+      "file": "src/teambot/repl/router.py",
+      "status": "analyzed",
+      "keyFindings": "AgentRouter has default_agent param, get_default_agent(), _route_raw() converts raw to agent command",
+      "integratedSections": ["functional-requirements", "technical-notes"]
+    },
+    {
+      "file": "src/teambot/repl/commands.py",
+      "status": "analyzed",
+      "keyFindings": "SystemCommands dispatch dict pattern, 10 existing commands, handle_help and handle_status handlers",
+      "integratedSections": ["functional-requirements", "technical-notes"]
+    },
+    {
+      "file": "src/teambot/repl/parser.py",
+      "status": "analyzed",
+      "keyFindings": "parse_command returns Command with type SYSTEM for /commands, RAW for plain text",
+      "integratedSections": ["data-analytics"]
+    },
+    {
+      "file": "src/teambot/config/loader.py",
+      "status": "analyzed",
+      "keyFindings": "_validate_default_agent checks against seen_ids set",
+      "integratedSections": ["technical-notes"]
+    },
+    {
+      "file": "src/teambot/ui/app.py",
+      "status": "analyzed",
+      "keyFindings": "TeamBotApp._get_status() formats agent status, routes /status specially",
+      "integratedSections": ["functional-requirements", "ux-ui"]
+    },
+    {
+      "file": "src/teambot/ui/widgets/status_panel.py",
+      "status": "analyzed",
+      "keyFindings": "StatusPanel uses AgentStatusManager listener pattern for reactive updates",
+      "integratedSections": ["functional-requirements", "technical-notes"]
+    },
+    {
+      "file": "src/teambot/ui/agent_state.py",
+      "status": "analyzed",
+      "keyFindings": "AgentStatusManager tracks state with listeners, default agents list: pm, ba, writer, builder-1, builder-2, reviewer",
+      "integratedSections": ["assumptions"]
+    },
+    {
+      "file": ".teambot/default-agent-switching/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Problem statement from Business Problem stage with goals, success criteria, assumptions, risks",
+      "integratedSections": ["problem-definition", "goals", "risks"]
+    }
+  ],
+  "nextActions": [
+    "Proceed to specification review (sdd.2-review-spec)",
+    "Implementation by builder agents"
+  ],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "personas-defined",
+    "functional-requirements-complete",
+    "non-functional-requirements-complete",
+    "acceptance-tests-defined",
+    "risks-documented",
+    "help-documentation-specified",
+    "no-unresolved-questions"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}

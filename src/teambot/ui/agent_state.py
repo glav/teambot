@@ -87,6 +87,7 @@ class AgentStatusManager:
 
     _statuses: dict[str, AgentStatus] = field(default_factory=dict)
     _listeners: list[Callable[["AgentStatusManager"], None]] = field(default_factory=list)
+    _default_agent: str | None = field(default=None)
 
     def __post_init__(self):
         """Initialize default agent statuses."""
@@ -207,6 +208,24 @@ class AgentStatusManager:
         if old_status.model != model:
             self._statuses[agent_id] = old_status.with_model(model)
             self._notify()
+
+    def set_default_agent(self, agent_id: str | None) -> None:
+        """Set the default agent and notify listeners.
+
+        Args:
+            agent_id: Agent ID to mark as default, or None to clear.
+        """
+        if self._default_agent != agent_id:
+            self._default_agent = agent_id
+            self._notify()
+
+    def get_default_agent(self) -> str | None:
+        """Get the current default agent.
+
+        Returns:
+            Default agent ID or None.
+        """
+        return self._default_agent
 
     def _notify(self) -> None:
         """Notify all listeners of state change."""

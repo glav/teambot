@@ -234,3 +234,9 @@ class TestREPLIntegration:
         assert repl._commands._executor is repl._executor, (
             "Commands should have same executor instance"
         )
+
+    def test_system_commands_has_router(self):
+        """SystemCommands receives router reference in REPL mode."""
+        repl = REPLLoop(config={"default_agent": "pm"})
+        assert repl._commands._router is not None
+        assert repl._commands._router.get_default_agent() == "pm"

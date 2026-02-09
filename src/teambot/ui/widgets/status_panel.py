@@ -116,9 +116,15 @@ class StatusPanel(Static):
 
         # Agent status list
         lines.append("[bold]Agents[/bold]")
+        default_agent = self._status_manager.get_default_agent()
         for agent_id, status in self._status_manager.get_all().items():
             indicator = self._get_indicator(status.state)
             line = f"{indicator} {agent_id}"
+
+            # Add default agent indicator
+            is_default = agent_id == default_agent
+            if is_default:
+                line += " [bold cyan]★[/bold cyan]"
 
             # Add model indicator if set - with nice abbreviated display
             if status.model:
@@ -135,7 +141,10 @@ class StatusPanel(Static):
                         task_display = task_display[:27] + "..."
                     lines.append(f"  [dim]→ {task_display}[/dim]")
             elif status.state == AgentState.IDLE:
-                lines.append(f"{line} [dim]idle[/dim]")
+                if is_default:
+                    lines.append(f"{line} [bold cyan]default[/bold cyan]")
+                else:
+                    lines.append(f"{line} [dim]idle[/dim]")
             else:
                 lines.append(line)
 

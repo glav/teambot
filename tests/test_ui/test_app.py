@@ -141,3 +141,25 @@ class TestStatusPanelIntegration:
 
             for agent in ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]:
                 assert agent in content
+
+
+class TestAppRouterWiring:
+    """Tests for router wiring in TeamBotApp."""
+
+    def test_system_commands_has_router_in_ui(self):
+        """SystemCommands receives router reference in UI mode."""
+        from teambot.repl.router import AgentRouter
+        from teambot.ui.app import TeamBotApp
+
+        router = AgentRouter(default_agent="pm")
+        app = TeamBotApp(router=router)
+        assert app._commands._router is router
+
+    def test_agent_status_initialized_with_default(self):
+        """AgentStatusManager initialized with router's default agent."""
+        from teambot.repl.router import AgentRouter
+        from teambot.ui.app import TeamBotApp
+
+        router = AgentRouter(default_agent="pm")
+        app = TeamBotApp(router=router)
+        assert app._agent_status.get_default_agent() == "pm"

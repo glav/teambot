@@ -52,10 +52,13 @@ class TeamBotApp(App):
         self._router = router
         self._sdk_client = sdk_client
         self._config = config
-        self._commands = SystemCommands(executor=executor)
+        self._commands = SystemCommands(executor=executor, router=router)
         self._pending_tasks: set[asyncio.Task] = set()
         # Centralized agent status manager
         self._agent_status = AgentStatusManager()
+        # Initialize default agent from router
+        if self._router:
+            self._agent_status.set_default_agent(self._router.get_default_agent())
         # Wire status manager to executor if provided
         if self._executor:
             self._executor.set_agent_status_manager(self._agent_status)
@@ -311,6 +314,11 @@ class TeamBotApp(App):
         if command.command == "model" and result.success:
             self._update_model_display(command.args or [])
 
+        # Update status panel if /use-agent or /reset-agent command succeeded
+        if command.command in ("use-agent", "reset-agent") and result.success:
+            new_default = self._router.get_default_agent() if self._router else None
+            self._agent_status.set_default_agent(new_default)
+
         if result.should_exit:
             self.exit()
 
@@ -412,6 +420,19 @@ class TeamBotApp(App):
             Formatted status string.
         """
         lines = ["Agent Status:", ""]
+
+        # Show default agent info
+        if self._router:
+            current_default = self._router.get_default_agent()
+            config_default = self._router.get_config_default_agent()
+            if current_default != config_default:
+                lines.append(
+                    f"  Default Agent: {current_default} "
+                    f"(session override; config: {config_default or 'none'})"
+                )
+            else:
+                lines.append(f"  Default Agent: {current_default or 'none'}")
+            lines.append("")
 
         for agent_id, status in self._agent_status.get_all().items():
             if status.state == AgentState.STREAMING:

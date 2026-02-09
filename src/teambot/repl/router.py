@@ -50,6 +50,7 @@ class AgentRouter:
         self._history: list[dict[str, Any]] = []
         self._history_limit = history_limit
         self._default_agent = default_agent
+        self._config_default_agent = default_agent
 
     def is_valid_agent(self, agent_id: str) -> bool:
         """Check if agent ID is valid.
@@ -89,6 +90,29 @@ class AgentRouter:
             Default agent ID or None if not configured.
         """
         return self._default_agent
+
+    def set_default_agent(self, agent_id: str | None) -> None:
+        """Set the default agent for routing raw input at runtime.
+
+        Args:
+            agent_id: Agent ID to set as default, or None to clear.
+
+        Raises:
+            RouterError: If agent_id is not a valid agent.
+        """
+        if agent_id is not None and not self.is_valid_agent(agent_id):
+            raise RouterError(
+                f"Unknown agent '{agent_id}'. Available agents: {', '.join(sorted(VALID_AGENTS))}"
+            )
+        self._default_agent = agent_id
+
+    def get_config_default_agent(self) -> str | None:
+        """Get the original configuration default agent.
+
+        Returns:
+            The default agent ID from configuration, or None.
+        """
+        return self._config_default_agent
 
     def register_agent_handler(self, handler: Callable[[str, str], Awaitable[str]]) -> None:
         """Register handler for agent commands.

@@ -10,6 +10,7 @@ from teambot.config.schema import MODEL_INFO, VALID_MODELS, validate_model
 from teambot.repl.router import VALID_AGENTS
 
 if TYPE_CHECKING:
+    from teambot.repl.router import AgentRouter
     from teambot.tasks.executor import TaskExecutor
     from teambot.visualization.overlay import OverlayRenderer
 
@@ -94,6 +95,8 @@ Available commands:
   /task <id>     - View task details
   /cancel <id>   - Cancel pending task
   /overlay       - Show/toggle status overlay
+  /use-agent <id> - Set default agent for plain text input
+  /reset-agent   - Reset default agent to config value
   /history       - Show command history
   /quit          - Exit interactive mode
 
@@ -112,11 +115,12 @@ Examples:
     )
 
 
-def handle_status(args: list[str]) -> CommandResult:
+def handle_status(args: list[str], router: "AgentRouter | None" = None) -> CommandResult:
     """Handle /status command.
 
     Args:
         args: Command arguments (unused).
+        router: Optional AgentRouter for default agent info.
 
     Returns:
         CommandResult with status.
@@ -124,6 +128,19 @@ def handle_status(args: list[str]) -> CommandResult:
     # Basic status without orchestrator
     agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
     lines = ["Agent Status:", ""]
+
+    if router:
+        current_default = router.get_default_agent()
+        config_default = router.get_config_default_agent()
+        if current_default != config_default:
+            lines.append(
+                f"  Default Agent: {current_default} "
+                f"(session override; config: {config_default or 'none'})"
+            )
+        else:
+            lines.append(f"  Default Agent: {current_default or 'none'}")
+        lines.append("")
+
     lines.append(f"  {'Agent':<12} {'Status':<10} {'Model':<20}")
     lines.append(f"  {'-' * 12} {'-' * 10} {'-' * 20}")
     for agent in agents:
@@ -275,6 +292,71 @@ def handle_model(args: list[str], session_overrides: dict[str, str]) -> CommandR
 
     session_overrides[agent_id] = model
     return CommandResult(output=f"Set model for {agent_id} to {model} for this session.")
+
+
+def handle_use_agent(args: list[str], router) -> CommandResult:
+    """Handle /use-agent command - view or set default agent.
+
+    Args:
+        args: [agent_id] or [] to view current default.
+        router: AgentRouter instance for mutation.
+
+    Returns:
+        CommandResult with agent info or confirmation.
+    """
+    if router is None:
+        return CommandResult(output="Router not available.", success=False)
+
+    if not args:
+        current = router.get_default_agent() or "none"
+        agents = ", ".join(sorted(router.get_all_agents()))
+        return CommandResult(output=f"Current default agent: {current}\nAvailable agents: {agents}")
+
+    raw_id = args[0]
+    if not router.is_valid_agent(raw_id):
+        agents = ", ".join(sorted(router.get_all_agents()))
+        return CommandResult(
+            output=f"Unknown agent '{raw_id}'. Available agents: {agents}",
+            success=False,
+        )
+
+    agent_id = router.resolve_agent_id(raw_id)
+    current = router.get_default_agent()
+    if current == agent_id:
+        return CommandResult(output=f"Default agent is already set to {agent_id}.")
+
+    router.set_default_agent(agent_id)
+    return CommandResult(
+        output=f"Default agent set to {agent_id}. "
+        f"Plain text input will now be routed to @{agent_id}."
+    )
+
+
+def handle_reset_agent(args: list[str], router) -> CommandResult:
+    """Handle /reset-agent command - reset default agent to config value.
+
+    Args:
+        args: Command arguments (unused).
+        router: AgentRouter instance for mutation.
+
+    Returns:
+        CommandResult with confirmation.
+    """
+    if router is None:
+        return CommandResult(output="Router not available.", success=False)
+
+    config_default = router.get_config_default_agent()
+    current = router.get_default_agent()
+
+    if current == config_default:
+        label = config_default or "none"
+        return CommandResult(
+            output=f"Default agent is already set to {label} (from configuration)."
+        )
+
+    router.set_default_agent(config_default)
+    label = config_default or "none"
+    return CommandResult(output=f"Default agent reset to {label} (from configuration).")
 
 
 def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> CommandResult:
@@ -523,6 +605,7 @@ class SystemCommands:
         orchestrator: Any = None,
         executor: Optional["TaskExecutor"] = None,
         overlay: Optional["OverlayRenderer"] = None,
+        router=None,
     ):
         """Initialize system commands.
 
@@ -530,10 +613,12 @@ class SystemCommands:
             orchestrator: Optional orchestrator for status info.
             executor: Optional task executor for task commands.
             overlay: Optional overlay renderer for overlay commands.
+            router: Optional agent router for default agent commands.
         """
         self._orchestrator = orchestrator
         self._executor: TaskExecutor | None = executor
         self._overlay: OverlayRenderer | None = overlay
+        self._router = router
         self._history: list[dict[str, Any]] = []
         self._session_model_overrides: dict[str, str] = {}
 
@@ -561,6 +646,14 @@ class SystemCommands:
         """
         self._overlay = overlay
 
+    def set_router(self, router) -> None:
+        """Set agent router for agent switching commands.
+
+        Args:
+            router: Agent router for default agent management.
+        """
+        self._router = router
+
     def dispatch(self, command: str, args: list[str]) -> CommandResult:
         """Dispatch a system command.
 
@@ -583,6 +676,8 @@ class SystemCommands:
             "overlay": self.overlay,
             "models": self.models,
             "model": self.model,
+            "use-agent": self.use_agent,
+            "reset-agent": self.reset_agent,
         }
 
         handler = handlers.get(command)
@@ -611,7 +706,7 @@ class SystemCommands:
             except Exception:
                 pass
 
-        return handle_status(args)
+        return handle_status(args, self._router)
 
     def history(self, args: list[str]) -> CommandResult:
         """Handle /history command."""
@@ -644,3 +739,11 @@ class SystemCommands:
     def model(self, args: list[str]) -> CommandResult:
         """Handle /model command."""
         return handle_model(args, self._session_model_overrides)
+
+    def use_agent(self, args: list[str]) -> CommandResult:
+        """Handle /use-agent command."""
+        return handle_use_agent(args, self._router)
+
+    def reset_agent(self, args: list[str]) -> CommandResult:
+        """Handle /reset-agent command."""
+        return handle_reset_agent(args, self._router)
