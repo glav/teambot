@@ -834,10 +834,8 @@ class TestCopilotSDKClientSessionRetry:
             assert mock_client.create_session.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_blocking_mode_retries_on_session_not_found(
-        self, mock_sdk_response, monkeypatch
-    ):
-        """Test that execute() in blocking mode (TEAMBOT_STREAMING=false) retries on session not found."""
+    async def test_blocking_mode_retries_on_session_not_found(self, mock_sdk_response, monkeypatch):
+        """Test execute() in blocking mode retries on session not found."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
         # Set environment variable to disable streaming
@@ -908,9 +906,7 @@ class TestCopilotSDKClientSessionRetry:
 
             # Second session also fails but with a different error
             second_session = MagicMock()
-            second_session.send_and_wait = AsyncMock(
-                side_effect=Exception("Rate limit exceeded")
-            )
+            second_session.send_and_wait = AsyncMock(side_effect=Exception("Rate limit exceeded"))
             second_session.destroy = AsyncMock()
 
             call_count = [0]
@@ -929,7 +925,7 @@ class TestCopilotSDKClientSessionRetry:
 
             with pytest.raises(SDKClientError, match="SDK error: Rate limit exceeded"):
                 await client.execute("pm", "Create a plan")
-            
+
             assert mock_client.create_session.call_count == 2
 
     @pytest.mark.asyncio
@@ -950,9 +946,7 @@ class TestCopilotSDKClientSessionRetry:
 
             # Session raises a non-session-not-found error
             session = MagicMock()
-            session.send_and_wait = AsyncMock(
-                side_effect=Exception("Rate limit exceeded")
-            )
+            session.send_and_wait = AsyncMock(side_effect=Exception("Rate limit exceeded"))
             session.destroy = AsyncMock()
 
             mock_client.create_session = AsyncMock(return_value=session)
@@ -963,7 +957,7 @@ class TestCopilotSDKClientSessionRetry:
 
             with pytest.raises(SDKClientError, match="SDK error: Rate limit exceeded"):
                 await client.execute("pm", "Create a plan")
-            
+
             # Should only have tried to create session once (no retry)
             assert mock_client.create_session.call_count == 1
 
