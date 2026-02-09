@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -264,9 +266,6 @@ class TestExecutionLoopStatePersistence:
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
         """Resume from root dir picks the most recently modified state file."""
-        import os
-        import time
-
         # Create two feature directories with state files
         old_dir = teambot_dir / "old-feature"
         old_dir.mkdir(parents=True, exist_ok=True)
