@@ -719,7 +719,8 @@ class TestUnknownAgentValidationAcceptance:
         manager.set_running("unknown-agent", "do something")
         assert manager.get("unknown-agent") is None
 
-    def test_at_001_no_task_dispatched(self):
+    @pytest.mark.asyncio
+    async def test_at_001_no_task_dispatched(self):
         """Router handler must never be called for unknown agent."""
         router = AgentRouter()
         mock_handler = AsyncMock(return_value="ok")
@@ -727,9 +728,7 @@ class TestUnknownAgentValidationAcceptance:
 
         command = parse_command("@unknown-agent do something")
         with pytest.raises(RouterError):
-            import asyncio
-
-            asyncio.get_event_loop().run_until_complete(router.route(command))
+            await router.route(command)
 
         mock_handler.assert_not_called()
 
@@ -938,15 +937,14 @@ class TestUnknownAgentValidationAcceptance:
         assert "Unknown agent: 'buidler-1'" in result.error
         mock_sdk.execute.assert_not_called()
 
-    def test_at_007_no_task_dispatched_for_typo(self):
+    @pytest.mark.asyncio
+    async def test_at_007_no_task_dispatched_for_typo(self):
         """Typo agent results in zero tasks dispatched."""
         mock_sdk = AsyncMock()
         executor = TaskExecutor(sdk_client=mock_sdk)
 
         command = parse_command("@buidler-1 implement login &")
 
-        import asyncio
-
-        asyncio.get_event_loop().run_until_complete(executor.execute(command))
+        await executor.execute(command)
 
         assert executor.task_count == 0
