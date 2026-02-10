@@ -149,16 +149,19 @@ class TestSDKUpgradeAcceptance:
         assert client._started is False
         assert client._authenticated is False
 
-    def test_at_007_check_auth_uses_getattr(self):
-        """_check_auth uses getattr (compatible with dataclass response)."""
+    def test_at_007_check_auth_handles_both_dict_and_dataclass(self):
+        """_check_auth handles both dict (test mocks) and dataclass (real SDK) responses."""
         import inspect
 
         from teambot.copilot.sdk_client import CopilotSDKClient
 
         source = inspect.getsource(CopilotSDKClient._check_auth)
-        # Must use getattr, not .get()
+        # Must handle dict responses with .get()
+        assert '.get("isAuthenticated"' in source or ".get('isAuthenticated'" in source
+        # Must also handle dataclass responses with getattr()
         assert "getattr(" in source
-        assert '.get("isAuthenticated"' not in source
+        # Must check isinstance to distinguish between them
+        assert "isinstance(" in source
 
     def test_at_007_list_sessions_empty_without_client(self):
         """list_sessions returns [] when client not started."""

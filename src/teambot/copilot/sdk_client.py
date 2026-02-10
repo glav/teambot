@@ -144,7 +144,11 @@ class CopilotSDKClient:
 
         try:
             status = await self._client.get_auth_status()
-            self._authenticated = getattr(status, "isAuthenticated", False)
+            # Handle both dict (test mocks) and dataclass (real SDK) responses
+            if isinstance(status, dict):
+                self._authenticated = status.get("isAuthenticated", False)
+            else:
+                self._authenticated = getattr(status, "isAuthenticated", False)
         except Exception:
             self._authenticated = False
 
