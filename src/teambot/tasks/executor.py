@@ -216,9 +216,11 @@ class TaskExecutor:
         # Check for $ref dependencies
         if command.references:
             # Validate all referenced agents exist
-            from teambot.repl.router import VALID_AGENTS
+            from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
 
-            invalid_refs = [ref for ref in command.references if ref not in VALID_AGENTS]
+            invalid_refs = [
+                ref for ref in command.references if AGENT_ALIASES.get(ref, ref) not in VALID_AGENTS
+            ]
             if invalid_refs:
                 valid_list = ", ".join(sorted(VALID_AGENTS))
                 return ExecutionResult(
@@ -415,9 +417,11 @@ class TaskExecutor:
         # Handle $ref dependencies for the first stage
         if command.references:
             # Validate all referenced agents exist
-            from teambot.repl.router import VALID_AGENTS
+            from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
 
-            invalid_refs = [ref for ref in command.references if ref not in VALID_AGENTS]
+            invalid_refs = [
+                ref for ref in command.references if AGENT_ALIASES.get(ref, ref) not in VALID_AGENTS
+            ]
             if invalid_refs:
                 valid_list = ", ".join(sorted(VALID_AGENTS))
                 return ExecutionResult(

@@ -149,7 +149,14 @@ class TeamBotApp(App):
         # Validate all agent IDs before dispatch
         from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
 
-        for agent_id in command.agent_ids:
+        all_agent_ids = []
+        if command.is_pipeline and command.pipeline:
+            for stage in command.pipeline:
+                all_agent_ids.extend(stage.agent_ids)
+        else:
+            all_agent_ids = list(command.agent_ids)
+
+        for agent_id in all_agent_ids:
             canonical = AGENT_ALIASES.get(agent_id, agent_id)
             if canonical not in VALID_AGENTS:
                 valid_list = ", ".join(sorted(VALID_AGENTS))

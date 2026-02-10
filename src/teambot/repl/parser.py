@@ -277,17 +277,6 @@ def _parse_pipeline(input_text: str) -> Command:
             seen.add(ref)
             references.append(ref)
 
-    # Extract references from all stages
-    all_content = " ".join(stage.content for stage in stages)
-    ref_matches = REFERENCE_PATTERN.findall(all_content)
-    # Deduplicate while preserving order
-    seen = set()
-    references = []
-    for ref in ref_matches:
-        if ref not in seen:
-            seen.add(ref)
-            references.append(ref)
-
     return Command(
         type=CommandType.AGENT,
         agent_id=stages[0].agent_ids[0] if stages and stages[0].agent_ids else None,
