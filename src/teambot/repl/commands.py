@@ -3,6 +3,7 @@
 Provides /help, /status, /history, /quit, /tasks, /overlay, /models, /model commands.
 """
 
+import importlib.metadata
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -80,8 +81,13 @@ Task management:
   /cancel <id>   - Cancel a pending task"""
         )
 
+    try:
+        sdk_version = importlib.metadata.version("github-copilot-sdk")
+    except importlib.metadata.PackageNotFoundError:
+        sdk_version = "unknown"
+
     return CommandResult(
-        output="""TeamBot Interactive Mode
+        output=f"""TeamBot Interactive Mode (Copilot SDK: {sdk_version})
 
 Available commands:
   @agent <task>  - Send task to agent (pm, ba, writer, builder-1, builder-2, reviewer)

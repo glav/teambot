@@ -273,7 +273,7 @@ class TestCopilotSDKClientPersonaInjection:
     async def test_session_includes_custom_agents_when_definition_exists(
         self, mock_sdk_client, tmp_path: Path
     ):
-        """Test that customAgents is included in session_config when agent definition exists."""
+        """Test that custom_agents is included in session_config when agent definition exists."""
         from teambot.copilot.agent_loader import AgentLoader
         from teambot.copilot.sdk_client import CopilotSDKClient
 
@@ -310,14 +310,14 @@ You are the Project Manager agent responsible for planning and coordination.""")
 
                 await client.get_or_create_session("pm")
 
-                # Verify customAgents was included
+                # Verify custom_agents was included
                 assert captured_config is not None
-                assert "customAgents" in captured_config
-                assert len(captured_config["customAgents"]) == 1
+                assert "custom_agents" in captured_config
+                assert len(captured_config["custom_agents"]) == 1
 
-                custom_agent = captured_config["customAgents"][0]
+                custom_agent = captured_config["custom_agents"][0]
                 assert custom_agent["name"] == "pm"
-                assert custom_agent["displayName"] == "Project Manager"
+                assert custom_agent["display_name"] == "Project Manager"
                 assert custom_agent["description"] == "Project Manager Agent"
                 assert "Project Manager agent responsible" in custom_agent["prompt"]
 
@@ -363,9 +363,9 @@ You are the Project Manager agent responsible for planning and coordination.""")
                     for record in caplog.records
                 )
 
-                # Verify customAgents was NOT included
+                # Verify custom_agents was NOT included
                 assert captured_config is not None
-                assert "customAgents" not in captured_config
+                assert "custom_agents" not in captured_config
 
     def test_build_prompt_with_persona_prepends_context(self, tmp_path: Path):
         """Test that _build_prompt_with_persona correctly prepends persona context."""

@@ -1,0 +1,67 @@
+{
+  "specFile": ".teambot/copilot-sdk/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-10T05:51:00Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "core-problem",
+    "solution-approach",
+    "product-type",
+    "target-users",
+    "primary-language",
+    "testing-approach",
+    "key-constraints",
+    "existing-patterns"
+  ],
+  "answeredQuestions": {
+    "product-name": "Copilot SDK Upgrade (0.1.16 → 0.1.23)",
+    "core-problem": "Stale SDK version exposes TeamBot to known bugs, rate limiting, and ecosystem drift",
+    "solution-approach": "Dependency version bump with compatibility verification",
+    "product-type": "Dependency upgrade + minor feature enhancement (/help SDK version display)",
+    "target-users": "TeamBot developers and end users",
+    "primary-language": "Python 3.10+",
+    "testing-approach": "Hybrid - run existing 1084+ test suite; add targeted tests for /help version display",
+    "key-constraints": "Minimal code changes; no new feature adoption; backward compatibility required",
+    "existing-patterns": "SDK integration in sdk_client.py; defensive getattr for events; dict-based config"
+  },
+  "referencesProcessed": [
+    {
+      "file": "pyproject.toml",
+      "status": "analyzed",
+      "keyFindings": "SDK pinned at 0.1.16 on line 11; Python >=3.10; uv package manager"
+    },
+    {
+      "file": "src/teambot/copilot/sdk_client.py",
+      "status": "analyzed",
+      "keyFindings": "Primary SDK integration; uses CopilotClient, SessionEventType; defensive getattr patterns"
+    },
+    {
+      "file": "src/teambot/repl/commands.py",
+      "status": "analyzed",
+      "keyFindings": "handle_help() returns CommandResult with multi-line string; no version info currently"
+    },
+    {
+      "file": "tests/conftest.py",
+      "status": "analyzed",
+      "keyFindings": "MockSDKResponse, MockSDKSession, MockStreamingSession, MockEventTypes, MockEventData"
+    },
+    {
+      "file": ".teambot/copilot-sdk/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Business problem defined; integration surface mapped; upstream changes assessed"
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-testable",
+    "acceptance-tests-defined",
+    "risks-documented",
+    "assumptions-documented"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}

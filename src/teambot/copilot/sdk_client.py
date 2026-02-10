@@ -108,12 +108,34 @@ class CopilotSDKClient:
         if not self.is_available():
             raise SDKClientError("Copilot SDK not available - install github-copilot-sdk")
 
+        self._ensure_binary_executable()
         self._client = CopilotClient()
         await self._client.start()
         self._started = True
 
         # Check authentication status
         await self._check_auth()
+
+    @staticmethod
+    def _ensure_binary_executable() -> None:
+        """Ensure the bundled SDK binary has execute permission.
+
+        Some SDK versions ship without the execute bit set on the
+        bundled CLI binary, causing PermissionError on start.
+        """
+        import stat
+        from pathlib import Path
+
+        try:
+            import copilot as _copilot_pkg
+
+            pkg_dir = Path(_copilot_pkg.__file__).parent
+            binary = pkg_dir / "bin" / "copilot"
+            if binary.exists() and not os.access(binary, os.X_OK):
+                binary.chmod(binary.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                logger.info(f"Fixed execute permission on SDK binary: {binary}")
+        except Exception:
+            pass  # Best effort — will fail with original PermissionError if needed
 
     async def _check_auth(self) -> None:
         """Check and store authentication status."""
@@ -122,7 +144,7 @@ class CopilotSDKClient:
 
         try:
             status = await self._client.get_auth_status()
-            self._authenticated = status.get("isAuthenticated", False)
+            self._authenticated = getattr(status, "isAuthenticated", False)
         except Exception:
             self._authenticated = False
 
@@ -204,10 +226,10 @@ class CopilotSDKClient:
 
         # Add custom agent definition if available
         if agent_def:
-            session_config["customAgents"] = [
+            session_config["custom_agents"] = [
                 {
                     "name": agent_id,
-                    "displayName": agent_def.display_name,
+                    "display_name": agent_def.display_name,
                     "description": agent_def.description,
                     "prompt": agent_def.prompt,
                 }
@@ -244,7 +266,7 @@ class CopilotSDKClient:
     def _build_prompt_with_persona(self, agent_id: str, user_prompt: str) -> str:
         """Build a prompt that includes the agent's persona context.
 
-        Since the SDK doesn't reliably use customAgents, we prepend
+        Since the SDK doesn't reliably use custom_agents, we prepend
         the agent's persona to every prompt to ensure the LLM knows
         its identity and constraints.
 
@@ -474,11 +496,11 @@ User request: {user_prompt}"""
         except Exception:
             return False
 
-    def list_sessions(self) -> list[dict[str, Any]]:
+    def list_sessions(self) -> list[Any]:
         """List all sessions known to the SDK.
 
         Returns:
-            List of session info dicts.
+            List of session info objects.
         """
         if not self._client:
             return []
