@@ -366,7 +366,7 @@ class REPLLoop:
             User input string or None if cancelled.
         """
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             line = await loop.run_in_executor(
                 None, lambda: Prompt.ask("[bold green]teambot[/bold green]")
             )
