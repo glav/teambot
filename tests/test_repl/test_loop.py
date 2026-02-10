@@ -240,3 +240,73 @@ class TestREPLIntegration:
         repl = REPLLoop(config={"default_agent": "pm"})
         assert repl._commands._router is not None
         assert repl._commands._router.get_default_agent() == "pm"
+
+
+class TestLegacyMultiLineInput:
+    """Tests for backslash continuation in legacy mode _get_input."""
+
+    @pytest.mark.asyncio
+    async def test_single_line_input(self):
+        """Single line without backslash returns as-is."""
+        from unittest.mock import patch
+
+        repl = REPLLoop()
+        with patch("teambot.repl.loop.Prompt") as mock_prompt:
+            mock_prompt.ask.return_value = "hello world"
+            result = await repl._get_input()
+        assert result == "hello world"
+
+    @pytest.mark.asyncio
+    async def test_backslash_continuation(self):
+        """Line ending with backslash prompts for continuation."""
+        from unittest.mock import patch
+
+        repl = REPLLoop()
+        with patch("teambot.repl.loop.Prompt") as mock_prompt:
+            mock_prompt.ask.side_effect = ["first line\\", "second line"]
+            result = await repl._get_input()
+        assert result == "first line\nsecond line"
+
+    @pytest.mark.asyncio
+    async def test_multiple_continuations(self):
+        """Multiple backslash continuations are joined."""
+        from unittest.mock import patch
+
+        repl = REPLLoop()
+        with patch("teambot.repl.loop.Prompt") as mock_prompt:
+            mock_prompt.ask.side_effect = ["a\\", "b\\", "c"]
+            result = await repl._get_input()
+        assert result == "a\nb\nc"
+
+    @pytest.mark.asyncio
+    async def test_backslash_in_middle_no_continuation(self):
+        """Backslash not at end does not trigger continuation."""
+        from unittest.mock import patch
+
+        repl = REPLLoop()
+        with patch("teambot.repl.loop.Prompt") as mock_prompt:
+            mock_prompt.ask.return_value = "path\\to\\file"
+            result = await repl._get_input()
+        assert result == "path\\to\\file"
+
+    @pytest.mark.asyncio
+    async def test_eof_returns_none(self):
+        """EOFError during input returns None."""
+        from unittest.mock import patch
+
+        repl = REPLLoop()
+        with patch("teambot.repl.loop.Prompt") as mock_prompt:
+            mock_prompt.ask.side_effect = EOFError
+            result = await repl._get_input()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_keyboard_interrupt_returns_none(self):
+        """KeyboardInterrupt during input returns None."""
+        from unittest.mock import patch
+
+        repl = REPLLoop()
+        with patch("teambot.repl.loop.Prompt") as mock_prompt:
+            mock_prompt.ask.side_effect = KeyboardInterrupt
+            result = await repl._get_input()
+        assert result is None

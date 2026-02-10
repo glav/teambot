@@ -359,15 +359,26 @@ class REPLLoop:
     async def _get_input(self) -> str | None:
         """Get input from user.
 
+        Supports multi-line input via backslash continuation: end a line with
+        ``\\`` to continue on the next line.
+
         Returns:
             User input string or None if cancelled.
         """
         try:
-            # Run in executor to allow async cancellation
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(
+            loop = asyncio.get_running_loop()
+            line = await loop.run_in_executor(
                 None, lambda: Prompt.ask("[bold green]teambot[/bold green]")
             )
+            # Backslash continuation for multi-line input in legacy mode
+            lines = [line]
+            while lines[-1].endswith("\\"):
+                lines[-1] = lines[-1][:-1]
+                cont = await loop.run_in_executor(
+                    None, lambda: Prompt.ask("[bold green]   ...[/bold green]")
+                )
+                lines.append(cont)
+            return "\n".join(lines)
         except EOFError:
             self._running = False
             return None

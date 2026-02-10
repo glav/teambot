@@ -48,7 +48,7 @@ class TestTeamBotApp:
             await pilot.pause()
 
             input_pane = app.query_one("#prompt")
-            assert input_pane.value == ""
+            assert input_pane.text == ""
 
     @pytest.mark.asyncio
     async def test_raw_input_shows_tip(self):
