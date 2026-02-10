@@ -533,6 +533,7 @@ class TestRuntimeValidation:
         # Expected error but got success, so this should fail
         assert result.passed == 0
         assert result.failed == 1
+        assert result.scenarios[0].status == AcceptanceTestStatus.FAILED
         assert "Expected an error but all commands succeeded" in result.scenarios[0].failure_reason
 
 
