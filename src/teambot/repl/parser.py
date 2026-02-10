@@ -76,7 +76,7 @@ class Command:
 
 
 # Pattern for agent commands: @agent-id or @agent1,agent2
-AGENT_PATTERN = re.compile(r"^@([a-zA-Z][a-zA-Z0-9,-]*)\s*(.*)", re.DOTALL)
+AGENT_PATTERN = re.compile(r"^@([a-zA-Z][a-zA-Z0-9,_-]*)\s*(.*)", re.DOTALL)
 
 # Pattern for system commands: /command args
 SYSTEM_PATTERN = re.compile(r"^/([a-zA-Z][a-zA-Z0-9-]*)\s*(.*)", re.DOTALL)
@@ -86,7 +86,7 @@ PIPELINE_PATTERN = re.compile(r"\s*->\s*@")
 
 # Pattern for agent references in content: $pm, $ba, $builder-1
 # Uses negative lookbehind to exclude escaped \$
-REFERENCE_PATTERN = re.compile(r"(?<!\\)\$([a-zA-Z][a-zA-Z0-9-]*)")
+REFERENCE_PATTERN = re.compile(r"(?<!\\)\$([a-zA-Z][a-zA-Z0-9_-]*)")
 
 # Pattern for model flag: --model <value> or -m <value>
 MODEL_FLAG_PATTERN = re.compile(r"(?:--model|-m)\s+([^\s]+)")
@@ -251,21 +251,20 @@ def _parse_pipeline(input_text: str) -> Command:
             content=stages[-1].content[:-1].strip(),
         )
 
+    # Validate agent IDs before checking content
+    from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
+
+    for stage in stages:
+        for agent_id in stage.agent_ids:
+            canonical = AGENT_ALIASES.get(agent_id, agent_id)
+            if canonical not in VALID_AGENTS:
+                valid_list = ", ".join(sorted(VALID_AGENTS))
+                raise ParseError(f"Unknown agent: '{agent_id}'. Valid agents: {valid_list}")
+
     # Validate all stages have content except possibly last
     for i, stage in enumerate(stages[:-1]):
         if not stage.content:
             raise ParseError(f"Pipeline stage {i + 1} requires task content")
-
-    # Extract references from all stages
-    all_content = " ".join(stage.content for stage in stages)
-    ref_matches = REFERENCE_PATTERN.findall(all_content)
-    # Deduplicate while preserving order
-    seen = set()
-    references = []
-    for ref in ref_matches:
-        if ref not in seen:
-            seen.add(ref)
-            references.append(ref)
 
     # Extract references from all stages
     all_content = " ".join(stage.content for stage in stages)

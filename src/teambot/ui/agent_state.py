@@ -157,6 +157,8 @@ class AgentStatusManager:
             agent_id: The agent to mark idle.
         """
         if agent_id not in self._statuses:
+            if agent_id not in DEFAULT_AGENTS:
+                return
             self._statuses[agent_id] = AgentStatus(agent_id=agent_id)
             return
 
@@ -182,6 +184,8 @@ class AgentStatusManager:
             task: Task description or None.
         """
         if agent_id not in self._statuses:
+            if agent_id not in DEFAULT_AGENTS:
+                return
             self._statuses[agent_id] = AgentStatus(agent_id=agent_id)
 
         old_status = self._statuses[agent_id]
@@ -200,6 +204,8 @@ class AgentStatusManager:
             model: Model to set (or None to clear).
         """
         if agent_id not in self._statuses:
+            if agent_id not in DEFAULT_AGENTS:
+                return
             self._statuses[agent_id] = AgentStatus(agent_id=agent_id, model=model)
             self._notify()
             return

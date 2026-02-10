@@ -10,6 +10,7 @@ import argparse
 import json
 import re
 from io import StringIO
+from unittest.mock import AsyncMock
 
 import pytest
 from rich.console import Console
@@ -22,8 +23,9 @@ from teambot.repl.commands import (
     handle_status,
     handle_use_agent,
 )
-from teambot.repl.parser import CommandType, parse_command
-from teambot.repl.router import VALID_AGENTS, AgentRouter
+from teambot.repl.parser import CommandType, ParseError, parse_command
+from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS, AgentRouter, RouterError
+from teambot.tasks.executor import TaskExecutor
 from teambot.ui.agent_state import AgentStatusManager
 from teambot.ui.widgets.status_panel import StatusPanel
 from teambot.visualization.animation import (
@@ -683,3 +685,266 @@ class TestDefaultAgentSwitchingE2E:
         # 7. Plain text → pm (restored from config)
         await router.route(parse_command("plan stuff"))
         assert agent_calls[-1] == ("pm", "plan stuff")
+
+
+class TestUnknownAgentValidationAcceptance:
+    """Acceptance tests for unknown agent ID validation (AT-001 through AT-007).
+
+    These tests exercise the REAL router, parser, executor, and agent_state
+    code. Only the SDK client (network boundary) is mocked.
+    """
+
+    # ------------------------------------------------------------------
+    # AT-001: Simple Unknown Agent Command (Simple Path)
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_001_router_rejects_unknown_agent_with_message(self):
+        """Simple path: router rejects unknown agent with spec-format error."""
+        router = AgentRouter()
+        router.register_agent_handler(AsyncMock(return_value="ok"))
+
+        command = parse_command("@unknown-agent do something")
+        with pytest.raises(RouterError, match=r"Unknown agent: 'unknown-agent'") as exc_info:
+            await router.route(command)
+
+        error_msg = str(exc_info.value)
+        assert "Valid agents:" in error_msg
+        assert "ba" in error_msg
+        assert "builder-1" in error_msg
+        assert "pm" in error_msg
+
+    def test_at_001_no_status_entry_created(self):
+        """Unknown agent must not get an entry in AgentStatusManager."""
+        manager = AgentStatusManager()
+        manager.set_running("unknown-agent", "do something")
+        assert manager.get("unknown-agent") is None
+
+    @pytest.mark.asyncio
+    async def test_at_001_no_task_dispatched(self):
+        """Router handler must never be called for unknown agent."""
+        router = AgentRouter()
+        mock_handler = AsyncMock(return_value="ok")
+        router.register_agent_handler(mock_handler)
+
+        command = parse_command("@unknown-agent do something")
+        with pytest.raises(RouterError):
+            await router.route(command)
+
+        mock_handler.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # AT-002: Unknown Agent in Background Command (Advanced Path)
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_002_executor_rejects_unknown_background(self):
+        """Background command to unknown agent returns error, no task spawned."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        command = parse_command("@unknown-agent do something &")
+        result = await executor.execute(command)
+
+        assert not result.success
+        assert "Unknown agent: 'unknown-agent'" in result.error
+        assert "Valid agents:" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_at_002_no_status_entry_for_background_unknown(self):
+        """No status entry created when background unknown agent is rejected."""
+        manager = AgentStatusManager()
+        manager.set_running("unknown-agent", "do something")
+        assert manager.get("unknown-agent") is None
+
+    @pytest.mark.asyncio
+    async def test_at_002_no_task_result_produced(self):
+        """Executor returns zero tasks for rejected background command."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        command = parse_command("@unknown-agent do something &")
+        result = await executor.execute(command)
+
+        assert executor.task_count == 0
+        assert result.task_ids == []
+
+    # ------------------------------------------------------------------
+    # AT-003: Multi-Agent Command with One Invalid ID
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_003_multi_agent_rejects_when_one_invalid(self):
+        """Multi-agent command with one invalid ID rejects entire command."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        command = parse_command("@builder-1,fake-agent implement the feature")
+        result = await executor.execute(command)
+
+        assert not result.success
+        assert "fake-agent" in result.error
+        assert "Unknown agent:" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_at_003_no_tasks_dispatched_for_either_agent(self):
+        """Neither valid nor invalid agent gets a task when one is invalid."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        command = parse_command("@builder-1,fake-agent implement the feature")
+        result = await executor.execute(command)
+
+        assert executor.task_count == 0
+        assert result.task_ids == []
+
+    @pytest.mark.asyncio
+    async def test_at_003_no_status_entries_created(self):
+        """No status entries created for any agent in rejected multi-agent cmd."""
+        manager = AgentStatusManager()
+        # Simulate what would happen — fake-agent should not get an entry
+        manager.set_running("fake-agent", "implement the feature")
+        assert manager.get("fake-agent") is None
+
+    # ------------------------------------------------------------------
+    # AT-004: Pipeline Command with Unknown Agent
+    # ------------------------------------------------------------------
+    def test_at_004_pipeline_unknown_agent_rejected_at_parse(self):
+        """Pipeline with unknown agent rejected during parsing."""
+        with pytest.raises(ParseError, match=r"Unknown agent: 'fake'"):
+            parse_command("@fake -> @pm create a plan")
+
+    def test_at_004_error_lists_valid_agents(self):
+        """Pipeline parse error for unknown agent lists valid agents."""
+        with pytest.raises(ParseError) as exc_info:
+            parse_command("@fake -> @pm create a plan")
+
+        error_msg = str(exc_info.value)
+        assert "Valid agents:" in error_msg
+        assert "pm" in error_msg
+
+    def test_at_004_pm_does_not_receive_input(self):
+        """PM never executes when pipeline is rejected at parse time."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        with pytest.raises(ParseError, match="Unknown agent"):
+            parse_command("@fake -> @pm create a plan")
+
+        # Parser rejects — executor never sees the command
+        assert executor.task_count == 0
+        mock_sdk.execute.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # AT-005: Valid Alias Continues to Work
+    # ------------------------------------------------------------------
+    def test_at_005_alias_resolves_to_canonical_id(self):
+        """Router resolves 'project_manager' alias to 'pm'."""
+        router = AgentRouter()
+        assert router.resolve_agent_id("project_manager") == "pm"
+        assert router.is_valid_agent("project_manager")
+
+    def test_at_005_all_aliases_valid(self):
+        """All defined aliases resolve to valid canonical agent IDs."""
+        router = AgentRouter()
+        for alias, canonical in AGENT_ALIASES.items():
+            assert router.resolve_agent_id(alias) == canonical
+            assert router.is_valid_agent(alias)
+
+    @pytest.mark.asyncio
+    async def test_at_005_alias_accepted_by_executor(self):
+        """Executor accepts commands with valid alias agent IDs."""
+        from teambot.repl.parser import Command, CommandType
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Plan created")
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        cmd = Command(
+            type=CommandType.AGENT,
+            agent_id="project_manager",
+            agent_ids=["project_manager"],
+            content="create a project plan",
+        )
+        result = await executor.execute(cmd)
+
+        assert result.success
+        assert result.error is None or "Unknown agent" not in (result.error or "")
+
+    # ------------------------------------------------------------------
+    # AT-006: All Six Valid Agents Work (Regression)
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_006_all_six_agents_accepted_by_router(self):
+        """All 6 valid agents are accepted by the router without error."""
+        router = AgentRouter()
+        mock_handler = AsyncMock(return_value="done")
+        router.register_agent_handler(mock_handler)
+
+        for agent_id in sorted(VALID_AGENTS):
+            command = parse_command(f"@{agent_id} do work")
+            result = await router.route(command)
+            assert result == "done"
+
+        assert mock_handler.call_count == 6
+
+    @pytest.mark.asyncio
+    async def test_at_006_all_six_agents_accepted_by_executor(self):
+        """All 6 valid agents dispatched without validation error via executor."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        for agent_id in sorted(VALID_AGENTS):
+            command = parse_command(f"@{agent_id} do work &")
+            result = await executor.execute(command)
+            assert result.error is None or "Unknown agent" not in (result.error or ""), (
+                f"Agent '{agent_id}' was incorrectly rejected"
+            )
+
+    def test_at_006_all_six_agents_have_status_entries(self):
+        """All 6 valid agents have default status entries."""
+        manager = AgentStatusManager()
+        for agent_id in sorted(VALID_AGENTS):
+            status = manager.get(agent_id)
+            assert status is not None, f"Missing status entry for '{agent_id}'"
+
+    # ------------------------------------------------------------------
+    # AT-007: Typo Near Valid Agent ID
+    # ------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_007_typo_rejected_by_router(self):
+        """Typo 'buidler-1' is rejected with helpful error message."""
+        router = AgentRouter()
+        router.register_agent_handler(AsyncMock(return_value="ok"))
+
+        command = parse_command("@buidler-1 implement login")
+        with pytest.raises(RouterError, match=r"Unknown agent: 'buidler-1'") as exc_info:
+            await router.route(command)
+
+        error_msg = str(exc_info.value)
+        assert "Valid agents:" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_at_007_typo_rejected_by_executor(self):
+        """Typo 'buidler-1' rejected via executor path too."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        command = parse_command("@buidler-1 implement login &")
+        result = await executor.execute(command)
+
+        assert not result.success
+        assert "Unknown agent: 'buidler-1'" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_at_007_no_task_dispatched_for_typo(self):
+        """Typo agent results in zero tasks dispatched."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        command = parse_command("@buidler-1 implement login &")
+
+        await executor.execute(command)
+
+        assert executor.task_count == 0

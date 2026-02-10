@@ -21,7 +21,7 @@ teambot/
 │   ├── prompts/              # Persona-specific prompt templates
 │   ├── visualization/        # Rich console display
 │   └── workflow/             # 13-stage workflow state machine
-├── tests/                    # Test suite (192 tests, 88% coverage)
+├── tests/                    # Test suite (1050 tests, 80% coverage)
 ├── docs/
 │   ├── guides/               # User documentation (10 guides)
 │   ├── feature-specs/        # Feature specifications
@@ -103,12 +103,12 @@ uv run ruff format .
 | `builder-2` | Builder (Secondary) | Implementation (parallel) |
 | `reviewer` | Reviewer | Code review, QA |
 
-### Workflow Stages (13)
+### Workflow Stages (14)
 
 ```
 SETUP → BUSINESS_PROBLEM → SPEC → SPEC_REVIEW → RESEARCH →
 TEST_STRATEGY → PLAN → PLAN_REVIEW → IMPLEMENTATION →
-IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
+IMPLEMENTATION_REVIEW → TEST → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
 
 ### Key Components
@@ -129,7 +129,7 @@ IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
 
 - Framework: `pytest` with `pytest-cov` and `pytest-mock`
 - Tests located in `tests/` directory
-- Current coverage: 88% (192 tests)
+- Current coverage: 80% (1050 tests)
 
 ## Security and Secrets
 

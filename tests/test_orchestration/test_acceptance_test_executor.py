@@ -454,3 +454,166 @@ class TestRuntimeValidation:
         assert merged.failed == 1
         assert merged.passed == 0
         assert "RUNTIME VALIDATION FAILED" in merged.scenarios[0].failure_reason
+
+    def test_is_expected_error_scenario_detects_error_messages(self) -> None:
+        """_is_expected_error_scenario returns True for error-expecting scenarios."""
+        executor = AcceptanceTestExecutor(spec_content="")
+
+        assert executor._is_expected_error_scenario(
+            "Error message: `Unknown agent: 'unknown-agent'`"
+        )
+        assert executor._is_expected_error_scenario(
+            "Error message listing valid agents; no background task spawned"
+        )
+        assert executor._is_expected_error_scenario(
+            "Error message identifying 'fake' as unknown; no pipeline stages execute"
+        )
+
+    def test_is_expected_error_scenario_rejects_normal(self) -> None:
+        """_is_expected_error_scenario returns False for normal scenarios."""
+        executor = AcceptanceTestExecutor(spec_content="")
+
+        assert not executor._is_expected_error_scenario("PM agent responds with output")
+        assert not executor._is_expected_error_scenario(
+            "All 6 commands are accepted and dispatched to the correct agent"
+        )
+        assert not executor._is_expected_error_scenario("")
+
+    @pytest.mark.asyncio
+    async def test_runtime_validation_passes_expected_error_scenario(self) -> None:
+        """Runtime validation passes when error IS the expected result."""
+        spec = """# Feature Spec
+
+## Acceptance Test Scenarios
+
+### AT-001: Unknown agent rejected
+**Description**: Unknown agent is rejected with error
+
+**Steps**:
+1. Execute `@unknown-agent do something`
+
+**Expected Result**: Error message: Unknown agent
+"""
+        executor = AcceptanceTestExecutor(spec_content=spec)
+        executor.load_scenarios()
+
+        mock_client = AsyncMock()
+        # The command will fail validation in TaskExecutor before reaching SDK
+        result = await executor._execute_runtime_validation(mock_client)
+
+        # Error IS the expected result, so this should pass
+        assert result.passed == 1
+        assert result.failed == 0
+
+    async def test_runtime_validation_fails_expected_error_without_error(
+        self,
+    ) -> None:
+        """Runtime validation fails when expected-error scenario produces no error."""
+        spec = """# Feature Spec
+
+## Acceptance Test Scenarios
+
+### AT-001: Should reject unknown agent
+**Description**: Command with unknown agent should produce an error
+
+**Steps**:
+1. Execute `@pm list agents`
+
+**Expected Result**: Error message: Unknown agent
+"""
+        executor = AcceptanceTestExecutor(spec_content=spec)
+        executor.load_scenarios()
+
+        mock_client = AsyncMock()
+        # Mock the SDK to return success (no error produced)
+        mock_client.execute_agent_task = AsyncMock(return_value="Agent list returned")
+
+        result = await executor._execute_runtime_validation(mock_client)
+
+        # Expected error but got success, so this should fail
+        assert result.passed == 0
+        assert result.failed == 1
+        assert result.scenarios[0].status == AcceptanceTestStatus.FAILED
+        assert "Expected an error but all commands succeeded" in result.scenarios[0].failure_reason
+
+
+class TestExtractCommandsExtendedSyntax:
+    """Tests for extract_commands_from_steps with multi-agent and alias syntax."""
+
+    def test_multiagent_comma_syntax(self) -> None:
+        """Multi-agent command with comma-separated IDs is extracted."""
+        steps = ["User enters: `@builder-1,fake-agent implement the feature`"]
+        commands = extract_commands_from_steps(steps)
+        assert len(commands) == 1
+        assert commands[0]["command"] == "@builder-1,fake-agent implement the feature"
+
+    def test_underscore_alias_syntax(self) -> None:
+        """Agent alias with underscore is extracted."""
+        steps = ["User enters: `@project_manager create a project plan`"]
+        commands = extract_commands_from_steps(steps)
+        assert len(commands) == 1
+        assert commands[0]["command"] == "@project_manager create a project plan"
+
+    def test_pipeline_syntax(self) -> None:
+        """Pipeline command with -> syntax is extracted."""
+        steps = ["User enters: `@fake -> @pm create a plan`"]
+        commands = extract_commands_from_steps(steps)
+        assert len(commands) == 1
+        assert commands[0]["command"] == "@fake -> @pm create a plan"
+
+    def test_simple_command_still_works(self) -> None:
+        """Simple single-agent command still extracts after regex change."""
+        steps = ["User enters: `@unknown-agent do something`"]
+        commands = extract_commands_from_steps(steps)
+        assert len(commands) == 1
+        assert commands[0]["command"] == "@unknown-agent do something"
+
+    def test_background_command_still_works(self) -> None:
+        """Background command with & still extracts after regex change."""
+        steps = ["User enters: `@unknown-agent do something &`"]
+        commands = extract_commands_from_steps(steps)
+        assert len(commands) == 1
+        assert commands[0]["command"] == "@unknown-agent do something &"
+
+
+class TestExpectedErrorScenarioEdgeCases:
+    """Edge case tests for _is_expected_error_scenario with backtick formatting."""
+
+    def test_backtick_wrapped_error_message(self) -> None:
+        """Error detection works with backtick-wrapped text from AT-001."""
+        text = (
+            "Error message: `Unknown agent: 'unknown-agent'. "
+            "Valid agents: ba, builder-1, builder-2, pm, reviewer, writer`"
+        )
+        assert AcceptanceTestExecutor._is_expected_error_scenario(text)
+
+    def test_backtick_wrapped_typo_error(self) -> None:
+        """Error detection works with backtick-wrapped text from AT-007."""
+        text = (
+            "Error message: `Unknown agent: 'buidler-1'. "
+            "Valid agents: ba, builder-1, builder-2, pm, reviewer, writer`"
+        )
+        assert AcceptanceTestExecutor._is_expected_error_scenario(text)
+
+    def test_backtick_only_error_text(self) -> None:
+        """Error detection works when text is entirely backtick-wrapped."""
+        assert AcceptanceTestExecutor._is_expected_error_scenario("`error message: unknown agent`")
+        assert AcceptanceTestExecutor._is_expected_error_scenario("`Unknown agent: 'fake'`")
+
+    def test_backtick_only_non_error_text(self) -> None:
+        """Non-error text with backticks returns False."""
+        assert not AcceptanceTestExecutor._is_expected_error_scenario(
+            "`command completed successfully`"
+        )
+
+    def test_extract_field_preserves_backtick_content(self) -> None:
+        """_extract_field correctly captures text with inline backticks."""
+        from teambot.orchestration.acceptance_test_executor import _extract_field
+
+        body = (
+            "**Expected Result**: Error message: "
+            "`Unknown agent: 'test'`\n**Verification**: Check output"
+        )
+        result = _extract_field(body, "Expected Result")
+        assert "Unknown agent" in result
+        assert result != ""

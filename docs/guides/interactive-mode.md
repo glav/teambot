@@ -141,6 +141,30 @@ teambot: @pm Summarize $ba  # Waits if @ba is still running
 - **`$ref`**: When you want to reference work an agent already completed
 - **`->`**: When you want to define a complete workflow from scratch
 
+## Agent Validation
+
+TeamBot validates agent IDs at every entry point. If you reference an unknown agent, you get a clear error listing all valid agents:
+
+```bash
+teambot: @designer Create a mockup
+# Error: Unknown agent: 'designer'. Valid agents: ba, builder-1, builder-2, pm, reviewer, writer
+```
+
+This validation applies to all command forms — single agent, multi-agent, pipelines, and `$ref` references.
+
+### Valid Agent IDs
+
+| Agent ID | Aliases |
+|----------|---------|
+| `pm` | `project_manager` |
+| `ba` | `business_analyst` |
+| `writer` | `technical_writer` |
+| `builder-1` | — |
+| `builder-2` | — |
+| `reviewer` | — |
+
+You can use either the short ID or the alias form (e.g., `@project_manager` resolves to `@pm`).
+
 ## Split-Pane Interface
 
 TeamBot features a split-pane terminal interface (powered by [Textual](https://textual.textualize.io/)):

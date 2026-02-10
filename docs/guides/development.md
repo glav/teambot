@@ -26,20 +26,27 @@ teambot/
 ├── src/teambot/
 │   ├── cli.py                # CLI entry point
 │   ├── orchestrator.py       # Agent lifecycle management
+│   ├── agent_runner.py       # Individual agent process execution
+│   ├── window_manager.py     # Cross-platform window spawning
 │   ├── orchestration/        # File-based orchestration
 │   │   ├── objective_parser.py
 │   │   ├── execution_loop.py
 │   │   ├── review_iterator.py
 │   │   ├── parallel_executor.py
+│   │   ├── acceptance_test_executor.py
+│   │   ├── stage_config.py
 │   │   └── time_manager.py
 │   ├── config/               # Configuration loading
 │   ├── copilot/              # Copilot SDK wrapper
 │   ├── history/              # History file management
 │   ├── messaging/            # Inter-agent messaging
 │   ├── prompts/              # Persona templates
-│   ├── ui/                   # Split-pane interface
+│   ├── repl/                 # Interactive REPL (parser, router, commands)
+│   ├── tasks/                # Task graph, execution, and output injection
+│   ├── ui/                   # Split-pane terminal interface (Textual)
+│   ├── visualization/        # Console formatting and status overlay
 │   └── workflow/             # Workflow state machine
-├── tests/                    # Test suite (650 tests)
+├── tests/                    # Test suite (1050 tests)
 └── docs/                     # Documentation
 ```
 
@@ -64,7 +71,7 @@ uv run pytest -x
 
 ## Test Coverage
 
-Current: **83% coverage** with **650 tests**
+Current: **80% coverage** with **1050 tests**
 
 | Module | Coverage |
 |--------|----------|
@@ -127,5 +134,6 @@ uv run ruff format .
 ## Next Steps
 
 - [Getting Started](getting-started.md) - Using TeamBot
+- [Architecture](architecture.md) - Internal architecture and design
 - [Configuration](configuration.md) - Configuration details
 - [Workflow Stages](workflow-stages.md) - Understanding the workflow

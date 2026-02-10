@@ -927,3 +927,122 @@ class TestTaskExecutorStatusIntegration:
         # Should have tracked status changes
         assert len(states) > 0
         assert AgentState.RUNNING in states
+
+
+class TestTaskExecutorAgentValidation:
+    """Tests for unknown agent ID validation in TaskExecutor."""
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_unknown_agent(self):
+        """Unknown agent ID returns error via executor."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+        cmd = parse_command("@unknown-agent do something &")
+
+        result = await executor.execute(cmd)
+
+        assert not result.success
+        assert "Unknown agent: 'unknown-agent'" in result.error
+        assert "Valid agents:" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_unknown_agent_background(self):
+        """Background command with unknown agent returns error."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+        cmd = parse_command("@fake-agent do something &")
+
+        result = await executor.execute(cmd)
+
+        assert not result.success
+        assert "fake-agent" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_unknown_in_multiagent(self):
+        """Multi-agent with invalid ID rejects entire command."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+        cmd = parse_command("@pm,fake-agent do something")
+
+        result = await executor.execute(cmd)
+
+        assert not result.success
+        assert "fake-agent" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_rejects_unknown_in_pipeline(self):
+        """Pipeline with invalid agent rejects entire pipeline (executor layer)."""
+        from teambot.repl.parser import Command, CommandType, PipelineStage
+
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+        # Construct command directly to test executor validation (parser now catches this too)
+        cmd = Command(
+            type=CommandType.AGENT,
+            agent_id="fake-agent",
+            agent_ids=["fake-agent", "pm"],
+            content="Do research",
+            is_pipeline=True,
+            pipeline=[
+                PipelineStage(agent_ids=["fake-agent"], content="Do research"),
+                PipelineStage(agent_ids=["pm"], content="Create plan"),
+            ],
+        )
+
+        result = await executor.execute(cmd)
+
+        assert not result.success
+        assert "fake-agent" in result.error
+        mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_accepts_valid_alias(self):
+        """Valid alias (project_manager) is accepted when provided directly."""
+        from teambot.repl.parser import Command, CommandType
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+        executor = TaskExecutor(sdk_client=mock_sdk)
+        cmd = Command(
+            type=CommandType.AGENT,
+            agent_id="project_manager",
+            agent_ids=["project_manager"],
+            content="Create a plan",
+            background=True,
+        )
+
+        result = await executor.execute(cmd)
+
+        # Should succeed (alias resolved to "pm", not rejected as unknown)
+        assert result.success or result.background
+
+    @pytest.mark.asyncio
+    async def test_execute_accepts_all_valid_agents(self):
+        """All 6 canonical agent IDs are accepted (regression guard)."""
+        from teambot.repl.router import VALID_AGENTS
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Done")
+
+        for agent_id in sorted(VALID_AGENTS):
+            executor = TaskExecutor(sdk_client=mock_sdk)
+            cmd = parse_command(f"@{agent_id} do work &")
+            result = await executor.execute(cmd)
+            assert result.error is None or "Unknown agent" not in (result.error or ""), (
+                f"Valid agent '{agent_id}' was rejected"
+            )
+
+    @pytest.mark.asyncio
+    async def test_execute_error_message_lists_valid_agents(self):
+        """Error message contains sorted list of all valid agents."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk)
+        cmd = parse_command("@nobody do something &")
+
+        result = await executor.execute(cmd)
+
+        assert not result.success
+        assert "ba, builder-1, builder-2, pm, reviewer, writer" in result.error

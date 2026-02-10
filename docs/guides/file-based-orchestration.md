@@ -1,6 +1,6 @@
 # File-Based Orchestration
 
-The primary way to use TeamBot is with objective files. Define your goals in markdown, and TeamBot autonomously executes the 13-stage workflow.
+The primary way to use TeamBot is with objective files. Define your goals in markdown, and TeamBot autonomously executes the 14-stage workflow.
 
 ## Running an Objective
 
@@ -28,9 +28,10 @@ uv run teambot run --resume
 ## Execution Flow
 
 1. Parse objective file (goals, success criteria, constraints)
-2. Progress through 13 workflow stages
+2. Progress through 14 workflow stages
 3. For review stages: iterate until approval or 4 failures
-4. Save state on completion, cancellation, or timeout
+4. Run acceptance tests to validate end-to-end behavior
+5. Save state on completion, cancellation, or timeout
 
 ## Cancellation & Resume
 
@@ -50,5 +51,5 @@ If a review stage fails after 4 iterations:
 ## Next Steps
 
 - [Objective Format](objective-format.md) - How to write objective files
-- [Workflow Stages](workflow-stages.md) - Understanding the 13-stage workflow
+- [Workflow Stages](workflow-stages.md) - Understanding the 14-stage workflow
 - [Interactive Mode](interactive-mode.md) - Ad-hoc tasks without objectives

@@ -175,6 +175,26 @@ class TaskExecutor:
                 error="Not an agent command",
             )
 
+        # Validate all agent IDs before dispatch
+        from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
+
+        all_agent_ids = []
+        if command.is_pipeline and command.pipeline:
+            for stage in command.pipeline:
+                all_agent_ids.extend(stage.agent_ids)
+        else:
+            all_agent_ids = list(command.agent_ids)
+
+        for agent_id in all_agent_ids:
+            canonical = AGENT_ALIASES.get(agent_id, agent_id)
+            if canonical not in VALID_AGENTS:
+                valid_list = ", ".join(sorted(VALID_AGENTS))
+                return ExecutionResult(
+                    success=False,
+                    output="",
+                    error=f"Unknown agent: '{agent_id}'. Valid agents: {valid_list}",
+                )
+
         if command.is_pipeline:
             return await self._execute_pipeline(command)
         elif len(command.agent_ids) > 1:
@@ -196,9 +216,11 @@ class TaskExecutor:
         # Check for $ref dependencies
         if command.references:
             # Validate all referenced agents exist
-            from teambot.repl.router import VALID_AGENTS
+            from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
 
-            invalid_refs = [ref for ref in command.references if ref not in VALID_AGENTS]
+            invalid_refs = [
+                ref for ref in command.references if AGENT_ALIASES.get(ref, ref) not in VALID_AGENTS
+            ]
             if invalid_refs:
                 valid_list = ", ".join(sorted(VALID_AGENTS))
                 return ExecutionResult(
@@ -395,9 +417,11 @@ class TaskExecutor:
         # Handle $ref dependencies for the first stage
         if command.references:
             # Validate all referenced agents exist
-            from teambot.repl.router import VALID_AGENTS
+            from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
 
-            invalid_refs = [ref for ref in command.references if ref not in VALID_AGENTS]
+            invalid_refs = [
+                ref for ref in command.references if AGENT_ALIASES.get(ref, ref) not in VALID_AGENTS
+            ]
             if invalid_refs:
                 valid_list = ", ".join(sorted(VALID_AGENTS))
                 return ExecutionResult(
