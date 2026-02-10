@@ -61,6 +61,7 @@ class TestSDKUpgradeAcceptance:
             capture_output=True,
             text=True,
             cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]),
+            timeout=30,
         )
         assert result.returncode == 0, f"ruff check failed:\n{result.stdout}\n{result.stderr}"
 
@@ -71,6 +72,7 @@ class TestSDKUpgradeAcceptance:
             capture_output=True,
             text=True,
             cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]),
+            timeout=30,
         )
         assert result.returncode == 0, f"ruff format failed:\n{result.stdout}\n{result.stderr}"
 
@@ -83,6 +85,8 @@ class TestSDKUpgradeAcceptance:
             [sys.executable, "-m", "teambot.cli", "--help"],
             capture_output=True,
             text=True,
+            cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]),
+            timeout=10,
         )
         assert result.returncode == 0, f"teambot --help failed:\n{result.stderr}"
         assert "TeamBot" in result.stdout
