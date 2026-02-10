@@ -16,8 +16,9 @@ Enhancement of the teambot user text input to support multi-line entry, improved
 - Copy/pasting multi-line content (code blocks, logs, structured text) is awkward and often loses formatting or structure.
 
 **Scope**:
-- This objective applies **only to the Textual split-pane UI** (`InputPane` in `src/teambot/ui/widgets/input_pane.py`).
-- The legacy Rich `Prompt`-based REPL in `src/teambot/repl/loop.py` is **out of scope for this objective**. Whether to remove it is a separate decision.
+- This objective applies to **both** the Textual split-pane UI and the legacy REPL:
+  - **Split-pane UI**: Enhanced `InputPane` in `src/teambot/ui/widgets/input_pane.py` to support multi-line input using `TextArea` widget with Alt+Enter, Ctrl+Enter, and Shift+Enter key combinations.
+  - **Legacy REPL**: Added backslash continuation support in `src/teambot/repl/loop.py` to allow multi-line input in legacy mode (lines ending with `\` continue on the next line).
 
 **Success Criteria**:
 - [ ] The text input field supports multi-line entry, allowing users to type or paste content spanning multiple lines.
