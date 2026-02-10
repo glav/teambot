@@ -20,16 +20,15 @@ class TestAcceptanceUnknownAgentValidation:
     # ------------------------------------------------------------------
     # AT-001: Simple Unknown Agent Command (Simple Path)
     # ------------------------------------------------------------------
-    def test_at_001_simple_unknown_agent_rejected_by_router(self):
+    @pytest.mark.asyncio
+    async def test_at_001_simple_unknown_agent_rejected_by_router(self):
         """Simple path: router rejects unknown agent with helpful error."""
         router = AgentRouter()
         router.register_agent_handler(AsyncMock(return_value="ok"))
 
         command = parse_command("@unknown-agent do something")
         with pytest.raises(RouterError, match="Unknown agent"):
-            import asyncio
-
-            asyncio.get_event_loop().run_until_complete(router.route(command))
+            await router.route(command)
 
     def test_at_001_simple_unknown_agent_not_valid(self):
         """Router's is_valid_agent returns False for unknown agent."""
