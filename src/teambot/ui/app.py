@@ -146,6 +146,19 @@ class TeamBotApp(App):
             output.write_info("No executor available")
             return
 
+        # Validate all agent IDs before dispatch
+        from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
+
+        for agent_id in command.agent_ids:
+            canonical = AGENT_ALIASES.get(agent_id, agent_id)
+            if canonical not in VALID_AGENTS:
+                valid_list = ", ".join(sorted(VALID_AGENTS))
+                output.write_task_error(
+                    agent_id,
+                    f"Unknown agent: '{agent_id}'. Valid agents: {valid_list}",
+                )
+                return
+
         content = command.content or ""
 
         # Handle multi-agent commands with parallel streaming

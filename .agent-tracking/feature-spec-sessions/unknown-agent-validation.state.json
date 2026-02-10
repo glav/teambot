@@ -1,0 +1,83 @@
+{
+  "specFile": ".teambot/unknown-agent-validation/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-09T22:48:00Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "core-problem",
+    "solution-approach",
+    "target-users",
+    "primary-language",
+    "testing-approach",
+    "technical-constraints",
+    "existing-patterns",
+    "scope-boundaries"
+  ],
+  "answeredQuestions": {
+    "product-name": "Unknown Agent ID Validation (TeamBot bug fix)",
+    "core-problem": "Unknown agent IDs silently accepted on advanced command paths, falling back to builder persona",
+    "solution-approach": "Add validation to TaskExecutor.execute() and guard AgentStatusManager auto-creation",
+    "target-users": "TeamBot end users who direct commands to agents via @agent syntax",
+    "primary-language": "Python",
+    "testing-approach": "pytest (follow existing patterns, test-after for bug fix)",
+    "technical-constraints": "Single source of truth for VALID_AGENTS, no circular imports, minimal changes",
+    "existing-patterns": "Local imports in executor.py methods, VALID_AGENTS set in router.py, AGENT_ALIASES dict",
+    "scope-boundaries": "Targeted bug fix only — no refactoring of dual-path routing architecture"
+  },
+  "referencesProcessed": [
+    {
+      "file": ".teambot/unknown-agent-validation/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Two root causes: TaskExecutor bypass and AgentStatusManager auto-creation. 8 success criteria defined.",
+      "integratedSections": ["problem-definition", "root-causes", "goals", "acceptance-criteria"],
+      "conflicts": [],
+      "pendingActions": []
+    },
+    {
+      "file": "src/teambot/repl/router.py",
+      "status": "analyzed",
+      "keyFindings": "VALID_AGENTS set at line 19, AGENT_ALIASES at lines 23-27, is_valid_agent/resolve_agent_id methods at lines 55-76",
+      "integratedSections": ["functional-requirements", "dependencies", "references"],
+      "conflicts": [],
+      "pendingActions": []
+    },
+    {
+      "file": "src/teambot/tasks/executor.py",
+      "status": "analyzed",
+      "keyFindings": "execute() at line 162 has no agent ID validation. Already uses local import of VALID_AGENTS for $ref validation at line 199.",
+      "integratedSections": ["functional-requirements", "root-causes", "references"],
+      "conflicts": [],
+      "pendingActions": []
+    },
+    {
+      "file": "src/teambot/ui/agent_state.py",
+      "status": "analyzed",
+      "keyFindings": "_update(), set_idle(), set_model() all auto-create status entries for any agent_id",
+      "integratedSections": ["functional-requirements", "root-causes", "references"],
+      "conflicts": [],
+      "pendingActions": []
+    },
+    {
+      "file": "src/teambot/repl/loop.py",
+      "status": "analyzed",
+      "keyFindings": "Lines 323-336: routing decision sends advanced commands to TaskExecutor, bypassing router validation",
+      "integratedSections": ["problem-definition", "references"],
+      "conflicts": [],
+      "pendingActions": []
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-complete",
+    "acceptance-tests-defined",
+    "no-placeholders",
+    "technical-stack-defined",
+    "testing-approach-defined"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}

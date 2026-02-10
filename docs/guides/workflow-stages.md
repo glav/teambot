@@ -1,13 +1,13 @@
 # Workflow Stages
 
-TeamBot enforces a 13-stage prescriptive workflow for autonomous development.
+TeamBot enforces a 14-stage prescriptive workflow for autonomous development.
 
 ## Stage Flow
 
 ```
 SETUP → BUSINESS_PROBLEM → SPEC → SPEC_REVIEW → RESEARCH →
 TEST_STRATEGY → PLAN → PLAN_REVIEW → IMPLEMENTATION →
-IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
+IMPLEMENTATION_REVIEW → TEST → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
 
 ## Stage Details
@@ -25,6 +25,7 @@ IMPLEMENTATION_REVIEW → TEST → POST_REVIEW → COMPLETE
 | `IMPLEMENTATION` | Execute the plan | Builder (parallel) |
 | `IMPLEMENTATION_REVIEW` | Review changes | Reviewer |
 | `TEST` | Execute tests and validate | Builder, Reviewer |
+| `ACCEPTANCE_TEST` | Run end-to-end acceptance tests | Builder |
 | `POST_REVIEW` | Final review and retrospective | PM, Reviewer |
 | `COMPLETE` | Workflow complete | - |
 
@@ -59,6 +60,15 @@ During `IMPLEMENTATION` stage, both `builder-1` and `builder-2` execute concurre
 - Faster development through parallelization
 - Multiple components implemented simultaneously
 - Coordinated work via shared workspace
+
+## Acceptance Testing
+
+The `ACCEPTANCE_TEST` stage runs after unit tests pass, validating the implementation end-to-end from a user's perspective. Unlike unit tests, acceptance tests exercise complete user flows defined in the feature specification.
+
+- The workflow **will not proceed** to `POST_REVIEW` if any acceptance test fails
+- `POST_REVIEW` has `requires_acceptance_tests_passed: true`, blocking final approval until all acceptance scenarios pass
+- Results are saved to `.teambot/{feature}/artifacts/acceptance_test_results.md`
+- **Error scenarios are supported**: scenarios that expect errors (e.g., testing invalid input rejection) treat command failures as correct behavior when the expected result describes an error
 
 ## Optional Stages
 

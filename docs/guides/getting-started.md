@@ -73,7 +73,7 @@ uv run teambot status
 1. **Initialize**: `uv run teambot init`
 2. **Create objective**: Write your goals in `objectives/my-task.md`
 3. **Run**: `uv run teambot run objectives/my-task.md`
-4. **Monitor**: Watch the 13-stage workflow execute automatically
+4. **Monitor**: Watch the 14-stage workflow execute automatically
 
 ---
 

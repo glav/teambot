@@ -166,7 +166,8 @@ class AgentRouter:
         agent_id = self.resolve_agent_id(command.agent_id)
 
         if not self.is_valid_agent(agent_id):
-            raise RouterError(f"Unknown agent: {command.agent_id}")
+            valid_list = ", ".join(sorted(VALID_AGENTS))
+            raise RouterError(f"Unknown agent: '{command.agent_id}'. Valid agents: {valid_list}")
 
         # Record in history
         self._record_history(agent_id, command.content)

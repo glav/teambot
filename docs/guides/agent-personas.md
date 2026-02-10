@@ -13,6 +13,21 @@ TeamBot includes 6 specialized agent personas that work together autonomously.
 | `builder-2` | Builder (Secondary) | Implementation, coding, testing |
 | `reviewer` | Reviewer | Code review, quality assurance |
 
+## Agent IDs and Aliases
+
+Each agent has a short ID and optional aliases:
+
+| Agent ID | Aliases | Persona |
+|----------|---------|---------|
+| `pm` | `project_manager` | Project Manager |
+| `ba` | `business_analyst` | Business Analyst |
+| `writer` | `technical_writer` | Technical Writer |
+| `builder-1` | — | Builder (Primary) |
+| `builder-2` | — | Builder (Secondary) |
+| `reviewer` | — | Reviewer |
+
+Use the short ID (e.g., `@pm`) or the full alias (e.g., `@project_manager`) when addressing agents. If you reference an unknown agent, TeamBot displays an error listing all valid agents.
+
 ## Persona Details
 
 ### Project Manager (`pm`)
@@ -98,6 +113,6 @@ Each stage has designated agents:
 
 ## Next Steps
 
-- [Workflow Stages](workflow-stages.md) - The 13-stage process
+- [Workflow Stages](workflow-stages.md) - The 14-stage process
 - [Interactive Mode](interactive-mode.md) - Using agents interactively
 - [Configuration](configuration.md) - Configuring agents

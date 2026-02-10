@@ -317,3 +317,33 @@ class TestAgentStatusManagerDefaultAgent:
         """get_default_agent() returns None initially."""
         manager = AgentStatusManager()
         assert manager.get_default_agent() is None
+
+
+class TestAgentStatusManagerGuard:
+    """Tests for ghost agent prevention in AgentStatusManager."""
+
+    def test_set_running_ignores_unknown_agent(self):
+        """set_running for unknown agent does not create status entry."""
+        manager = AgentStatusManager()
+        manager.set_running("fake-agent", "some task")
+        assert manager.get("fake-agent") is None
+
+    def test_set_idle_ignores_unknown_agent(self):
+        """set_idle for unknown agent does not create status entry."""
+        manager = AgentStatusManager()
+        manager.set_idle("fake-agent")
+        assert manager.get("fake-agent") is None
+
+    def test_set_model_ignores_unknown_agent(self):
+        """set_model for unknown agent does not create status entry."""
+        manager = AgentStatusManager()
+        manager.set_model("fake-agent", "gpt-4")
+        assert manager.get("fake-agent") is None
+
+    def test_default_agents_still_auto_created(self):
+        """Known agents still get auto-created status entries."""
+        manager = AgentStatusManager()
+        manager.set_running("pm", "plan authentication")
+        status = manager.get("pm")
+        assert status is not None
+        assert status.state == AgentState.RUNNING
