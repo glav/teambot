@@ -44,8 +44,12 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=src/teambot --cov-report=term-missing"
+addopts = "--cov=src/teambot --cov-report=term-missing -m 'not acceptance'"
 asyncio_mode = "auto"
+markers = [
+    "acceptance: marks tests as acceptance tests (slow, may duplicate CI checks; run with -m acceptance)",
+    "slow: marks tests as slow running (run with -m slow)",
+]
 
 [tool.uv]
 package = true

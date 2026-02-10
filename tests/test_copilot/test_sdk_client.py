@@ -656,10 +656,8 @@ class TestCopilotSDKClientSessionRetry:
 
             def on(handler):
                 session._handlers.append(handler)
-                return (
-                    lambda: session._handlers.remove(handler)
-                    if handler in session._handlers
-                    else None
+                return lambda: (
+                    session._handlers.remove(handler) if handler in session._handlers else None
                 )
 
             session.on = on
@@ -735,10 +733,8 @@ class TestCopilotSDKClientSessionRetry:
 
             def on(handler):
                 session._handlers.append(handler)
-                return (
-                    lambda: session._handlers.remove(handler)
-                    if handler in session._handlers
-                    else None
+                return lambda: (
+                    session._handlers.remove(handler) if handler in session._handlers else None
                 )
 
             session.on = on
@@ -813,10 +809,8 @@ class TestCopilotSDKClientSessionRetry:
 
             def on(handler):
                 session._handlers.append(handler)
-                return (
-                    lambda: session._handlers.remove(handler)
-                    if handler in session._handlers
-                    else None
+                return lambda: (
+                    session._handlers.remove(handler) if handler in session._handlers else None
                 )
 
             session.on = on
