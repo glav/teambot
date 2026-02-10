@@ -50,6 +50,11 @@ class TestHelpCommand:
         assert "/use-agent" in result.output
         assert "/reset-agent" in result.output
 
+    def test_help_shows_sdk_version(self):
+        """Test /help output includes Copilot SDK version."""
+        result = handle_help([])
+        assert "Copilot SDK:" in result.output
+
 
 class TestStatusCommand:
     """Tests for /status command."""
