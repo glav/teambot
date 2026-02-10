@@ -50,7 +50,6 @@ class InputPane(TextArea):
             self._history_index = -1
             self._current_input = ""
             self.post_message(self.Submitted(self, text))
-            self.clear()
             return
 
         if event.key == "up" and self.cursor_at_first_line:
