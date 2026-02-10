@@ -27,6 +27,7 @@ from teambot.repl.parser import CommandType, ParseError, parse_command
 from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS, AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor
 from teambot.ui.agent_state import AgentStatusManager
+from teambot.ui.widgets.input_pane import InputPane
 from teambot.ui.widgets.status_panel import StatusPanel
 from teambot.visualization.animation import (
     LOGO_COLOR_MAP,
@@ -948,3 +949,312 @@ class TestUnknownAgentValidationAcceptance:
         await executor.execute(command)
 
         assert executor.task_count == 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Enhanced Multi-Line Text Input — Acceptance Tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestMultiLineInputAcceptance:
+    """Acceptance tests for enhanced multi-line text input feature."""
+
+    # ── AT-001: Paste Multi-Line Code Snippet ───────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_at_001_paste_multiline_code_snippet(self):
+        """User composes a multi-line code snippet prefixed with agent command and submits."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+            output = app.query_one("#output")
+
+            await pilot.click("#prompt")
+
+            # Type agent prefix
+            for ch in "@builder-1 review this code:":
+                await pilot.press(ch)
+
+            # Alt+Enter for newlines (simulating multi-line paste)
+            await pilot.press("alt+enter")
+            for ch in "def hello():":
+                await pilot.press(ch)
+            await pilot.press("alt+enter")
+            for ch in "    print('hi')":
+                await pilot.press(ch)
+            await pilot.press("alt+enter")
+            for ch in "    return True":
+                await pilot.press(ch)
+            await pilot.press("alt+enter")
+            # empty line
+            await pilot.press("alt+enter")
+            for ch in "hello()":
+                await pilot.press(ch)
+            await pilot.pause()
+
+            # Verify multi-line content in input before submit
+            text = input_pane.text
+            assert "@builder-1 review this code:" in text
+            assert "def hello():" in text
+            assert "hello()" in text
+            assert text.count("\n") == 5  # 5 newlines = 6 lines
+
+            # Submit with Enter
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Input cleared after submit
+            assert input_pane.text == ""
+            # Output received the command (echoed)
+            assert len(output.lines) > 0
+
+    @pytest.mark.asyncio
+    async def test_at_001_multiline_parsed_as_agent_command(self):
+        """Multi-line content with @agent prefix is parsed correctly by real parser."""
+        multiline = (
+            "@builder-1 review this code:\n"
+            "def hello():\n"
+            "    print('hi')\n"
+            "    return True\n"
+            "\n"
+            "hello()"
+        )
+        cmd = parse_command(multiline)
+        assert cmd.type == CommandType.AGENT
+        assert cmd.agent_ids == ["builder-1"]
+        assert "def hello():" in cmd.content
+        assert "hello()" in cmd.content
+
+    # ── AT-002: Enter Submits, Alt+Enter Inserts Newline ────────────────
+
+    @pytest.mark.asyncio
+    async def test_at_002_enter_submits_alt_enter_inserts_newline(self):
+        """Alt+Enter inserts newlines without submitting; Enter submits all content."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+            output = app.query_one("#output")
+            initial_lines = len(output.lines)
+
+            await pilot.click("#prompt")
+
+            # Step 1: type prefix
+            for ch in "@pm plan the following:":
+                await pilot.press(ch)
+            await pilot.pause()
+
+            # Step 2: Alt+Enter (newline, NOT submitted)
+            await pilot.press("alt+enter")
+            await pilot.pause()
+            assert len(output.lines) == initial_lines  # No submission
+
+            # Step 3: type first item
+            for ch in "- Add authentication":
+                await pilot.press(ch)
+
+            # Step 4: Alt+Enter again (newline, NOT submitted)
+            await pilot.press("alt+enter")
+            await pilot.pause()
+            assert len(output.lines) == initial_lines  # Still no submission
+
+            # Step 5: type second item
+            for ch in "- Add logging":
+                await pilot.press(ch)
+            await pilot.pause()
+
+            # Verify 3 lines in input before submit
+            text = input_pane.text
+            assert "@pm plan the following:" in text
+            assert "- Add authentication" in text
+            assert "- Add logging" in text
+            assert text.count("\n") == 2
+
+            # Step 6: Enter to submit
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Submission occurred
+            assert len(output.lines) > initial_lines
+            # Input cleared
+            assert input_pane.text == ""
+
+    # ── AT-003: History Navigation in Multi-Line Context ────────────────
+
+    @pytest.mark.asyncio
+    async def test_at_003_history_navigation_multiline(self):
+        """Up/Down on interior lines move cursor; on boundary trigger history."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+
+            # Submit a previous command to have history
+            await pilot.click("#prompt")
+            for ch in "@pm hello":
+                await pilot.press(ch)
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Step 1: Type 2-line input
+            await pilot.click("#prompt")
+            for ch in "line one":
+                await pilot.press(ch)
+            await pilot.press("alt+enter")
+            for ch in "line two":
+                await pilot.press(ch)
+            await pilot.pause()
+
+            # Verify 2-line content
+            assert "line one" in input_pane.text
+            assert "line two" in input_pane.text
+
+            # Step 2: Cursor is on line 2. Press Up → moves cursor to line 1
+            await pilot.press("up")
+            await pilot.pause()
+            # Content should still be 2-line text (not replaced by history)
+            assert "line one" in input_pane.text
+            assert "line two" in input_pane.text
+
+            # Step 3: Cursor now on line 1. Press Up → history loads "@pm hello"
+            await pilot.press("up")
+            await pilot.pause()
+            assert input_pane.text == "@pm hello"
+
+            # Step 4: Press Down → original 2-line input restored
+            await pilot.press("down")
+            await pilot.pause()
+            assert "line one" in input_pane.text
+            assert "line two" in input_pane.text
+            assert "\n" in input_pane.text
+
+    # ── AT-004: Single-Line Workflow Backward Compatibility ─────────────
+
+    @pytest.mark.asyncio
+    async def test_at_004_single_line_backward_compat(self):
+        """Single-line commands work identically to pre-migration behavior."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+            output = app.query_one("#output")
+            initial_lines = len(output.lines)
+
+            # Step 1-2: Type and submit single-line command
+            await pilot.click("#prompt")
+            for ch in "@pm create a plan":
+                await pilot.press(ch)
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Step 3: Command submitted
+            assert len(output.lines) > initial_lines
+            assert input_pane.text == ""
+
+            # Step 4-5: Up arrow recalls previous command
+            await pilot.click("#prompt")
+            await pilot.press("up")
+            await pilot.pause()
+            assert input_pane.text == "@pm create a plan"
+
+    @pytest.mark.asyncio
+    async def test_at_004_single_line_parsed_correctly(self):
+        """Single-line agent command parses and routes correctly."""
+        cmd = parse_command("@pm create a plan")
+        assert cmd.type == CommandType.AGENT
+        assert cmd.agent_ids == ["pm"]
+        assert cmd.content == "create a plan"
+
+    # ── AT-005: Word Wrap and Scrolling ─────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_at_005_word_wrap_enabled(self):
+        """TextArea has soft_wrap=True for word wrapping."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as _pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+            assert input_pane.soft_wrap is True
+
+    @pytest.mark.asyncio
+    async def test_at_005_css_height_configured(self):
+        """Input pane has multi-line height configuration."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as _pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+            assert input_pane.styles.min_height is not None
+
+    @pytest.mark.asyncio
+    async def test_at_005_large_content_scrollable(self):
+        """20 lines of content can be entered and all are accessible."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+
+            await pilot.click("#prompt")
+            for i in range(20):
+                for ch in f"line {i + 1}":
+                    await pilot.press(ch)
+                if i < 19:
+                    await pilot.press("ctrl+enter")
+            await pilot.pause()
+
+            text = input_pane.text
+            assert text.count("\n") == 19  # 19 newlines = 20 lines
+            assert "line 1" in text
+            assert "line 10" in text
+            assert "line 20" in text
+
+    # ── AT-006: Ctrl+Enter as Alternative Newline Binding ───────────────
+
+    @pytest.mark.asyncio
+    async def test_at_006_ctrl_enter_inserts_newline(self):
+        """Ctrl+Enter inserts a newline; Enter submits both lines."""
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt", InputPane)
+            output = app.query_one("#output")
+            initial_lines = len(output.lines)
+
+            await pilot.click("#prompt")
+
+            # Step 1: type first line
+            for ch in "first line":
+                await pilot.press(ch)
+
+            # Step 2-3: Ctrl+Enter inserts newline
+            await pilot.press("ctrl+enter")
+            await pilot.pause()
+
+            # No submission occurred
+            assert len(output.lines) == initial_lines
+            # Newline inserted
+            assert "\n" in input_pane.text
+
+            # Step 4: type second line
+            for ch in "second line":
+                await pilot.press(ch)
+            await pilot.pause()
+
+            # Verify content
+            assert input_pane.text == "first line\nsecond line"
+
+            # Step 5: Enter to submit
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Submitted
+            assert len(output.lines) > initial_lines
+            assert input_pane.text == ""

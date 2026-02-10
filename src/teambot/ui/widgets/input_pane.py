@@ -1,32 +1,72 @@
-"""Input pane widget with command history navigation."""
+"""Input pane widget with multi-line editing and command history navigation."""
 
-from textual.widgets import Input
+from textual import events
+from textual.message import Message
+from textual.widgets import TextArea
 
 
-class InputPane(Input):
-    """Input pane with command history navigation."""
+class InputPane(TextArea):
+    """Multi-line input pane with command history navigation.
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    Extends TextArea to provide:
+    - Enter to submit (posts Submitted message)
+    - Ctrl+Enter / Alt+Enter / Shift+Enter to insert newline
+    - Conditional Up/Down history navigation (only at first/last line)
+    """
+
+    class Submitted(Message):
+        """Posted when user presses Enter to submit input."""
+
+        def __init__(self, input: "InputPane", value: str) -> None:
+            super().__init__()
+            self.input = input
+            self.value = value
+
+    def __init__(self, placeholder: str = "", **kwargs):
+        super().__init__(
+            soft_wrap=True,
+            show_line_numbers=False,
+            **kwargs,
+        )
+        self.placeholder = placeholder
         self._history: list[str] = []
         self._history_index: int = -1
         self._current_input: str = ""
 
-    def on_input_submitted(self, event) -> None:
-        """Store submitted input in history."""
-        if event.value.strip():
-            self._history.append(event.value)
-        self._history_index = -1
-        self._current_input = ""
+    async def _on_key(self, event: events.Key) -> None:
+        """Handle key events for submit, newline, and history."""
+        if event.key in ("ctrl+enter", "alt+enter", "shift+enter"):
+            event.stop()
+            event.prevent_default()
+            self.insert("\n")
+            return
 
-    def on_key(self, event) -> None:
-        """Handle up/down arrow for history navigation."""
-        if event.key == "up":
-            self._navigate_history(1)  # Up goes back in history (higher index)
+        if event.key == "enter":
+            event.stop()
             event.prevent_default()
-        elif event.key == "down":
-            self._navigate_history(-1)  # Down goes forward (lower index)
+            text = self.text
+            if text.strip():
+                self._history.append(text)
+            self._history_index = -1
+            self._current_input = ""
+            self.post_message(self.Submitted(self, text))
+            self.clear()
+            return
+
+        if event.key == "up" and self.cursor_at_first_line:
+            event.stop()
             event.prevent_default()
+            self._navigate_history(1)
+            return
+
+        if event.key == "down" and self.cursor_at_last_line:
+            event.stop()
+            event.prevent_default()
+            self._navigate_history(-1)
+            return
+
+        # All other keys: default TextArea behavior
+        await super()._on_key(event)
 
     def _navigate_history(self, direction: int) -> None:
         """Navigate through command history.
@@ -40,7 +80,7 @@ class InputPane(Input):
 
         # Save current input when starting navigation
         if self._history_index == -1 and direction > 0:
-            self._current_input = self.value
+            self._current_input = self.text
 
         # Calculate new index
         new_index = self._history_index + direction
@@ -53,9 +93,9 @@ class InputPane(Input):
 
         self._history_index = new_index
 
-        # Update input value
+        # Update input text
         if self._history_index == -1:
-            self.value = self._current_input
+            self.text = self._current_input
         else:
             # Navigate from end of history (most recent first)
-            self.value = self._history[-(self._history_index + 1)]
+            self.text = self._history[-(self._history_index + 1)]

@@ -1,0 +1,103 @@
+{
+  "specFile": ".teambot/enhanced-text-input/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-10T04:15:00Z",
+  "currentPhase": "specification-complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "solution-approach",
+    "product-type",
+    "primary-language",
+    "testing-approach",
+    "key-constraints",
+    "existing-patterns",
+    "success-metrics",
+    "scope-boundaries",
+    "keybinding-strategy",
+    "history-navigation",
+    "layout-impact",
+    "api-compatibility"
+  ],
+  "answeredQuestions": {
+    "product-name": "Enhanced Multi-Line Text Input for TeamBot",
+    "target-users": "Developers using TeamBot TUI to interact with AI agents",
+    "core-problem": "Single-line Input widget prevents composing/pasting multi-line content (code, errors, instructions)",
+    "solution-approach": "Migrate InputPane from textual.widgets.Input to textual.widgets.TextArea with custom keybindings",
+    "product-type": "Feature enhancement to existing TeamBot TUI",
+    "primary-language": "Python (Textual/Rich framework)",
+    "testing-approach": "Hybrid — unit tests for widget behavior, acceptance tests for end-to-end flows",
+    "key-constraints": "Textual TUI framework, terminal emulator keybinding limitations, Shift+Enter indistinguishable from Enter",
+    "existing-patterns": "InputPane extends Input, app.py consumes InputPane.Submitted, parser uses re.DOTALL",
+    "success-metrics": "All 1084+ existing tests pass, 10+ new tests, multi-line submission works end-to-end",
+    "scope-boundaries": "No syntax highlighting, no configurable height, no rich output rendering of multi-line content",
+    "keybinding-strategy": "Enter=submit, Alt+Enter=newline, Ctrl+Enter=newline (alternative)",
+    "history-navigation": "Up on first line = history back, Down on last line = history forward, otherwise cursor movement",
+    "layout-impact": "Input area grows to 3-5 lines, status panel height reduced proportionally",
+    "api-compatibility": "Custom InputPane.Submitted message with .value and .input attributes preserves app.py contract"
+  },
+  "referencesProcessed": [
+    {
+      "file": "src/teambot/ui/widgets/input_pane.py",
+      "status": "analyzed",
+      "keyFindings": "InputPane extends textual.widgets.Input, has _history list, _navigate_history(), on_input_submitted(), on_key() for Up/Down",
+      "integratedSections": ["problem-definition", "functional-requirements", "technical-notes"]
+    },
+    {
+      "file": "src/teambot/ui/app.py",
+      "status": "analyzed",
+      "keyFindings": "handle_input() uses @on(InputPane.Submitted), extracts event.value, calls event.input.clear()",
+      "integratedSections": ["problem-definition", "functional-requirements", "api-compatibility"]
+    },
+    {
+      "file": "src/teambot/ui/styles.css",
+      "status": "analyzed",
+      "keyFindings": "#prompt { dock: bottom; } — no explicit height set",
+      "integratedSections": ["functional-requirements", "scope"]
+    },
+    {
+      "file": "src/teambot/repl/parser.py",
+      "status": "analyzed",
+      "keyFindings": "AGENT_PATTERN and SYSTEM_PATTERN use re.DOTALL — already supports multi-line content",
+      "integratedSections": ["assumptions", "dependencies"]
+    },
+    {
+      "file": "tests/test_ui/test_input_pane.py",
+      "status": "analyzed",
+      "keyFindings": "4 tests: history up/down, empty history, preserves current input — all need adaptation for TextArea API",
+      "integratedSections": ["risks", "dependencies"]
+    },
+    {
+      "file": "Textual TextArea widget documentation",
+      "status": "analyzed",
+      "keyFindings": "TextArea: .text property, soft_wrap=True default, cursor_location tuple, Changed/SelectionChanged messages, no Submitted event, no placeholder support",
+      "integratedSections": ["functional-requirements", "technical-notes", "risks"]
+    },
+    {
+      "file": ".teambot/enhanced-text-input/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Business problem analysis with 4 pain points, 8 success criteria, risk assessment",
+      "integratedSections": ["problem-definition", "goals", "success-criteria"]
+    }
+  ],
+  "nextActions": [
+    "Run specification review (sdd.2-review-spec.prompt.md)",
+    "Resolve Q-001: Verify Textual minimum version for soft_wrap support",
+    "Proceed to research phase after review approval"
+  ],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-linked-to-goals",
+    "acceptance-criteria-defined",
+    "acceptance-test-scenarios-defined",
+    "risks-documented",
+    "dependencies-documented",
+    "technical-notes-complete"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured",
+    "testing-approach": "hybrid"
+  }
+}

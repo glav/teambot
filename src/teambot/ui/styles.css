@@ -31,6 +31,9 @@ Horizontal {
 
 #prompt {
     dock: bottom;
+    height: 5;
+    min-height: 3;
+    max-height: 10;
 }
 
 #output {

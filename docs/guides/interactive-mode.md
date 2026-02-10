@@ -165,6 +165,35 @@ This validation applies to all command forms — single agent, multi-agent, pipe
 
 You can use either the short ID or the alias form (e.g., `@project_manager` resolves to `@pm`).
 
+## Multi-Line Input
+
+### Split-Pane Mode (Textual)
+
+In the default split-pane interface, use these key combos to insert newlines without submitting:
+
+| Key Combo | Terminal Support |
+|-----------|----------------|
+| **Alt+Enter** | Most terminals (recommended) |
+| **Ctrl+Enter** | Terminals with CSI u / kitty keyboard protocol |
+| **Shift+Enter** | Terminals with CSI u / kitty keyboard protocol |
+
+Press **Enter** alone to submit your input.
+
+> **Tip:** If Shift+Enter or Ctrl+Enter acts like plain Enter, your terminal likely
+> doesn't support the [kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
+> Use **Alt+Enter** instead, or switch to a terminal that supports the protocol
+> (kitty, WezTerm, Ghostty, foot, recent iTerm2/Windows Terminal).
+
+### Legacy Mode
+
+In legacy mode (`TEAMBOT_LEGACY_MODE=true`), end a line with `\` to continue on the next line:
+
+```bash
+teambot: @builder-1 Implement the login feature \
+   ...: with JWT authentication and \
+   ...: password hashing using bcrypt
+```
+
 ## Split-Pane Interface
 
 TeamBot features a split-pane terminal interface (powered by [Textual](https://textual.textualize.io/)):
