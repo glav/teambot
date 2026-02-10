@@ -409,11 +409,18 @@ class AcceptanceTestExecutor:
                         outputs.values()
                     )
                 elif all_commands_succeeded and scenario.expected_result:
-                    # For non-error scenarios, successful execution of all commands
-                    # is sufficient runtime verification. Output content is validated
-                    # by code-level pytest tests; mock SDK output in runtime validation
-                    # does not produce meaningful text for content matching.
-                    pass
+                    # Check if this is an expected-error scenario that didn't produce an error
+                    if self._is_expected_error_scenario(scenario.expected_result):
+                        all_commands_succeeded = False
+                        runtime_scenario.failure_reason = (
+                            "Expected an error but all commands succeeded"
+                        )
+                    else:
+                        # For non-error scenarios, successful execution of all commands
+                        # is sufficient runtime verification. Output content is validated
+                        # by code-level pytest tests; mock SDK output in runtime validation
+                        # does not produce meaningful text for content matching.
+                        pass
 
                 if all_commands_succeeded:
                     runtime_scenario.status = AcceptanceTestStatus.PASSED

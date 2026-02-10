@@ -505,6 +505,36 @@ class TestRuntimeValidation:
         assert result.passed == 1
         assert result.failed == 0
 
+    async def test_runtime_validation_fails_expected_error_without_error(
+        self,
+    ) -> None:
+        """Runtime validation fails when expected-error scenario produces no error."""
+        spec = """# Feature Spec
+
+## Acceptance Test Scenarios
+
+### AT-001: Should reject unknown agent
+**Description**: Command with unknown agent should produce an error
+
+**Steps**:
+1. Execute `@pm list agents`
+
+**Expected Result**: Error message: Unknown agent
+"""
+        executor = AcceptanceTestExecutor(spec_content=spec)
+        executor.load_scenarios()
+
+        mock_client = AsyncMock()
+        # Mock the SDK to return success (no error produced)
+        mock_client.execute_agent_task = AsyncMock(return_value="Agent list returned")
+
+        result = await executor._execute_runtime_validation(mock_client)
+
+        # Expected error but got success, so this should fail
+        assert result.passed == 0
+        assert result.failed == 1
+        assert "Expected an error but all commands succeeded" in result.scenarios[0].failure_reason
+
 
 class TestExtractCommandsExtendedSyntax:
     """Tests for extract_commands_from_steps with multi-agent and alias syntax."""
