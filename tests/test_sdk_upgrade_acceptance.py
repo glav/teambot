@@ -8,6 +8,8 @@ import importlib.metadata
 import subprocess
 import sys
 
+import pytest
+
 
 class TestSDKUpgradeAcceptance:
     """Acceptance scenarios for the SDK version bump."""
@@ -54,6 +56,8 @@ class TestSDKUpgradeAcceptance:
     # ------------------------------------------------------------------
     # AT-003: Linting Passes
     # ------------------------------------------------------------------
+    @pytest.mark.acceptance
+    @pytest.mark.slow
     def test_at_003_ruff_check_passes(self):
         """ruff check exits with code 0."""
         result = subprocess.run(
@@ -65,6 +69,8 @@ class TestSDKUpgradeAcceptance:
         )
         assert result.returncode == 0, f"ruff check failed:\n{result.stdout}\n{result.stderr}"
 
+    @pytest.mark.acceptance
+    @pytest.mark.slow
     def test_at_003_ruff_format_check_passes(self):
         """ruff format --check exits with code 0."""
         result = subprocess.run(
