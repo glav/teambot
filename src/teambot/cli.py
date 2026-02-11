@@ -17,6 +17,7 @@ from teambot.visualization.animation import play_startup_animation
 from teambot.visualization.console import ConsoleDisplay
 
 if TYPE_CHECKING:
+    from teambot.notifications.event_bus import EventBus
     from teambot.orchestration import ExecutionLoop, ExecutionResult
 
 
@@ -264,6 +265,7 @@ async def _run_orchestration_async(
     loop: ExecutionLoop,
     display: ConsoleDisplay,
     on_progress: Callable[[str, dict], None],
+    event_bus: EventBus | None = None,
 ) -> ExecutionResult:
     """Async implementation of orchestration run."""
     from teambot.copilot.sdk_client import CopilotSDKClient
@@ -278,6 +280,9 @@ async def _run_orchestration_async(
         return await loop.run(sdk_client=sdk_client, on_progress=on_progress)
     finally:
         await sdk_client.stop()
+        # Drain pending notifications before shutdown
+        if event_bus is not None:
+            await event_bus.drain(timeout=5.0)
 
 
 def _run_orchestration(
@@ -361,7 +366,7 @@ def _run_orchestration(
             event_bus.emit_sync(event_type, data)
 
     try:
-        result = asyncio.run(_run_orchestration_async(loop, display, on_progress))
+        result = asyncio.run(_run_orchestration_async(loop, display, on_progress, event_bus))
 
         if result == ExecutionResult.COMPLETE:
             display.print_success("Objective completed!")
@@ -388,6 +393,7 @@ async def _run_orchestration_resume_async(
     loop: ExecutionLoop,
     display: ConsoleDisplay,
     on_progress: Callable[[str, dict], None],
+    event_bus: EventBus | None = None,
 ) -> ExecutionResult:
     """Async implementation of orchestration resume."""
     from teambot.copilot.sdk_client import CopilotSDKClient
@@ -402,6 +408,9 @@ async def _run_orchestration_resume_async(
         return await loop.run(sdk_client=sdk_client, on_progress=on_progress)
     finally:
         await sdk_client.stop()
+        # Drain pending notifications before shutdown
+        if event_bus is not None:
+            await event_bus.drain(timeout=5.0)
 
 
 def _run_orchestration_resume(
@@ -481,7 +490,7 @@ def _run_orchestration_resume(
             event_bus.emit_sync(event_type, data)
 
     try:
-        result = asyncio.run(_run_orchestration_resume_async(loop, display, on_progress))
+        result = asyncio.run(_run_orchestration_resume_async(loop, display, on_progress, event_bus))
 
         if result == ExecutionResult.COMPLETE:
             display.print_success("Objective completed!")
