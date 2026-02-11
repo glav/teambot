@@ -202,6 +202,27 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             )
         )
 
+    # Validate no duplicate work_agents in parallel groups
+    for group in parallel_groups:
+        agent_to_stages: dict[str, list[WorkflowStage]] = {}
+        for stage in group.stages:
+            stage_config = stages[stage]
+            if stage_config.work_agent is not None:
+                if stage_config.work_agent not in agent_to_stages:
+                    agent_to_stages[stage_config.work_agent] = []
+                agent_to_stages[stage_config.work_agent].append(stage)
+
+        # Check for duplicates
+        for agent, stage_list in agent_to_stages.items():
+            if len(stage_list) > 1:
+                stage_names = ", ".join(s.name for s in stage_list)
+                raise ValueError(
+                    f"Parallel group '{group.name}' has duplicate work_agent '{agent}' "
+                    f"across stages: {stage_names}. Stages in a parallel group must use "
+                    f"different agents to avoid session conflicts. Consider assigning a "
+                    f"different agent (e.g., 'builder-2') to one of these stages."
+                )
+
     return StagesConfiguration(
         stages=stages,
         stage_order=stage_order,

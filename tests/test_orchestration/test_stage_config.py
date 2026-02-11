@@ -360,7 +360,7 @@ stages:
   TEST_STRATEGY:
     name: Test Strategy
     description: Test strategy
-    work_agent: builder-1
+    work_agent: builder-2
     review_agent: null
     allowed_personas: [builder]
   PLAN:
@@ -472,6 +472,108 @@ parallel_groups:
 
         with pytest.raises(ValueError, match="Invalid stage name in parallel group"):
             load_stages_config(config_file)
+
+    def test_parallel_group_duplicate_agent_raises(self, tmp_path: Path) -> None:
+        """Parallel group with duplicate work_agent raises ValueError."""
+        yaml_content = """
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize
+    work_agent: pm
+    review_agent: null
+    allowed_personas: [pm]
+  RESEARCH:
+    name: Research
+    description: Research
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas: [builder]
+  TEST_STRATEGY:
+    name: Test Strategy
+    description: Test strategy
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas: [builder]
+  COMPLETE:
+    name: Complete
+    description: Done
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+
+stage_order:
+  - SETUP
+  - RESEARCH
+  - TEST_STRATEGY
+  - COMPLETE
+
+work_to_review_mapping: {}
+
+parallel_groups:
+  post_setup:
+    after: SETUP
+    stages:
+      - RESEARCH
+      - TEST_STRATEGY
+    before: COMPLETE
+"""
+        config_file = tmp_path / "stages.yaml"
+        config_file.write_text(yaml_content)
+
+        with pytest.raises(ValueError, match="duplicate work_agent"):
+            load_stages_config(config_file)
+
+    def test_parallel_group_different_agents_passes(self, tmp_path: Path) -> None:
+        """Parallel group with different work_agents loads successfully."""
+        yaml_content = """
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize
+    work_agent: pm
+    review_agent: null
+    allowed_personas: [pm]
+  RESEARCH:
+    name: Research
+    description: Research
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas: [builder]
+  TEST_STRATEGY:
+    name: Test Strategy
+    description: Test strategy
+    work_agent: builder-2
+    review_agent: null
+    allowed_personas: [builder]
+  COMPLETE:
+    name: Complete
+    description: Done
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+
+stage_order:
+  - SETUP
+  - RESEARCH
+  - TEST_STRATEGY
+  - COMPLETE
+
+work_to_review_mapping: {}
+
+parallel_groups:
+  post_setup:
+    after: SETUP
+    stages:
+      - RESEARCH
+      - TEST_STRATEGY
+    before: COMPLETE
+"""
+        config_file = tmp_path / "stages.yaml"
+        config_file.write_text(yaml_content)
+
+        config = load_stages_config(config_file)
+        assert len(config.parallel_groups) == 1
 
     def test_stages_config_has_parallel_groups_field(self) -> None:
         """StagesConfiguration has parallel_groups attribute."""

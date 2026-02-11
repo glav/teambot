@@ -122,6 +122,9 @@
 #   - All stages in a group must be defined in the 'stages' section
 #   - The 'after' stage must precede all parallel stages in stage_order
 #   - The 'before' stage must follow all parallel stages in stage_order
+#   - Stages in a parallel group must use different work_agents. Using the
+#     same agent in multiple parallel stages causes session conflicts and
+#     will be rejected at startup with a validation error.
 #
 # =============================================================================
 # VALIDATION RULES
@@ -237,7 +240,7 @@ stages:
   TEST_STRATEGY:
     name: Test Strategy
     description: Define testing approach (TDD vs Code-First), coverage targets, and test patterns
-    work_agent: builder-1
+    work_agent: builder-2
     review_agent: null
     allowed_personas:
       - builder

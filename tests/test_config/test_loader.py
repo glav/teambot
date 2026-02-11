@@ -512,3 +512,201 @@ class TestAnimationConfig:
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'show_startup_animation' must be a boolean"):
             loader.load(config_file)
+
+
+class TestNotificationsConfigValidation:
+    """Tests for notifications configuration validation."""
+
+    def test_valid_notifications_config(self, tmp_path):
+        """Valid notifications config passes validation."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                    }
+                ],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["notifications"]["enabled"] is True
+        assert len(config["notifications"]["channels"]) == 1
+
+    def test_notifications_not_object_raises(self, tmp_path):
+        """notifications must be an object."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": "invalid",
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'notifications' must be an object"):
+            loader.load(config_file)
+
+    def test_notifications_enabled_not_bool_raises(self, tmp_path):
+        """notifications.enabled must be boolean."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {"enabled": "yes"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'notifications.enabled' must be a boolean"):
+            loader.load(config_file)
+
+    def test_channels_not_list_raises(self, tmp_path):
+        """notifications.channels must be a list."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {"channels": "invalid"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'notifications.channels' must be a list"):
+            loader.load(config_file)
+
+    def test_channel_missing_type_raises(self, tmp_path):
+        """Channel without type raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"token": "x", "chat_id": "y"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="must have a 'type' field"):
+            loader.load(config_file)
+
+    def test_channel_invalid_type_raises(self, tmp_path):
+        """Invalid channel type raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"type": "unknown"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="Invalid channel type 'unknown'"):
+            loader.load(config_file)
+
+    def test_telegram_missing_token_raises(self, tmp_path):
+        """Telegram channel without token raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"type": "telegram", "chat_id": "123"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="missing required field 'token'"):
+            loader.load(config_file)
+
+    def test_telegram_missing_chat_id_raises(self, tmp_path):
+        """Telegram channel without chat_id raises ConfigError."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"type": "telegram", "token": "abc"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="missing required field 'chat_id'"):
+            loader.load(config_file)
+
+    def test_dry_run_not_bool_raises(self, tmp_path):
+        """dry_run must be boolean."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"type": "telegram", "token": "x", "chat_id": "y", "dry_run": "yes"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'dry_run' .* must be a boolean"):
+            loader.load(config_file)
+
+    def test_events_not_list_raises(self, tmp_path):
+        """events filter must be a list."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"type": "telegram", "token": "x", "chat_id": "y", "events": "all"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'events' .* must be a list"):
+            loader.load(config_file)
+
+    def test_notifications_defaults_applied(self, tmp_path):
+        """Defaults are applied to notifications config."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "notifications": {
+                "channels": [{"type": "telegram", "token": "x", "chat_id": "y"}],
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data))
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        # Default enabled=True
+        assert config["notifications"]["enabled"] is True
+        # Default dry_run=False
+        assert config["notifications"]["channels"][0]["dry_run"] is False
