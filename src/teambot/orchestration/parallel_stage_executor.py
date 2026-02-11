@@ -62,8 +62,12 @@ class ParallelStageExecutor:
 
         async def execute_one(stage: WorkflowStage) -> tuple[WorkflowStage, StageResult]:
             async with self.semaphore:
+                # Get agent information for progress events
+                agents = execution_loop.stages_config.get_stage_agents(stage)
+                agent = agents.get("work") or agents.get("review") or "builder-1"
+                
                 if on_progress:
-                    on_progress("parallel_stage_start", {"stage": stage.name})
+                    on_progress("parallel_stage_start", {"stage": stage.name, "agent": agent})
 
                 try:
                     # Delegate to ExecutionLoop's existing stage execution
@@ -93,6 +97,7 @@ class ParallelStageExecutor:
                             "parallel_stage_failed",
                             {
                                 "stage": stage.name,
+                                "agent": agent,
                                 "error": str(e),
                             },
                         )
@@ -121,6 +126,9 @@ class ParallelStageExecutor:
                 event = (
                     "parallel_stage_complete" if stage_result.success else "parallel_stage_failed"
                 )
-                on_progress(event, {"stage": stage.name})
+                # Get agent information for progress events
+                agents = execution_loop.stages_config.get_stage_agents(stage)
+                agent = agents.get("work") or agents.get("review") or "builder-1"
+                on_progress(event, {"stage": stage.name, "agent": agent})
 
         return output
