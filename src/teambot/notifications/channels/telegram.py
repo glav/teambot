@@ -122,7 +122,7 @@ class TelegramChannel:
                 try:
                     data = response.json()
                     retry_after = data.get("parameters", {}).get("retry_after", 1.0)
-                except (ValueError, KeyError):
+                except ValueError:
                     logger.warning(
                         "Failed to parse retry_after from rate limit response, using default"
                     )
@@ -131,7 +131,7 @@ class TelegramChannel:
                 # Try to parse error description from JSON, fallback to response text
                 try:
                     error = response.json().get("description", response.text)
-                except (ValueError, KeyError):
+                except ValueError:
                     error = response.text
                 logger.error(f"Telegram API error: {error}")
                 return False
