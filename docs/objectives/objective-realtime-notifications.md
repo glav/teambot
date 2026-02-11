@@ -109,7 +109,7 @@ The notification system introduces four new components in `src/teambot/notificat
     "channels": [
       {
         "type": "telegram",
-        "bot_token": "${TEAMBOT_TELEGRAM_TOKEN}",
+        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
         "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
         "events": ["stage_complete", "agent_complete", "agent_failed", "parallel_stage_complete", "pipeline_complete", "pipeline_timeout"],
         "dry_run": false
