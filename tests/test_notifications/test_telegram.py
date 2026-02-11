@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from teambot.notifications.channels.telegram import TelegramChannel
@@ -197,6 +198,62 @@ class TestTelegramChannelSend:
 
         assert result is False
         assert "API error" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_send_timeout_error(self, monkeypatch, caplog) -> None:
+        """Timeout error returns False and logs without token."""
+        import logging
+
+        caplog.set_level(logging.ERROR)
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "secret-bot-token-123")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel = TelegramChannel()
+        event = NotificationEvent(event_type="test", data={})
+
+        # Mock httpx client to raise TimeoutException
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
+        channel._client = mock_client
+
+        result = await channel.send(event)
+
+        assert result is False
+        assert "timed out" in caplog.text
+        # Verify token is not in logs
+        assert "secret-bot-token-123" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_send_request_error_no_token_leak(self, monkeypatch, caplog) -> None:
+        """RequestError logs error type but not URL with token."""
+        import logging
+
+        caplog.set_level(logging.ERROR)
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "secret-bot-token-456")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel = TelegramChannel()
+        event = NotificationEvent(event_type="test", data={})
+
+        # Create a request that would contain the token
+        url_with_token = "https://api.telegram.org/botsecret-bot-token-456/sendMessage"
+        mock_request = httpx.Request("POST", url_with_token)
+        mock_error = httpx.RequestError(
+            f"Connection failed to {url_with_token}", request=mock_request
+        )
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(side_effect=mock_error)
+        channel._client = mock_client
+
+        result = await channel.send(event)
+
+        assert result is False
+        assert "request error" in caplog.text
+        # Verify token is NOT leaked in logs
+        assert "secret-bot-token-456" not in caplog.text
+        # Verify we log the error type
+        assert "RequestError" in caplog.text
 
 
 class TestTelegramChannelPoll:
