@@ -104,7 +104,7 @@ class TestParallelStageExecutor:
         from teambot.orchestration.parallel_stage_executor import ParallelStageExecutor
 
         mock_execution_loop._execute_work_stage.side_effect = Exception("Stage failed")
-        
+
         events: list[tuple[str, dict]] = []
 
         def on_progress(event_type: str, data: dict) -> None:

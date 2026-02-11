@@ -68,7 +68,7 @@ class ParallelStageExecutor:
         async def execute_one(stage: WorkflowStage) -> tuple[WorkflowStage, StageResult]:
             async with self.semaphore:
                 agent = get_stage_agent(stage)
-                
+
                 if on_progress:
                     on_progress("parallel_stage_start", {"stage": stage.name, "agent": agent})
 
