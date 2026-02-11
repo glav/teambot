@@ -210,10 +210,32 @@ SPEC:
 
 If no `stages.yaml` exists, TeamBot uses built-in defaults.
 
+## Notifications
+
+TeamBot supports real-time notifications via external channels (e.g., Telegram). Configuration is optional and uses environment variables for secrets.
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "channels": [
+      {
+        "type": "telegram",
+        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}"
+      }
+    ]
+  }
+}
+```
+
+See the [Notifications Guide](notifications.md) for full setup instructions.
+
 ---
 
 ## Next Steps
 
+- [Notifications](notifications.md) - Real-time notification setup
 - [Workflow Stages](workflow-stages.md) - Stage details
 - [Agent Personas](agent-personas.md) - Configuring agents
 - [CLI Reference](cli-reference.md) - Command options
