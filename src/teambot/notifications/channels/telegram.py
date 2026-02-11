@@ -117,11 +117,22 @@ class TelegramChannel:
                 logger.debug(f"Telegram notification sent: {event.event_type}")
                 return True
             elif response.status_code == 429:
-                # Rate limited
-                retry_after = response.json().get("parameters", {}).get("retry_after", 1.0)
+                # Rate limited - try to parse retry_after from JSON, fallback to default
+                retry_after = 1.0
+                try:
+                    data = response.json()
+                    retry_after = data.get("parameters", {}).get("retry_after", 1.0)
+                except ValueError:
+                    logger.warning(
+                        "Failed to parse retry_after from rate limit response, using default"
+                    )
                 raise RateLimitError(retry_after=retry_after)
             else:
-                error = response.json().get("description", response.text)
+                # Try to parse error description from JSON, fallback to response text
+                try:
+                    error = response.json().get("description", response.text)
+                except ValueError:
+                    error = response.text
                 logger.error(f"Telegram API error: {error}")
                 return False
 
