@@ -259,3 +259,178 @@ class TestEventBusProgressCallback:
         call_args = mock_channel.send.call_args[0][0]
         assert call_args.event_type == "stage_changed"
         assert call_args.data["stage"] == "SETUP"
+
+
+class TestEventBusTaskTracking:
+    """Tests for EventBus task tracking."""
+
+    @pytest.mark.asyncio
+    async def test_emit_tracks_pending_tasks(self, mock_channel: MagicMock) -> None:
+        """emit() adds tasks to _pending_tasks."""
+
+        # Make send slow so task stays pending
+        async def slow_send(event):
+            await asyncio.sleep(0.2)
+
+        mock_channel.send = slow_send
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        event = NotificationEvent(event_type="test", data={})
+        await bus.emit(event)
+
+        # Task should be pending
+        assert len(bus._pending_tasks) == 1
+
+        # Wait for task to complete
+        await asyncio.sleep(0.3)
+        assert len(bus._pending_tasks) == 0
+
+    @pytest.mark.asyncio
+    async def test_emit_sync_tracks_pending_tasks(self, mock_channel: MagicMock) -> None:
+        """emit_sync() adds tasks to _pending_tasks."""
+
+        # Make send slow so task stays pending
+        async def slow_send(event):
+            await asyncio.sleep(0.2)
+
+        mock_channel.send = slow_send
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        bus.emit_sync("test", {})
+
+        # Give time for task to be scheduled
+        await asyncio.sleep(0.05)
+        assert len(bus._pending_tasks) == 1
+
+        # Wait for task to complete
+        await asyncio.sleep(0.3)
+        assert len(bus._pending_tasks) == 0
+
+    @pytest.mark.asyncio
+    async def test_failed_tasks_are_removed(self, mock_channel: MagicMock) -> None:
+        """Failed tasks are removed from _pending_tasks."""
+        mock_channel.send = AsyncMock(side_effect=Exception("Error"))
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        event = NotificationEvent(event_type="test", data={})
+        await bus.emit(event)
+
+        # Wait for task to fail
+        await asyncio.sleep(0.1)
+        assert len(bus._pending_tasks) == 0
+
+
+class TestEventBusDrain:
+    """Tests for EventBus.drain()."""
+
+    @pytest.mark.asyncio
+    async def test_drain_waits_for_pending_tasks(self, mock_channel: MagicMock) -> None:
+        """drain() waits for all pending tasks to complete."""
+        completed = []
+
+        async def slow_send(event):
+            await asyncio.sleep(0.1)
+            completed.append(True)
+
+        mock_channel.send = slow_send
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        # Emit multiple events
+        for i in range(3):
+            event = NotificationEvent(event_type=f"test{i}", data={})
+            await bus.emit(event)
+
+        assert len(bus._pending_tasks) == 3
+        assert len(completed) == 0
+
+        # Drain should wait for all tasks
+        await bus.drain(timeout=1.0)
+
+        assert len(bus._pending_tasks) == 0
+        assert len(completed) == 3
+
+    @pytest.mark.asyncio
+    async def test_drain_returns_immediately_with_no_tasks(self) -> None:
+        """drain() with no pending tasks returns immediately."""
+        bus = EventBus()
+
+        import time
+
+        start = time.time()
+        await bus.drain(timeout=5.0)
+        elapsed = time.time() - start
+
+        assert elapsed < 0.1  # Should be instant
+
+    @pytest.mark.asyncio
+    async def test_drain_timeout_logs_warning(self, mock_channel: MagicMock, caplog) -> None:
+        """drain() logs warning if timeout is reached."""
+
+        async def very_slow_send(event):
+            await asyncio.sleep(10)
+
+        mock_channel.send = very_slow_send
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        event = NotificationEvent(event_type="test", data={})
+        await bus.emit(event)
+
+        # Drain with short timeout
+        await bus.drain(timeout=0.1)
+
+        assert "timeout" in caplog.text.lower()
+        assert "still pending" in caplog.text.lower()
+
+
+class TestEventBusClose:
+    """Tests for EventBus.close()."""
+
+    @pytest.mark.asyncio
+    async def test_close_drains_and_clears(self, mock_channel: MagicMock) -> None:
+        """close() drains tasks and clears channels."""
+        completed = []
+
+        async def slow_send(event):
+            await asyncio.sleep(0.1)
+            completed.append(True)
+
+        mock_channel.send = slow_send
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        event = NotificationEvent(event_type="test", data={})
+        await bus.emit(event)
+
+        assert len(bus._channels) == 1
+        assert len(bus._pending_tasks) == 1
+
+        await bus.close(timeout=1.0)
+
+        assert len(bus._channels) == 0
+        assert len(bus._pending_tasks) == 0
+        assert len(completed) == 1
+
+    @pytest.mark.asyncio
+    async def test_close_with_timeout(self, mock_channel: MagicMock, caplog) -> None:
+        """close() respects timeout parameter."""
+
+        async def very_slow_send(event):
+            await asyncio.sleep(10)
+
+        mock_channel.send = very_slow_send
+        bus = EventBus()
+        bus.subscribe(mock_channel)
+
+        event = NotificationEvent(event_type="test", data={})
+        await bus.emit(event)
+
+        await bus.close(timeout=0.1)
+
+        # Channels should still be cleared even with timeout
+        assert len(bus._channels) == 0
+        assert "timeout" in caplog.text.lower()

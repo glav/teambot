@@ -41,6 +41,7 @@ class EventBus:
         self._channels: list[NotificationChannel] = []
         self._feature_name = feature_name
         self._current_stage: str | None = None
+        self._pending_tasks: set[asyncio.Task] = set()
 
     def subscribe(self, channel: NotificationChannel) -> None:
         """Subscribe a channel to receive events.
@@ -90,8 +91,10 @@ class EventBus:
         # Dispatch to all matching channels concurrently
         for channel in self._channels:
             if channel.enabled and channel.supports_event(event.event_type):
-                # Fire and forget - don't await
-                asyncio.create_task(self._safe_send(channel, event))
+                # Fire and forget - track task for graceful shutdown
+                task = asyncio.create_task(self._safe_send(channel, event))
+                self._pending_tasks.add(task)
+                task.add_done_callback(self._pending_tasks.discard)
 
     async def _safe_send(self, channel: NotificationChannel, event: NotificationEvent) -> None:
         """Send notification with retry and error handling.
@@ -150,7 +153,9 @@ class EventBus:
             loop = asyncio.get_running_loop()
             for channel in self._channels:
                 if channel.enabled and channel.supports_event(event_type):
-                    loop.create_task(self._safe_send(channel, event))
+                    task = loop.create_task(self._safe_send(channel, event))
+                    self._pending_tasks.add(task)
+                    task.add_done_callback(self._pending_tasks.discard)
         except RuntimeError:
             # No running event loop - skip notifications
             logger.debug("No event loop running, skipping notification")
@@ -166,3 +171,45 @@ class EventBus:
             self.emit_sync(event_type, data)
 
         return on_progress
+
+    async def drain(self, timeout: float = 5.0) -> None:
+        """Wait for all pending notification tasks to complete.
+
+        This method should be called before shutting down to ensure
+        in-flight notifications are delivered.
+
+        Args:
+            timeout: Maximum seconds to wait for tasks (default: 5.0)
+
+        Returns:
+            None. Logs warning if timeout is reached.
+        """
+        if not self._pending_tasks:
+            return
+
+        logger.debug(f"Draining {len(self._pending_tasks)} pending notification tasks")
+
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*self._pending_tasks, return_exceptions=True),
+                timeout=timeout,
+            )
+            logger.debug("All notification tasks completed")
+        except TimeoutError:
+            logger.warning(
+                f"Notification drain timeout after {timeout}s, "
+                f"{len(self._pending_tasks)} tasks still pending"
+            )
+
+    async def close(self, timeout: float = 5.0) -> None:
+        """Close the event bus and wait for pending tasks.
+
+        This method drains pending tasks and clears all channels.
+
+        Args:
+            timeout: Maximum seconds to wait for pending tasks (default: 5.0)
+        """
+        await self.drain(timeout=timeout)
+        self._channels.clear()
+        self._pending_tasks.clear()
+        logger.debug("EventBus closed")
