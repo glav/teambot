@@ -9,14 +9,16 @@ from typing import Any
 ENV_VAR_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
 
-def resolve_env_vars(value: str) -> str:
+def resolve_env_vars(value: Any) -> Any:
     """Resolve ${VAR} patterns in string values.
 
     Args:
-        value: String potentially containing ${VAR} patterns
+        value: String potentially containing ${VAR} patterns, or any other type
+               (non-string values are returned unchanged)
 
     Returns:
-        String with env vars resolved (empty string if var not set)
+        String with env vars resolved (empty string if var not set),
+        or the original value if not a string
     """
     if not isinstance(value, str):
         return value
