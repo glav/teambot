@@ -88,14 +88,6 @@ class ParallelStageExecutor:
                         )
 
                 except Exception as e:
-                    if on_progress:
-                        on_progress(
-                            "parallel_stage_failed",
-                            {
-                                "stage": stage.name,
-                                "error": str(e),
-                            },
-                        )
                     return stage, StageResult(
                         stage=stage,
                         success=False,

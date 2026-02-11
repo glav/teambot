@@ -147,6 +147,44 @@ class TestParallelStageExecutor:
         complete_events = [e for e in events if e[0] == "parallel_stage_complete"]
         assert len(complete_events) == 2
 
+    @pytest.mark.asyncio
+    async def test_execute_parallel_failure_events_fire_once(
+        self, mock_execution_loop: MagicMock
+    ) -> None:
+        """Failed stages fire parallel_stage_failed event exactly once."""
+        from teambot.orchestration.parallel_stage_executor import ParallelStageExecutor
+
+        events: list[tuple[str, dict]] = []
+
+        def on_progress(event_type: str, data: dict) -> None:
+            events.append((event_type, data))
+
+        # First call succeeds, second fails
+        mock_execution_loop._execute_work_stage.side_effect = [
+            "Success output",
+            Exception("Stage failed"),
+        ]
+
+        executor = ParallelStageExecutor(max_concurrent=2)
+        stages = [WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY]
+
+        await executor.execute_parallel(stages, mock_execution_loop, on_progress)
+
+        # Check start events - should be 2 (one per stage)
+        start_events = [e for e in events if e[0] == "parallel_stage_start"]
+        assert len(start_events) == 2
+
+        # Check complete events - should be 1 (only for successful stage)
+        complete_events = [e for e in events if e[0] == "parallel_stage_complete"]
+        assert len(complete_events) == 1
+
+        # Check failed events - should be 1 (only for failed stage, NOT duplicated)
+        failed_events = [e for e in events if e[0] == "parallel_stage_failed"]
+        assert len(failed_events) == 1
+
+        # Verify the failed event has correct stage info
+        assert failed_events[0][1]["stage"] in ["RESEARCH", "TEST_STRATEGY"]
+
 
 class TestStageResult:
     """Tests for StageResult dataclass."""
