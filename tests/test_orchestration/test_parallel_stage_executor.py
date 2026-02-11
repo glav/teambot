@@ -21,7 +21,9 @@ class TestParallelStageExecutor:
         loop._execute_work_stage = AsyncMock(return_value="Stage output")
         loop.stages_config = MagicMock()
         loop.stages_config.review_stages = set()
-        loop.stages_config.get_stage_agents = MagicMock(return_value={"work": "builder-1", "review": None})
+        loop.stages_config.get_stage_agents = MagicMock(
+            return_value={"work": "builder-1", "review": None}
+        )
         loop.stage_outputs = {}
         return loop
 
@@ -172,7 +174,7 @@ class TestParallelStageExecutor:
         start_events = [e for e in events if e[0] == "parallel_stage_start"]
         assert len(start_events) == 2
         # Verify agent field is present
-        for event_type, data in start_events:
+        for _event_type, data in start_events:
             assert "agent" in data
             assert data["agent"] == "builder-1"
 
@@ -180,7 +182,7 @@ class TestParallelStageExecutor:
         complete_events = [e for e in events if e[0] == "parallel_stage_complete"]
         assert len(complete_events) == 2
         # Verify agent field is present
-        for event_type, data in complete_events:
+        for _event_type, data in complete_events:
             assert "agent" in data
             assert data["agent"] == "builder-1"
 
