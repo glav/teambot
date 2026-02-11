@@ -29,6 +29,12 @@
 #   prompt_template   - Path to SDD prompt file (relative to repo root) (default: null)
 #   include_objective - Include objective content in agent context (default: true)
 #
+# Global Sections (at file level):
+#   stages            - Map of stage definitions (required)
+#   stage_order       - List defining sequential execution order (required)
+#   parallel_groups   - Map of parallel stage groups (optional, see PARALLEL STAGE GROUPS)
+#   work_to_review_mapping - Map of work stages to their review stages (required)
+#
 # =============================================================================
 # AGENT FIELD SEMANTICS
 # =============================================================================
@@ -87,6 +93,35 @@
 #
 # These are NOT redundant - a stage can be in work_to_review_mapping
 # without being a review stage itself (e.g., ACCEPTANCE_TEST → POST_REVIEW).
+#
+# =============================================================================
+# PARALLEL STAGE GROUPS
+# =============================================================================
+#
+# The parallel_groups section defines stages that can execute concurrently
+# instead of sequentially. This enables workflow optimization by running
+# independent stages in parallel.
+#
+# Each parallel group has the following fields:
+#
+#   after  - Trigger stage that must complete before parallel execution starts
+#   stages - List of stage names to run concurrently
+#   before - Gate stage that waits for all parallel stages to complete
+#
+# Example:
+#   parallel_groups:
+#     post_spec_review:
+#       after: SPEC_REVIEW      # Parallel stages start after SPEC_REVIEW completes
+#       stages:
+#         - RESEARCH            # These two stages run concurrently
+#         - TEST_STRATEGY
+#       before: PLAN            # PLAN waits for both RESEARCH and TEST_STRATEGY
+#
+# Constraints:
+#   - Parallel stages must be independent (no dependencies between them)
+#   - All stages in a group must be defined in the 'stages' section
+#   - The 'after' stage must precede all parallel stages in stage_order
+#   - The 'before' stage must follow all parallel stages in stage_order
 #
 # =============================================================================
 # VALIDATION RULES
