@@ -43,5 +43,23 @@ def create_progress_callback(
         elif event_type == "time_update":
             if on_time:
                 on_time(data["elapsed"], data["remaining"])
+        # Parallel group events
+        elif event_type == "parallel_group_start":
+            # Parallel group starting - update all stages in the group
+            for stage in data.get("stages", []):
+                if on_stage:
+                    on_stage(f"parallel:{stage}")
+        elif event_type == "parallel_stage_start":
+            # Individual stage within parallel group starting
+            status_manager.set_running(data.get("agent", "builder-1"), data.get("stage", "unknown"))
+        elif event_type == "parallel_stage_complete":
+            # Individual stage within parallel group completed
+            status_manager.set_completed(data.get("agent", "builder-1"))
+        elif event_type == "parallel_stage_failed":
+            # Individual stage within parallel group failed
+            status_manager.set_failed(data.get("agent", "builder-1"))
+        elif event_type == "parallel_group_complete":
+            # All stages in parallel group completed
+            pass  # Group completion handled at higher level
 
     return on_progress

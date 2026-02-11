@@ -386,6 +386,18 @@ stage_order:
   - POST_REVIEW
   - COMPLETE
 
+# Parallel stage groups - stages that execute concurrently
+# after: trigger stage that must complete first
+# stages: list of stages to run in parallel
+# before: gate stage - all parallel stages must complete before this
+parallel_groups:
+  post_spec_review:
+    after: SPEC_REVIEW
+    stages:
+      - RESEARCH
+      - TEST_STRATEGY
+    before: PLAN
+
 # Mapping of work stages to their review stages
 # Note: This defines NAVIGATION (which review follows which work stage).
 # The is_review_stage flag on each stage controls EXECUTION BEHAVIOR.

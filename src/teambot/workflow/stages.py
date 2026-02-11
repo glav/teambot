@@ -75,7 +75,7 @@ STAGE_METADATA: dict[WorkflowStage, StageMetadata] = {
         allowed_personas=["reviewer", "project_manager", "pm"],
         required_artifacts=["spec_review.md"],
         optional=False,
-        next_stages=[WorkflowStage.RESEARCH],
+        next_stages=[WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY],
     ),
     WorkflowStage.RESEARCH: StageMetadata(
         name="Research",
@@ -83,7 +83,7 @@ STAGE_METADATA: dict[WorkflowStage, StageMetadata] = {
         allowed_personas=["builder", "developer", "technical_writer", "writer"],
         required_artifacts=["research.md"],
         optional=False,
-        next_stages=[WorkflowStage.TEST_STRATEGY],
+        next_stages=[WorkflowStage.PLAN],
     ),
     WorkflowStage.TEST_STRATEGY: StageMetadata(
         name="Test Strategy",

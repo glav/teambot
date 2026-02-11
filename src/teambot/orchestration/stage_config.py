@@ -35,6 +35,16 @@ class StageConfig:
 
 
 @dataclass
+class ParallelGroupConfig:
+    """Configuration for a parallel stage group."""
+
+    name: str  # Group identifier (e.g., "post_spec_review")
+    after: WorkflowStage  # Trigger stage that must complete first
+    stages: list[WorkflowStage]  # Stages to run in parallel
+    before: WorkflowStage  # Gate stage - all must complete before this
+
+
+@dataclass
 class StagesConfiguration:
     """Complete stages configuration."""
 
@@ -43,6 +53,7 @@ class StagesConfiguration:
     work_to_review_mapping: dict[WorkflowStage, WorkflowStage]
     review_stages: set[WorkflowStage] = field(default_factory=set)
     acceptance_test_stages: set[WorkflowStage] = field(default_factory=set)
+    parallel_groups: list[ParallelGroupConfig] = field(default_factory=list)
     source: str = "built-in-defaults"  # Path to config file or "built-in-defaults"
 
     def get_stage_agents(self, stage: WorkflowStage) -> dict[str, str | None]:
@@ -171,12 +182,33 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
         except KeyError as err:
             raise ValueError(f"Unknown stage in work_to_review_mapping: {err}") from err
 
+    # Parse parallel groups
+    parallel_groups_data = data.get("parallel_groups", {})
+    parallel_groups: list[ParallelGroupConfig] = []
+    for group_name, group_data in parallel_groups_data.items():
+        try:
+            after_stage = WorkflowStage[group_data["after"]]
+            before_stage = WorkflowStage[group_data["before"]]
+            group_stages = [WorkflowStage[s] for s in group_data["stages"]]
+        except KeyError as err:
+            raise ValueError(f"Invalid stage name in parallel group '{group_name}': {err}") from err
+
+        parallel_groups.append(
+            ParallelGroupConfig(
+                name=group_name,
+                after=after_stage,
+                stages=group_stages,
+                before=before_stage,
+            )
+        )
+
     return StagesConfiguration(
         stages=stages,
         stage_order=stage_order,
         work_to_review_mapping=work_to_review,
         review_stages=review_stages,
         acceptance_test_stages=acceptance_test_stages,
+        parallel_groups=parallel_groups,
     )
 
 

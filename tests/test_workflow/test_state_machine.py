@@ -205,15 +205,20 @@ class TestWorkflowStateMachine:
         assert not machine.is_persona_allowed("builder")
 
     def test_full_workflow_path(self, teambot_dir):
-        """Test walking through a complete workflow."""
+        """Test walking through a complete workflow.
+
+        Note: With parallel stage groups, RESEARCH and TEST_STRATEGY both
+        branch from SPEC_REVIEW and converge at PLAN. This test takes the
+        RESEARCH path; test_full_workflow_path_via_test_strategy takes the
+        alternate path.
+        """
         machine = WorkflowStateMachine(teambot_dir, objective="Test project")
 
-        # Walk through workflow
+        # Walk through workflow (RESEARCH path through parallel group)
         machine.transition_to(WorkflowStage.SPEC)
         machine.transition_to(WorkflowStage.SPEC_REVIEW)
-        machine.transition_to(WorkflowStage.RESEARCH)
-        machine.transition_to(WorkflowStage.TEST_STRATEGY)
-        machine.transition_to(WorkflowStage.PLAN)
+        machine.transition_to(WorkflowStage.RESEARCH)  # One path through parallel group
+        machine.transition_to(WorkflowStage.PLAN)  # RESEARCH → PLAN (convergence)
         machine.transition_to(WorkflowStage.PLAN_REVIEW)
         machine.transition_to(WorkflowStage.IMPLEMENTATION)
         machine.transition_to(WorkflowStage.IMPLEMENTATION_REVIEW)
@@ -225,6 +230,29 @@ class TestWorkflowStateMachine:
         assert machine.is_complete
         progress = machine.get_progress()
         assert progress["is_complete"] is True
+
+    def test_full_workflow_path_via_test_strategy(self, teambot_dir):
+        """Test walking through workflow via TEST_STRATEGY path.
+
+        With parallel stage groups, RESEARCH and TEST_STRATEGY both branch
+        from SPEC_REVIEW. This test takes the TEST_STRATEGY path.
+        """
+        machine = WorkflowStateMachine(teambot_dir, objective="Test project")
+
+        # Walk through workflow (TEST_STRATEGY path through parallel group)
+        machine.transition_to(WorkflowStage.SPEC)
+        machine.transition_to(WorkflowStage.SPEC_REVIEW)
+        machine.transition_to(WorkflowStage.TEST_STRATEGY)  # Alternate path
+        machine.transition_to(WorkflowStage.PLAN)  # TEST_STRATEGY → PLAN (convergence)
+        machine.transition_to(WorkflowStage.PLAN_REVIEW)
+        machine.transition_to(WorkflowStage.IMPLEMENTATION)
+        machine.transition_to(WorkflowStage.IMPLEMENTATION_REVIEW)
+        machine.transition_to(WorkflowStage.TEST)
+        machine.transition_to(WorkflowStage.ACCEPTANCE_TEST)
+        machine.transition_to(WorkflowStage.POST_REVIEW)
+        machine.transition_to(WorkflowStage.COMPLETE)
+
+        assert machine.is_complete
 
     def test_persistence_across_instances(self, teambot_dir):
         """Test state persists across machine instances."""

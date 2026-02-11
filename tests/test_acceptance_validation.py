@@ -9,13 +9,17 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 from io import StringIO
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 from rich.console import Console
 from rich.panel import Panel
 
+from teambot.orchestration.execution_loop import ExecutionLoop
+from teambot.orchestration.stage_config import load_stages_config
 from teambot.repl.commands import (
     SystemCommands,
     handle_help,
@@ -35,6 +39,7 @@ from teambot.visualization.animation import (
     StartupAnimation,
     play_startup_animation,
 )
+from teambot.workflow.stages import WorkflowStage
 
 
 class TestAcceptanceScenarios:
@@ -1258,3 +1263,341 @@ class TestMultiLineInputAcceptance:
             # Submitted
             assert len(output.lines) > initial_lines
             assert input_pane.text == ""
+
+
+# =============================================================================
+# Parallel Stage Groups Acceptance Tests
+# =============================================================================
+
+
+class TestParallelStageGroupsAcceptance:
+    """Acceptance tests for parallel stage groups feature."""
+
+    @pytest.fixture
+    def objective_file(self, tmp_path: Path) -> Path:
+        """Create a minimal objective file."""
+        obj_file = tmp_path / "test-objective.md"
+        obj_file.write_text(
+            """# Test Objective
+
+## Goals
+- Test parallel stage groups
+
+## Success Criteria
+- [ ] Parallel execution works
+
+## Context
+**Target Codebase**: Test
+**Primary Language/Framework**: Python
+"""
+        )
+        return obj_file
+
+    @pytest.fixture
+    def teambot_dir(self, tmp_path: Path) -> Path:
+        """Create teambot directory."""
+        tb_dir = tmp_path / ".teambot"
+        tb_dir.mkdir()
+        return tb_dir
+
+    @pytest.fixture
+    def mock_sdk_client(self) -> AsyncMock:
+        """Create mock SDK client that approves all work."""
+        client = AsyncMock()
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed successfully."
+        return client
+
+    # =========================================================================
+    # AT-001: Concurrent Execution of RESEARCH and TEST_STRATEGY
+    # =========================================================================
+    @pytest.mark.asyncio
+    async def test_at_001_concurrent_execution_research_and_test_strategy(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """AT-001: RESEARCH and TEST_STRATEGY execute concurrently after SPEC_REVIEW."""
+        # Track stage start times using REAL parallel group execution
+        stage_times: dict[str, dict[str, float]] = {}
+
+        def track_progress(event: str, data: dict) -> None:
+            if event == "parallel_stage_start":
+                stage_times[data["stage"]] = {"start": time.time()}
+            elif event in ("parallel_stage_complete", "parallel_stage_failed"):
+                if data["stage"] in stage_times:
+                    stage_times[data["stage"]]["end"] = time.time()
+
+        # Create feature spec artifact
+        feature_dir = teambot_dir / "test-objective"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text("# Test Spec\n\n## Acceptance")
+
+        # Load REAL stages config with parallel groups
+        stages_config = load_stages_config()
+
+        # Verify parallel groups are configured
+        assert len(stages_config.parallel_groups) > 0
+        group = stages_config.parallel_groups[0]
+        assert group.name == "post_spec_review"
+        assert WorkflowStage.RESEARCH in group.stages
+        assert WorkflowStage.TEST_STRATEGY in group.stages
+
+        # Create REAL ExecutionLoop
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=1.0,
+            stages_config=stages_config,
+        )
+
+        # Start from SPEC_REVIEW (which triggers parallel group on next stage)
+        loop.current_stage = WorkflowStage.SPEC_REVIEW
+        loop.sdk_client = mock_sdk_client
+
+        # Execute parallel group directly to test concurrency
+        success = await loop._execute_parallel_group(group, on_progress=track_progress)
+
+        # Verify both stages were executed
+        assert success is True
+        assert "RESEARCH" in stage_times
+        assert "TEST_STRATEGY" in stage_times
+
+        # Verify concurrent execution (starts within 1 second of each other)
+        research_start = stage_times["RESEARCH"]["start"]
+        test_strategy_start = stage_times["TEST_STRATEGY"]["start"]
+        start_diff = abs(research_start - test_strategy_start)
+        assert start_diff < 1.0, f"Stages started {start_diff}s apart (expected < 1s)"
+
+        # Verify both stages have outputs (REAL stage execution)
+        assert WorkflowStage.RESEARCH in loop.stage_outputs
+        assert WorkflowStage.TEST_STRATEGY in loop.stage_outputs
+
+    # =========================================================================
+    # AT-002: Resume Mid-Parallel-Group with One Stage Complete
+    # =========================================================================
+    @pytest.mark.asyncio
+    async def test_at_002_resume_mid_parallel_group_reruns_only_incomplete(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """AT-002: Resume mid-parallel-group only re-runs incomplete stages."""
+        # Create feature directory structure
+        feature_dir = teambot_dir / "test-objective"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text("# Test Spec\n\n## Acceptance")
+
+        # Create REAL state file simulating mid-parallel-group interrupt
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(
+            json.dumps(
+                {
+                    "objective_file": str(objective_file),
+                    "current_stage": "RESEARCH",
+                    "elapsed_seconds": 100,
+                    "max_seconds": 3600,
+                    "status": "in_progress",
+                    "stage_outputs": {"RESEARCH": "Research completed successfully."},
+                    "parallel_group_status": {
+                        "post_spec_review": {
+                            "stages": {
+                                "RESEARCH": {"status": "completed", "error": None},
+                                # TEST_STRATEGY not present = incomplete
+                            }
+                        }
+                    },
+                }
+            )
+        )
+
+        # Use REAL resume() classmethod
+        loop = ExecutionLoop.resume(teambot_dir, {})
+
+        # Verify state was loaded correctly
+        assert (
+            loop.parallel_group_status["post_spec_review"]["stages"]["RESEARCH"]["status"]
+            == "completed"
+        )
+
+        # Load stages config and get parallel group
+        stages_config = load_stages_config()
+        loop.stages_config = stages_config
+        group = stages_config.parallel_groups[0]
+
+        # Use REAL _filter_incomplete_stages method
+        incomplete = loop._filter_incomplete_stages(group)
+
+        # Verify only TEST_STRATEGY is incomplete
+        assert len(incomplete) == 1
+        assert WorkflowStage.TEST_STRATEGY in incomplete
+        assert WorkflowStage.RESEARCH not in incomplete
+
+        # Verify RESEARCH output preserved
+        assert loop.stage_outputs[WorkflowStage.RESEARCH] == "Research completed successfully."
+
+    # =========================================================================
+    # AT-003: Parallel Group Failure Handling
+    # =========================================================================
+    @pytest.mark.asyncio
+    async def test_at_003_parallel_group_failure_allows_sibling_completion(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """AT-003: One stage fails, sibling completes, failure reported."""
+        # Create feature directory structure
+        feature_dir = teambot_dir / "test-objective"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text("# Test Spec\n\n## Acceptance")
+
+        # Create mock that fails on first call (RESEARCH), succeeds on second
+        call_count = 0
+
+        async def fail_first_succeed_second(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("RESEARCH failed: simulated error")
+            return "VERIFIED_APPROVED: Work completed."
+
+        mock_sdk_client = AsyncMock()
+        mock_sdk_client.execute_streaming.side_effect = fail_first_succeed_second
+
+        stages_config = load_stages_config()
+        group = stages_config.parallel_groups[0]
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=1.0,
+            stages_config=stages_config,
+        )
+        loop.sdk_client = mock_sdk_client
+
+        # Track events
+        events: list[tuple[str, dict]] = []
+
+        def track_events(event: str, data: dict) -> None:
+            events.append((event, data))
+
+        # Execute REAL parallel group
+        success = await loop._execute_parallel_group(group, on_progress=track_events)
+
+        # Verify overall failure (one stage failed)
+        assert success is False
+
+        # Verify parallel_group_status shows partial completion
+        group_status = loop.parallel_group_status["post_spec_review"]["stages"]
+
+        # One stage should be failed, one completed
+        statuses = {s: info["status"] for s, info in group_status.items()}
+        assert "failed" in statuses.values()
+        assert "completed" in statuses.values()
+
+        # Verify failure event was fired
+        failed_events = [e for e in events if e[0] == "parallel_stage_failed"]
+        assert len(failed_events) >= 1
+
+        # Verify group complete event shows failure
+        complete_events = [e for e in events if e[0] == "parallel_group_complete"]
+        assert len(complete_events) == 1
+        assert complete_events[0][1]["all_success"] is False
+
+    # =========================================================================
+    # AT-004: Backward Compatibility with Legacy State File
+    # =========================================================================
+    def test_at_004_backward_compat_legacy_state_file_loads(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """AT-004: Legacy state file without parallel_group_status loads correctly."""
+        # Create feature directory
+        feature_dir = teambot_dir / "test-objective"
+        feature_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create LEGACY state file (no parallel_group_status field)
+        state_file = feature_dir / "orchestration_state.json"
+        state_file.write_text(
+            json.dumps(
+                {
+                    "objective_file": str(objective_file),
+                    "current_stage": "RESEARCH",
+                    "elapsed_seconds": 50,
+                    "max_seconds": 28800,
+                    "status": "in_progress",
+                    "stage_outputs": {"SETUP": "Setup complete"},
+                    # NOTE: No parallel_group_status field - legacy format
+                }
+            )
+        )
+
+        # Use REAL resume() classmethod - should not crash
+        loop = ExecutionLoop.resume(teambot_dir, {})
+
+        # Verify resume succeeded
+        assert loop.current_stage == WorkflowStage.RESEARCH
+
+        # Verify parallel_group_status defaulted to empty dict
+        assert loop.parallel_group_status == {}
+
+        # Verify other state was preserved
+        assert loop.stage_outputs[WorkflowStage.SETUP] == "Setup complete"
+
+    # =========================================================================
+    # AT-005: Configuration Validation Rejects Invalid Parallel Groups
+    # =========================================================================
+    def test_at_005_config_rejects_nonexistent_stage_in_parallel_group(
+        self, tmp_path: Path
+    ) -> None:
+        """AT-005: Configuration rejects non-existent stages in parallel groups."""
+        # Create invalid stages.yaml with non-existent stage
+        invalid_config = tmp_path / "invalid_stages.yaml"
+        invalid_config.write_text(
+            """
+stages:
+  SETUP:
+    work_agent: pm
+    review_agent: null
+  SPEC:
+    work_agent: ba
+    review_agent: reviewer
+  SPEC_REVIEW:
+    work_agent: ba
+    review_agent: reviewer
+    is_review_stage: true
+  RESEARCH:
+    work_agent: builder-1
+    review_agent: null
+  TEST_STRATEGY:
+    work_agent: builder-1
+    review_agent: null
+  PLAN:
+    work_agent: pm
+    review_agent: reviewer
+
+stage_order:
+  - SETUP
+  - SPEC
+  - SPEC_REVIEW
+  - RESEARCH
+  - TEST_STRATEGY
+  - PLAN
+
+parallel_groups:
+  invalid_group:
+    after: SPEC_REVIEW
+    stages:
+      - RESEARCH
+      - NONEXISTENT_STAGE
+    before: PLAN
+"""
+        )
+
+        # Attempt to load REAL config - should raise error
+        with pytest.raises(ValueError) as exc_info:
+            load_stages_config(invalid_config)
+
+        # Verify error mentions invalid stage
+        error_msg = str(exc_info.value)
+        assert "NONEXISTENT_STAGE" in error_msg
