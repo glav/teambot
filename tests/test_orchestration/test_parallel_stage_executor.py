@@ -115,10 +115,10 @@ class TestParallelStageExecutor:
 
         await executor.execute_parallel(stages, mock_execution_loop, on_progress)
 
-        # Check for failed event
+        # Check for failed events - expect 2: one during exception, one when processing results
         failed_events = [e for e in events if e[0] == "parallel_stage_failed"]
-        assert len(failed_events) == 2  # One during execution, one after gathering
-        # Verify agent field is present in both
+        assert len(failed_events) == 2
+        # Verify agent field is present in all failed events
         for event_type, data in failed_events:
             assert "agent" in data
             assert data["agent"] == "builder-1"
