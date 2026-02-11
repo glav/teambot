@@ -40,6 +40,24 @@ def resolve_env_vars(value: Any) -> Any:
     return ENV_VAR_PATTERN.sub(replacer, value)
 
 
+def extract_env_var_name(value: str) -> str | None:
+    """Extract env var name from ${VAR} pattern.
+
+    Args:
+        value: String potentially containing ${VAR} pattern
+
+    Returns:
+        Environment variable name if pattern found, None otherwise
+    """
+    if not isinstance(value, str):
+        return None
+
+    match = ENV_VAR_PATTERN.search(value)
+    if match:
+        return match.group(1)
+    return None
+
+
 def resolve_config_secrets(config: Any) -> Any:
     """Recursively resolve env vars in config dict/list.
 
@@ -95,12 +113,26 @@ def _create_channel(channel_config: dict[str, Any]):
     channel_type = channel_config.get("type")
 
     if channel_type == "telegram":
-        # Resolve env var references
+        # Extract env var names from ${VAR} patterns
+        token_env_var = extract_env_var_name(channel_config.get("token", ""))
+        chat_id_env_var = extract_env_var_name(channel_config.get("chat_id", ""))
+
+        # Resolve other config values
         resolved = resolve_config_secrets(channel_config)
         subscribed = set(resolved.get("events", []))
-        return TelegramChannel(
-            subscribed_events=subscribed if subscribed else None,
-            dry_run=resolved.get("dry_run", False),
-        )
+
+        # Build kwargs for TelegramChannel
+        kwargs = {
+            "subscribed_events": subscribed if subscribed else None,
+            "dry_run": resolved.get("dry_run", False),
+        }
+
+        # Pass custom env var names if present
+        if token_env_var:
+            kwargs["token_env_var"] = token_env_var
+        if chat_id_env_var:
+            kwargs["chat_id_env_var"] = chat_id_env_var
+
+        return TelegramChannel(**kwargs)
 
     return None
