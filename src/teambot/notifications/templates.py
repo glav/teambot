@@ -54,18 +54,16 @@ class MessageTemplates:
         template = self.TEMPLATES.get(event.event_type, self._default_template())
 
         # Build context from event - escape all string values from event.data
-        context: dict[str, Any] = {}
-        for key, value in event.data.items():
-            if isinstance(value, str):
-                context[key] = html.escape(value)
-            else:
-                context[key] = value
+        context: dict[str, Any] = {
+            key: html.escape(value) if isinstance(value, str) else value
+            for key, value in event.data.items()
+        }
 
         # Escape event-provided string fields
         context["event_type"] = html.escape(event.event_type)
         context["feature_name"] = html.escape(event.feature_name or "Unknown")
         # Use event.stage first, fallback to already-escaped event.data stage, or "Unknown"
-        if event.stage:
+        if event.stage is not None:
             context["stage"] = html.escape(event.stage)
         elif "stage" not in context:
             context["stage"] = "Unknown"
@@ -81,9 +79,7 @@ class MessageTemplates:
 
         # Format stages list if present
         if "stages" in context and isinstance(context["stages"], list):
-            escaped_stages = [
-                html.escape(s) if isinstance(s, str) else str(s) for s in context["stages"]
-            ]
+            escaped_stages = [html.escape(str(s)) for s in context["stages"]]
             context["stages"] = ", ".join(escaped_stages)
 
         # Safe format - use fallback for missing keys
