@@ -198,6 +198,57 @@ class TestTelegramChannelSend:
         assert result is False
         assert "API error" in caplog.text
 
+    @pytest.mark.asyncio
+    async def test_send_rate_limit_non_json_response(self, monkeypatch, caplog) -> None:
+        """HTTP 429 with non-JSON body uses default retry_after."""
+        import logging
+
+        caplog.set_level(logging.WARNING)
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "test-token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel = TelegramChannel()
+        event = NotificationEvent(event_type="test", data={})
+
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.json.side_effect = ValueError("Not JSON")
+        mock_response.text = "<html>Rate Limited</html>"
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        channel._client = mock_client
+
+        with pytest.raises(RateLimitError) as exc_info:
+            await channel.send(event)
+
+        # Should use default retry_after value
+        assert exc_info.value.retry_after == 1.0
+        assert "Failed to parse retry_after" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_send_api_error_non_json_response(self, monkeypatch, caplog) -> None:
+        """API error with non-JSON body falls back to response.text."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "test-token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel = TelegramChannel()
+        event = NotificationEvent(event_type="test", data={})
+
+        mock_response = MagicMock()
+        mock_response.status_code = 502
+        mock_response.json.side_effect = ValueError("Not JSON")
+        mock_response.text = "<html><body>Bad Gateway</body></html>"
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        channel._client = mock_client
+
+        result = await channel.send(event)
+
+        assert result is False
+        assert "Bad Gateway" in caplog.text
+
 
 class TestTelegramChannelPoll:
     """Tests for TelegramChannel.poll()."""
