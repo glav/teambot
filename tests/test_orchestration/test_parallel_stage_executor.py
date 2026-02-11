@@ -21,6 +21,7 @@ class TestParallelStageExecutor:
         loop._execute_work_stage = AsyncMock(return_value="Stage output")
         loop.stages_config = MagicMock()
         loop.stages_config.review_stages = set()
+        loop.stages_config.get_stage_agents = MagicMock(return_value={"work": "builder-1", "review": None})
         loop.stage_outputs = {}
         return loop
 
@@ -96,6 +97,34 @@ class TestParallelStageExecutor:
         assert "Stage failed" in failed_results[0].error
 
     @pytest.mark.asyncio
+    async def test_execute_parallel_failed_event_includes_agent(
+        self, mock_execution_loop: MagicMock
+    ) -> None:
+        """Failed stage event includes agent information."""
+        from teambot.orchestration.parallel_stage_executor import ParallelStageExecutor
+
+        mock_execution_loop._execute_work_stage.side_effect = Exception("Stage failed")
+
+        events: list[tuple[str, dict]] = []
+
+        def on_progress(event_type: str, data: dict) -> None:
+            events.append((event_type, data))
+
+        executor = ParallelStageExecutor(max_concurrent=2)
+        stages = [WorkflowStage.RESEARCH]
+
+        await executor.execute_parallel(stages, mock_execution_loop, on_progress)
+
+        # Check for failed event - expect 1 (emitted only when processing results)
+        failed_events = [e for e in events if e[0] == "parallel_stage_failed"]
+        assert len(failed_events) == 1
+        # Verify agent field is present in the failed event
+        event_type, data = failed_events[0]
+        assert "agent" in data
+        assert data["agent"] == "builder-1"
+        assert "stage" in data
+
+    @pytest.mark.asyncio
     async def test_execute_parallel_respects_concurrency(
         self, mock_execution_loop: MagicMock
     ) -> None:
@@ -142,10 +171,18 @@ class TestParallelStageExecutor:
         # Check for start events
         start_events = [e for e in events if e[0] == "parallel_stage_start"]
         assert len(start_events) == 2
+        # Verify agent field is present
+        for event_type, data in start_events:
+            assert "agent" in data
+            assert data["agent"] == "builder-1"
 
         # Check for complete events
         complete_events = [e for e in events if e[0] == "parallel_stage_complete"]
         assert len(complete_events) == 2
+        # Verify agent field is present
+        for event_type, data in complete_events:
+            assert "agent" in data
+            assert data["agent"] == "builder-1"
 
     @pytest.mark.asyncio
     async def test_execute_parallel_failure_events_fire_once(
