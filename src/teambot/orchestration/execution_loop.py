@@ -15,6 +15,7 @@ from teambot.orchestration.acceptance_test_executor import (
 from teambot.orchestration.objective_parser import parse_objective_file
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewStatus
 from teambot.orchestration.stage_config import (
+    ParallelGroupConfig,
     StagesConfiguration,
     load_stages_config,
 )
@@ -118,6 +119,9 @@ class ExecutionLoop:
         self.current_stage = WorkflowStage.SETUP
         self.stage_outputs: dict[WorkflowStage, str] = {}
 
+        # Parallel group tracking (for resume mid-parallel-group)
+        self.parallel_group_status: dict[str, dict[str, Any]] = {}
+
         # Acceptance test tracking
         self.acceptance_tests_passed: bool = False
         self.acceptance_test_result: AcceptanceTestResult | None = None
@@ -166,7 +170,20 @@ class ExecutionLoop:
                 # Execute stage based on type
                 stage_config = self.stages_config.stages.get(stage)
 
-                if stage in self.stages_config.acceptance_test_stages:
+                # Check for parallel group first - this triggers when we reach
+                # the first stage in a parallel group
+                parallel_group = self._get_parallel_group_for_stage(stage)
+                if parallel_group:
+                    success = await self._execute_parallel_group(parallel_group, on_progress)
+                    if not success:
+                        self._save_state(ExecutionResult.ERROR)
+                        return ExecutionResult.ERROR
+                    # Skip to the 'before' stage (e.g., PLAN) after parallel group
+                    self.current_stage = parallel_group.before
+                    self._save_state()
+                    continue  # Skip normal stage advancement
+
+                elif stage in self.stages_config.acceptance_test_stages:
                     # Execute acceptance test stage with retry loop
                     await self._execute_acceptance_test_with_retry(stage, on_progress)
                     if not self.acceptance_tests_passed:
@@ -206,6 +223,114 @@ class ExecutionLoop:
         except Exception:
             self._save_state(ExecutionResult.ERROR)
             raise
+
+    def _get_parallel_group_for_stage(self, stage: WorkflowStage) -> ParallelGroupConfig | None:
+        """Find parallel group that starts with this stage.
+
+        Only triggers when the stage is the first stage in a parallel group.
+
+        Args:
+            stage: Current stage to check
+
+        Returns:
+            ParallelGroupConfig if stage is first in a group, None otherwise
+        """
+
+        for group in self.stages_config.parallel_groups:
+            # Only trigger on the first stage in the group
+            if group.stages and stage == group.stages[0]:
+                return group
+        return None
+
+    async def _execute_parallel_group(
+        self,
+        group: ParallelGroupConfig,
+        on_progress: Callable[[str, Any], None] | None,
+    ) -> bool:
+        """Execute all stages in a parallel group concurrently.
+
+        Args:
+            group: Parallel group configuration
+            on_progress: Progress callback
+
+        Returns:
+            True if all stages succeeded, False if any failed
+        """
+        from teambot.orchestration.parallel_stage_executor import ParallelStageExecutor
+
+        if on_progress:
+            on_progress(
+                "parallel_group_start",
+                {
+                    "group": group.name,
+                    "stages": [s.name for s in group.stages],
+                },
+            )
+
+        # Filter to only incomplete stages (for resume support)
+        stages_to_run = self._filter_incomplete_stages(group)
+
+        if not stages_to_run:
+            # All stages already complete
+            if on_progress:
+                on_progress(
+                    "parallel_group_complete",
+                    {"group": group.name, "all_success": True},
+                )
+            return True
+
+        executor = ParallelStageExecutor(max_concurrent=2)
+        results = await executor.execute_parallel(
+            stages=stages_to_run,
+            execution_loop=self,
+            on_progress=on_progress,
+        )
+
+        # Track results in parallel_group_status
+        if group.name not in self.parallel_group_status:
+            self.parallel_group_status[group.name] = {"stages": {}}
+
+        for stage, result in results.items():
+            self.parallel_group_status[group.name]["stages"][stage.name] = {
+                "status": "completed" if result.success else "failed",
+                "error": result.error,
+            }
+
+        all_success = all(r.success for r in results.values())
+
+        if on_progress:
+            on_progress(
+                "parallel_group_complete",
+                {"group": group.name, "all_success": all_success},
+            )
+
+        return all_success
+
+    def _filter_incomplete_stages(self, group: ParallelGroupConfig) -> list[WorkflowStage]:
+        """Filter parallel group stages to only those not yet completed.
+
+        Used for resume support - only re-run stages that didn't complete.
+
+        Args:
+            group: Parallel group configuration
+
+        Returns:
+            List of stages that need to be executed
+        """
+        if group.name not in self.parallel_group_status:
+            # No prior status - run all stages
+            return list(group.stages)
+
+        group_status = self.parallel_group_status[group.name]
+        stages_status = group_status.get("stages", {})
+
+        incomplete = []
+        for stage in group.stages:
+            stage_info = stages_status.get(stage.name, {})
+            if stage_info.get("status") != "completed":
+                incomplete.append(stage)
+
+        return incomplete
 
     def cancel(self) -> None:
         """Request cancellation of execution."""
@@ -890,6 +1015,7 @@ class ExecutionLoop:
                 self.acceptance_test_result.summary if self.acceptance_test_result else None
             ),
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
+            "parallel_group_status": self.parallel_group_status,
         }
 
         state_file.write_text(json.dumps(state, indent=2))
@@ -946,6 +1072,9 @@ class ExecutionLoop:
         loop.acceptance_tests_passed = state.get("acceptance_tests_passed", False)
         loop.acceptance_test_iterations = state.get("acceptance_test_iterations", 0)
         loop._acceptance_test_history = state.get("acceptance_test_history", [])
+
+        # Restore parallel group status (with backward compatibility for old state files)
+        loop.parallel_group_status = state.get("parallel_group_status", {})
 
         return loop
 

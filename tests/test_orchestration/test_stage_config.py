@@ -329,3 +329,152 @@ class TestStageConfigDataclass:
         assert config.is_review_stage is False
         assert config.parallel_agents is None
         assert config.prompt_template is None
+
+
+class TestParallelGroupsConfig:
+    """Tests for parallel stage groups configuration."""
+
+    def test_parse_parallel_groups_valid(self, tmp_path: Path) -> None:
+        """Valid parallel_groups parses correctly."""
+        yaml_content = """
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize
+    work_agent: pm
+    review_agent: null
+    allowed_personas: [pm]
+  SPEC_REVIEW:
+    name: Spec Review
+    description: Review spec
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas: [reviewer]
+    is_review_stage: true
+  RESEARCH:
+    name: Research
+    description: Research
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas: [builder]
+  TEST_STRATEGY:
+    name: Test Strategy
+    description: Test strategy
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas: [builder]
+  PLAN:
+    name: Plan
+    description: Plan
+    work_agent: pm
+    review_agent: null
+    allowed_personas: [pm]
+  COMPLETE:
+    name: Complete
+    description: Done
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+
+stage_order:
+  - SETUP
+  - SPEC_REVIEW
+  - RESEARCH
+  - TEST_STRATEGY
+  - PLAN
+  - COMPLETE
+
+work_to_review_mapping: {}
+
+parallel_groups:
+  post_spec_review:
+    after: SPEC_REVIEW
+    stages:
+      - RESEARCH
+      - TEST_STRATEGY
+    before: PLAN
+"""
+        config_file = tmp_path / "stages.yaml"
+        config_file.write_text(yaml_content)
+
+        config = load_stages_config(config_file)
+
+        assert len(config.parallel_groups) == 1
+        group = config.parallel_groups[0]
+        assert group.name == "post_spec_review"
+        assert group.after == WorkflowStage.SPEC_REVIEW
+        assert group.before == WorkflowStage.PLAN
+        assert WorkflowStage.RESEARCH in group.stages
+        assert WorkflowStage.TEST_STRATEGY in group.stages
+
+    def test_parse_parallel_groups_missing_defaults_empty(self, tmp_path: Path) -> None:
+        """Missing parallel_groups defaults to empty list."""
+        yaml_content = """
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize
+    work_agent: pm
+    review_agent: null
+    allowed_personas: [pm]
+  COMPLETE:
+    name: Complete
+    description: Done
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+
+stage_order:
+  - SETUP
+  - COMPLETE
+
+work_to_review_mapping: {}
+"""
+        config_file = tmp_path / "stages.yaml"
+        config_file.write_text(yaml_content)
+
+        config = load_stages_config(config_file)
+
+        assert config.parallel_groups == []
+
+    def test_parse_parallel_groups_invalid_stage_raises(self, tmp_path: Path) -> None:
+        """Invalid stage name in group raises ValueError."""
+        yaml_content = """
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize
+    work_agent: pm
+    review_agent: null
+    allowed_personas: [pm]
+  COMPLETE:
+    name: Complete
+    description: Done
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+
+stage_order:
+  - SETUP
+  - COMPLETE
+
+work_to_review_mapping: {}
+
+parallel_groups:
+  bad_group:
+    after: SETUP
+    stages:
+      - NONEXISTENT_STAGE
+    before: COMPLETE
+"""
+        config_file = tmp_path / "stages.yaml"
+        config_file.write_text(yaml_content)
+
+        with pytest.raises(ValueError, match="Invalid stage name in parallel group"):
+            load_stages_config(config_file)
+
+    def test_stages_config_has_parallel_groups_field(self) -> None:
+        """StagesConfiguration has parallel_groups attribute."""
+        config = _get_default_configuration()
+        assert hasattr(config, "parallel_groups")
+        assert isinstance(config.parallel_groups, list)

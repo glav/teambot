@@ -178,3 +178,76 @@ class TestCreateProgressCallback:
         callback = create_progress_callback(manager)
 
         assert callable(callback)
+
+
+class TestParallelGroupProgressEvents:
+    """Tests for parallel group progress events."""
+
+    def test_parallel_group_start_calls_on_stage_for_each_stage(self) -> None:
+        """parallel_group_start event calls on_stage for each stage in group."""
+        manager = AgentStatusManager()
+        on_stage_mock = Mock()
+        callback = create_progress_callback(manager, on_stage=on_stage_mock)
+
+        callback(
+            "parallel_group_start",
+            {"group": "post_spec_review", "stages": ["RESEARCH", "TEST_STRATEGY"]},
+        )
+
+        # Should call on_stage for each stage with "parallel:" prefix
+        assert on_stage_mock.call_count == 2
+        on_stage_mock.assert_any_call("parallel:RESEARCH")
+        on_stage_mock.assert_any_call("parallel:TEST_STRATEGY")
+
+    def test_parallel_stage_start_sets_agent_running(self) -> None:
+        """parallel_stage_start event sets agent to running state."""
+        manager = AgentStatusManager()
+        callback = create_progress_callback(manager)
+
+        callback(
+            "parallel_stage_start",
+            {"stage": "RESEARCH", "agent": "builder-1"},
+        )
+
+        status = manager.get("builder-1")
+        assert status is not None
+        assert status.state == AgentState.RUNNING
+
+    def test_parallel_stage_complete_sets_agent_completed(self) -> None:
+        """parallel_stage_complete event sets agent to completed state."""
+        manager = AgentStatusManager()
+        callback = create_progress_callback(manager)
+
+        callback(
+            "parallel_stage_complete",
+            {"stage": "RESEARCH", "agent": "builder-1"},
+        )
+
+        status = manager.get("builder-1")
+        assert status is not None
+        assert status.state == AgentState.COMPLETED
+
+    def test_parallel_stage_failed_sets_agent_failed(self) -> None:
+        """parallel_stage_failed event sets agent to failed state."""
+        manager = AgentStatusManager()
+        callback = create_progress_callback(manager)
+
+        callback(
+            "parallel_stage_failed",
+            {"stage": "RESEARCH", "agent": "builder-1", "error": "Test failed"},
+        )
+
+        status = manager.get("builder-1")
+        assert status is not None
+        assert status.state == AgentState.FAILED
+
+    def test_parallel_group_complete_is_handled(self) -> None:
+        """parallel_group_complete event is handled without error."""
+        manager = AgentStatusManager()
+        callback = create_progress_callback(manager)
+
+        # Should not raise an exception
+        callback(
+            "parallel_group_complete",
+            {"group": "post_spec_review", "all_success": True},
+        )

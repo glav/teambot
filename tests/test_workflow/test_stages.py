@@ -185,3 +185,24 @@ class TestGetNextStages:
             iterations += 1
 
         assert current == WorkflowStage.COMPLETE
+
+
+class TestParallelStageTransitions:
+    """Tests for parallel stage group transitions."""
+
+    def test_spec_review_next_stages_includes_both_parallel_stages(self):
+        """SPEC_REVIEW.next_stages includes both RESEARCH and TEST_STRATEGY."""
+        next_stages = get_next_stages(WorkflowStage.SPEC_REVIEW)
+        assert WorkflowStage.RESEARCH in next_stages
+        assert WorkflowStage.TEST_STRATEGY in next_stages
+        assert len(next_stages) == 2
+
+    def test_research_converges_at_plan(self):
+        """RESEARCH converges at PLAN."""
+        next_stages = get_next_stages(WorkflowStage.RESEARCH)
+        assert WorkflowStage.PLAN in next_stages
+
+    def test_test_strategy_converges_at_plan(self):
+        """TEST_STRATEGY converges at PLAN."""
+        next_stages = get_next_stages(WorkflowStage.TEST_STRATEGY)
+        assert WorkflowStage.PLAN in next_stages
