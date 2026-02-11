@@ -140,7 +140,8 @@ class TelegramChannel:
             logger.error("Telegram request timed out")
             return False
         except httpx.RequestError as e:
-            logger.error(f"Telegram request error: {e}")
+            # Log error type without exposing URL (which contains token)
+            logger.error(f"Telegram request error: {type(e).__name__}")
             return False
 
     async def poll(self) -> list[dict[str, Any]] | None:

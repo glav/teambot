@@ -138,3 +138,99 @@ class TestMessageTemplates:
 
         # Should not raise, should include "Missing" info
         assert "Missing" in result or "Event:" in result
+
+    def test_render_escapes_html_in_feature_name(self, templates: MessageTemplates) -> None:
+        """HTML characters in feature_name are escaped."""
+        event = NotificationEvent(
+            event_type="stage_changed",
+            data={"stage": "IMPLEMENTATION"},
+            feature_name="<script>alert('xss')</script>",
+        )
+
+        result = templates.render(event)
+
+        # HTML should be escaped
+        assert "&lt;script&gt;" in result
+        assert "<script>" not in result
+
+    def test_render_escapes_html_in_agent_id(self, templates: MessageTemplates) -> None:
+        """HTML characters in agent_id are escaped."""
+        event = NotificationEvent(
+            event_type="agent_running",
+            data={"agent_id": "builder<>&", "task": "test"},
+        )
+
+        result = templates.render(event)
+
+        # HTML should be escaped
+        assert "&lt;&gt;&amp;" in result
+        assert "builder<>&" not in result
+
+    def test_render_escapes_html_in_task(self, templates: MessageTemplates) -> None:
+        """HTML characters in task are escaped."""
+        event = NotificationEvent(
+            event_type="agent_running",
+            data={"agent_id": "builder", "task": "Fix <bug> & test"},
+        )
+
+        result = templates.render(event)
+
+        # HTML should be escaped
+        assert "&lt;bug&gt; &amp;" in result
+        assert "<bug> &" not in result
+
+    def test_render_escapes_html_in_stage(self, templates: MessageTemplates) -> None:
+        """HTML characters in stage are escaped."""
+        event = NotificationEvent(
+            event_type="stage_changed",
+            data={},
+            stage="TEST<>STAGE",
+            feature_name="test",
+        )
+
+        result = templates.render(event)
+
+        # HTML should be escaped
+        assert "TEST&lt;&gt;STAGE" in result
+        assert "TEST<>STAGE" not in result
+
+    def test_render_escapes_html_in_stages_list(self, templates: MessageTemplates) -> None:
+        """HTML characters in stages list are escaped."""
+        event = NotificationEvent(
+            event_type="parallel_group_start",
+            data={"group": "test", "stages": ["STAGE<1>", "STAGE&2"]},
+        )
+
+        result = templates.render(event)
+
+        # HTML should be escaped
+        assert "STAGE&lt;1&gt;" in result
+        assert "STAGE&amp;2" in result
+        assert "STAGE<1>" not in result
+
+    def test_render_escapes_html_in_message(self, templates: MessageTemplates) -> None:
+        """HTML characters in message are escaped."""
+        event = NotificationEvent(
+            event_type="review_progress",
+            data={"message": "Found <issue> & fixed it"},
+            stage="REVIEW",
+        )
+
+        result = templates.render(event)
+
+        # HTML should be escaped
+        assert "&lt;issue&gt; &amp;" in result
+        assert "<issue> &" not in result
+
+    def test_render_preserves_numeric_values(self, templates: MessageTemplates) -> None:
+        """Numeric values are not affected by escaping."""
+        event = NotificationEvent(
+            event_type="acceptance_test_stage_complete",
+            data={"passed": 10, "failed": 0, "total": 10},
+            feature_name="test",
+        )
+
+        result = templates.render(event)
+
+        # Numeric values should work fine
+        assert "10/10" in result

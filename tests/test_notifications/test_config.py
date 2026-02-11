@@ -4,9 +4,50 @@ from __future__ import annotations
 
 from teambot.notifications.config import (
     create_event_bus_from_config,
+    extract_env_var_name,
     resolve_config_secrets,
     resolve_env_vars,
 )
+
+
+class TestExtractEnvVarName:
+    """Tests for extract_env_var_name function."""
+
+    def test_extract_simple_pattern(self) -> None:
+        """Extract env var name from ${VAR} pattern."""
+        result = extract_env_var_name("${MY_TOKEN}")
+
+        assert result == "MY_TOKEN"
+
+    def test_extract_from_string_with_text(self) -> None:
+        """Extract env var name even with surrounding text."""
+        result = extract_env_var_name("prefix ${TOKEN} suffix")
+
+        assert result == "TOKEN"
+
+    def test_extract_first_match(self) -> None:
+        """Extract first env var name when multiple present."""
+        result = extract_env_var_name("${VAR1} and ${VAR2}")
+
+        assert result == "VAR1"
+
+    def test_no_pattern_returns_none(self) -> None:
+        """Returns None when no ${} pattern found."""
+        result = extract_env_var_name("regular text")
+
+        assert result is None
+
+    def test_partial_pattern_returns_none(self) -> None:
+        """Returns None for partial patterns like $VAR."""
+        result = extract_env_var_name("$VAR without braces")
+
+        assert result is None
+
+    def test_non_string_returns_none(self) -> None:
+        """Returns None for non-string values."""
+        assert extract_env_var_name(123) is None
+        assert extract_env_var_name(None) is None
+        assert extract_env_var_name(True) is None
 
 
 class TestResolveEnvVars:
@@ -176,6 +217,55 @@ class TestCreateEventBusFromConfig:
 
         channel = result._channels[0]
         assert channel._dry_run is True
+
+    def test_uses_custom_env_var_names(self, monkeypatch) -> None:
+        """Uses custom env var names from config."""
+        monkeypatch.setenv("MY_CUSTOM_TOKEN", "custom-token")
+        monkeypatch.setenv("MY_CUSTOM_CHAT_ID", "custom-123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${MY_CUSTOM_TOKEN}",
+                        "chat_id": "${MY_CUSTOM_CHAT_ID}",
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        assert channel._token_env_var == "MY_CUSTOM_TOKEN"
+        assert channel._chat_id_env_var == "MY_CUSTOM_CHAT_ID"
+        assert channel.enabled is True
+
+    def test_defaults_to_standard_env_vars_when_no_pattern(self, monkeypatch) -> None:
+        """Uses default env var names when config doesn't have ${} patterns."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        # Missing token/chat_id fields, should use defaults
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # Should still use defaults when fields are missing
+        assert channel._token_env_var == "TEAMBOT_TELEGRAM_TOKEN"
+        assert channel._chat_id_env_var == "TEAMBOT_TELEGRAM_CHAT_ID"
 
     def test_ignores_unknown_channel_type(self) -> None:
         """Unknown channel types are ignored."""

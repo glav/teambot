@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from typing import Any
 
 from teambot.notifications.events import NotificationEvent
@@ -52,13 +53,22 @@ class MessageTemplates:
         """
         template = self.TEMPLATES.get(event.event_type, self._default_template())
 
-        # Build context from event
-        context: dict[str, Any] = {**event.data}
-        context["event_type"] = event.event_type
-        context["feature_name"] = event.feature_name or "Unknown"
-        context["stage"] = event.stage or event.data.get("stage", "Unknown")
+        # Build context from event - escape all string values from event.data
+        context: dict[str, Any] = {
+            key: html.escape(value) if isinstance(value, str) else value
+            for key, value in event.data.items()
+        }
 
-        # Add computed emoji fields
+        # Escape event-provided string fields
+        context["event_type"] = html.escape(event.event_type)
+        context["feature_name"] = html.escape(event.feature_name or "Unknown")
+        # Use event.stage first, fallback to already-escaped event.data stage, or "Unknown"
+        if event.stage is not None:
+            context["stage"] = html.escape(event.stage)
+        elif "stage" not in context:
+            context["stage"] = "Unknown"
+
+        # Add computed emoji fields (emojis and hardcoded strings are safe)
         if event.event_type == "parallel_group_complete":
             all_success = event.data.get("all_success", False)
             context["emoji"] = STATUS_EMOJI["success"] if all_success else STATUS_EMOJI["warning"]
@@ -69,13 +79,14 @@ class MessageTemplates:
 
         # Format stages list if present
         if "stages" in context and isinstance(context["stages"], list):
-            context["stages"] = ", ".join(context["stages"])
+            escaped_stages = [html.escape(str(s)) for s in context["stages"]]
+            context["stages"] = ", ".join(escaped_stages)
 
         # Safe format - use fallback for missing keys
         try:
             return template.format(**context).strip()
         except KeyError as e:
-            return f"📢 Event: {event.event_type}\n(Missing: {e})"
+            return f"📢 Event: {html.escape(event.event_type)}\n(Missing: {e})"
 
     def _default_template(self) -> str:
         """Get fallback template for unknown events."""
