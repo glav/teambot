@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -133,8 +134,6 @@ class TestEventBusEmit:
         event = NotificationEvent(event_type="test", data={})
 
         # emit() should return quickly even if send takes 5s
-        import time
-
         start = time.time()
         await bus.emit(event)
         elapsed = time.time() - start

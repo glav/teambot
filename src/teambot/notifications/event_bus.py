@@ -205,11 +205,15 @@ class EventBus:
         """Close the event bus and wait for pending tasks.
 
         This method drains pending tasks and clears all channels.
+        After drain() times out or completes, the pending tasks set is cleared
+        to allow garbage collection. Any remaining tasks continue running in
+        the background until completion or event loop shutdown.
 
         Args:
             timeout: Maximum seconds to wait for pending tasks (default: 5.0)
         """
         await self.drain(timeout=timeout)
         self._channels.clear()
+        # Clear pending tasks to allow GC. Tasks continue running if not complete.
         self._pending_tasks.clear()
         logger.debug("EventBus closed")
