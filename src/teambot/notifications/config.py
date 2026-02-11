@@ -4,9 +4,19 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any
+from typing import Any, TypeVar, overload
 
 ENV_VAR_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+
+_T = TypeVar("_T")
+
+
+@overload
+def resolve_env_vars(value: str) -> str: ...
+
+
+@overload
+def resolve_env_vars(value: _T) -> _T: ...  # noqa: UP047
 
 
 def resolve_env_vars(value: Any) -> Any:
