@@ -4,19 +4,31 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any
+from typing import Any, TypeVar, overload
 
 ENV_VAR_PATTERN = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
+_T = TypeVar("_T")
 
-def resolve_env_vars(value: str) -> str:
+
+@overload
+def resolve_env_vars(value: str) -> str: ...
+
+
+@overload
+def resolve_env_vars(value: _T) -> _T: ...  # noqa: UP047
+
+
+def resolve_env_vars(value: Any) -> Any:
     """Resolve ${VAR} patterns in string values.
 
     Args:
-        value: String potentially containing ${VAR} patterns
+        value: String potentially containing ${VAR} patterns, or any other type
+               (non-string values are returned unchanged)
 
     Returns:
-        String with env vars resolved (empty string if var not set)
+        String with env vars resolved (empty string if var not set),
+        or the original value if not a string
     """
     if not isinstance(value, str):
         return value
