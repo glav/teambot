@@ -181,15 +181,21 @@ class TaskExecutor:
         Returns:
             ExecutionResult with confirmation output.
         """
+        logger.debug(f"@notify: Handling notification, message length={len(message)}")
+
         # Truncate if message too long
         message = truncate_for_notification(message)
 
         try:
             if self._config:
+                logger.debug("@notify: Config available, creating event bus")
                 event_bus = create_event_bus_from_config(self._config)
                 if event_bus and event_bus._channels:
+                    channel_names = [type(ch).__name__ for ch in event_bus._channels]
+                    logger.debug(f"@notify: Emitting to channels: {channel_names}")
                     event_bus.emit_sync("custom_message", {"message": message})
                     output = "Notification sent ✅"
+                    logger.debug("@notify: emit_sync completed")
                 else:
                     output = "⚠️ No notification channels configured"
                     logger.warning("@notify: No notification channels configured")
@@ -403,6 +409,32 @@ class TaskExecutor:
         sections.append(f"=== Your Task ===\n{prompt}")
         return "\n".join(sections)
 
+    def _inject_pipeline_outputs(self, prompt: str, dep_task_ids: list[str]) -> str:
+        """Inject previous pipeline stage outputs into prompt.
+
+        Args:
+            prompt: Original prompt/message for the current stage.
+            dep_task_ids: List of task IDs from previous stage.
+
+        Returns:
+            Prompt with previous outputs prepended.
+        """
+        sections = []
+        for task_id in dep_task_ids:
+            task = self._manager.get_task(task_id)
+            result = self._manager.get_result(task_id)
+            agent_name = task.agent_id if task else task_id
+            if result and result.success:
+                sections.append(f"=== Output from @{agent_name} ===\n{result.output}\n")
+            else:
+                error_msg = result.error if result else "Task result missing"
+                sections.append(f"=== Output from @{agent_name} ===\n[Failed: {error_msg}]\n")
+
+        if sections:
+            sections.append(f"=== Your Task ===\n{prompt}")
+            return "\n".join(sections)
+        return prompt
+
     async def _execute_multiagent(self, command: Command) -> ExecutionResult:
         """Execute multi-agent fan-out command.
 
@@ -533,7 +565,8 @@ class TaskExecutor:
         previous_task_ids: list[str] = []
         stage_task_map: dict[int, list[str]] = {}  # stage_index -> task_ids
         # Track pseudo-agent stages for inline handling
-        pseudo_agent_stages: dict[int, tuple[str, str]] = {}  # stage_index -> (agent_id, prompt)
+        # stage_index -> (agent_id, prompt, dependency_task_ids)
+        pseudo_agent_stages: dict[int, tuple[str, str, list[str]]] = {}
 
         # Create tasks for each stage with dependencies
         for i, stage in enumerate(command.pipeline):
@@ -548,7 +581,8 @@ class TaskExecutor:
 
                 # Handle pseudo-agents differently - don't create tasks for them
                 if is_pseudo_agent(agent_id):
-                    pseudo_agent_stages[i] = (agent_id, prompt)
+                    # Store prompt and dependencies for later injection
+                    pseudo_agent_stages[i] = (agent_id, prompt, previous_task_ids.copy())
                     continue
 
                 # Custom agents in .github/agents/ handle persona context
@@ -563,7 +597,10 @@ class TaskExecutor:
                 all_task_ids.append(task.id)
 
             stage_task_map[i] = stage_task_ids
-            previous_task_ids = stage_task_ids
+            # Only update previous_task_ids if we created real tasks
+            # (pseudo-agents don't produce task IDs, so keep previous for next stage)
+            if stage_task_ids:
+                previous_task_ids = stage_task_ids
 
         total_stages = len(command.pipeline)
 
@@ -590,8 +627,13 @@ class TaskExecutor:
             for stage_index, stage_task_ids in stage_task_map.items():
                 # Handle pseudo-agent stages inline (e.g., @notify)
                 if stage_index in pseudo_agent_stages:
-                    agent_id, prompt = pseudo_agent_stages[stage_index]
-                    notify_result = await self._handle_notify(prompt, command.background)
+                    agent_id, prompt, dep_task_ids = pseudo_agent_stages[stage_index]
+                    # Inject previous stage outputs into notify message
+                    if dep_task_ids:
+                        notify_prompt = self._inject_pipeline_outputs(prompt, dep_task_ids)
+                    else:
+                        notify_prompt = prompt
+                    notify_result = await self._handle_notify(notify_prompt, command.background)
                     final_outputs.append(f"=== @notify ===\n{notify_result.output}")
                     continue
 

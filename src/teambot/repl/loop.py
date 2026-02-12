@@ -12,7 +12,14 @@ from rich.prompt import Prompt
 
 from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 from teambot.repl.commands import SystemCommands
-from teambot.repl.parser import CommandType, ParseError, parse_command
+from teambot.repl.parser import (
+    Command,
+    CommandType,
+    ParseError,
+    needs_default_agent_for_pipeline,
+    parse_command,
+    prepend_default_agent,
+)
 from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor, is_pseudo_agent
 from teambot.tasks.models import Task, TaskResult
@@ -322,6 +329,24 @@ class REPLLoop:
 
                     # Route command
                     try:
+                        # Convert raw input to agent command if default agent is set
+                        # This ensures raw input goes through TaskExecutor for advanced features
+                        if command.type == CommandType.RAW and self._router.get_default_agent():
+                            default_agent = self._router.get_default_agent()
+                            if command.content and command.content.strip():
+                                # Check if this is a pipeline requiring default agent
+                                if needs_default_agent_for_pipeline(command.content):
+                                    # Re-parse with default agent prepended
+                                    prefixed = prepend_default_agent(command.content, default_agent)
+                                    command = parse_command(prefixed)
+                                else:
+                                    command = Command(
+                                        type=CommandType.AGENT,
+                                        agent_id=default_agent,
+                                        agent_ids=[default_agent],
+                                        content=command.content,
+                                    )
+
                         # Check if this is an advanced agent command
                         if command.type == CommandType.AGENT and (
                             command.is_pipeline
@@ -334,7 +359,7 @@ class REPLLoop:
                             result = await self._handle_advanced_command(command)
                             self._console.print(result)
                         else:
-                            # Use existing router for system commands only
+                            # Use existing router for system commands and simple agent commands
                             result = await self._router.route(command)
 
                             # Handle system command results

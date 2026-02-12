@@ -6,7 +6,9 @@ from teambot.repl.parser import (
     Command,
     CommandType,
     ParseError,
+    needs_default_agent_for_pipeline,
     parse_command,
+    prepend_default_agent,
 )
 
 
@@ -420,3 +422,51 @@ class TestParseModelFlag:
         result = parse_command("@pm --model claude-sonnet-4.5 Create plan")
 
         assert result.model == "claude-sonnet-4.5"
+
+
+class TestDefaultAgentPipeline:
+    """Tests for default agent pipeline detection and handling."""
+
+    def test_needs_default_agent_for_simple_pipeline(self):
+        """Test detection of raw input -> @agent pattern."""
+        assert needs_default_agent_for_pipeline("tell joke -> @notify") is True
+        assert needs_default_agent_for_pipeline("do something -> @pm") is True
+
+    def test_needs_default_agent_false_for_agent_prefix(self):
+        """Test that @agent -> @agent doesn't need default agent."""
+        assert needs_default_agent_for_pipeline("@pm task -> @notify") is False
+
+    def test_needs_default_agent_false_for_no_pipeline(self):
+        """Test that plain raw input doesn't need default agent."""
+        assert needs_default_agent_for_pipeline("tell me a joke") is False
+        assert needs_default_agent_for_pipeline("do something") is False
+
+    def test_needs_default_agent_false_for_system_command(self):
+        """Test that system commands don't trigger default agent."""
+        assert needs_default_agent_for_pipeline("/help -> @notify") is False
+
+    def test_prepend_default_agent(self):
+        """Test prepending default agent to raw input."""
+        result = prepend_default_agent("tell joke -> @notify", "pm")
+        assert result == "@pm tell joke -> @notify"
+
+    def test_prepend_default_agent_creates_valid_pipeline(self):
+        """Test that prepended input parses as pipeline."""
+        raw_input = "tell joke -> @notify"
+        prefixed = prepend_default_agent(raw_input, "pm")
+        result = parse_command(prefixed)
+
+        assert result.type == CommandType.AGENT
+        assert result.is_pipeline is True
+        assert len(result.pipeline) == 2
+        assert result.pipeline[0].agent_ids == ["pm"]
+        assert "tell joke" in result.pipeline[0].content
+        assert result.pipeline[1].agent_ids == ["notify"]
+
+    def test_needs_default_agent_with_multiword_content(self):
+        """Test detection with multi-word content before pipeline."""
+        assert needs_default_agent_for_pipeline("tell me a funny joke -> @notify") is True
+
+    def test_needs_default_agent_with_special_chars(self):
+        """Test detection with special characters in content."""
+        assert needs_default_agent_for_pipeline("what's 2+2? -> @notify") is True

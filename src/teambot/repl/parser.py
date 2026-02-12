@@ -81,8 +81,12 @@ AGENT_PATTERN = re.compile(r"^@([a-zA-Z][a-zA-Z0-9,_-]*)\s*(.*)", re.DOTALL)
 # Pattern for system commands: /command args
 SYSTEM_PATTERN = re.compile(r"^/([a-zA-Z][a-zA-Z0-9-]*)\s*(.*)", re.DOTALL)
 
-# Pattern for pipeline separator
+# Pattern for pipeline separator (requires @ after ->)
 PIPELINE_PATTERN = re.compile(r"\s*->\s*@")
+
+# Pattern for detecting raw input -> @agent (no @ prefix before ->)
+# Used to detect when default agent should be prepended
+RAW_PIPELINE_PATTERN = re.compile(r"^([^@/][^>]*?)\s*->\s*@")
 
 # Pattern for agent references in content: $pm, $ba, $builder-1
 # Uses negative lookbehind to exclude escaped \$
@@ -120,6 +124,36 @@ def parse_command(input_text: str) -> Command:
 
     # Default to raw input
     return Command(type=CommandType.RAW, content=input_text)
+
+
+def needs_default_agent_for_pipeline(input_text: str) -> bool:
+    """Check if raw input needs default agent prepended for pipeline.
+
+    Detects patterns like "tell joke -> @notify" where raw input
+    is followed by pipeline operator to an agent.
+
+    Args:
+        input_text: Raw user input string.
+
+    Returns:
+        True if input needs default agent for pipeline parsing.
+    """
+    return RAW_PIPELINE_PATTERN.match(input_text) is not None
+
+
+def prepend_default_agent(input_text: str, default_agent: str) -> str:
+    """Prepend default agent to raw pipeline input.
+
+    Converts "tell joke -> @notify" to "@pm tell joke -> @notify".
+
+    Args:
+        input_text: Raw user input string.
+        default_agent: Agent ID to prepend.
+
+    Returns:
+        Input text with default agent prepended.
+    """
+    return f"@{default_agent} {input_text}"
 
 
 def _parse_agent_command(input_text: str, agent_match: re.Match) -> Command:

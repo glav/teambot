@@ -12,7 +12,13 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 
 from teambot.repl.commands import SystemCommands
-from teambot.repl.parser import Command, CommandType, parse_command
+from teambot.repl.parser import (
+    Command,
+    CommandType,
+    needs_default_agent_for_pipeline,
+    parse_command,
+    prepend_default_agent,
+)
 from teambot.tasks.executor import is_pseudo_agent
 from teambot.ui.agent_state import AgentState, AgentStatusManager
 from teambot.ui.widgets import InputPane, OutputPane, StatusPanel
@@ -125,13 +131,19 @@ class TeamBotApp(App):
             # Handle raw input - check if default agent is configured
             default_agent = self._router.get_default_agent() if self._router else None
             if default_agent:
-                # Route to default agent
-                agent_command = Command(
-                    type=CommandType.AGENT,
-                    agent_id=default_agent,
-                    agent_ids=[default_agent],
-                    content=command.content,
-                )
+                # Check if this is a pipeline requiring default agent
+                if command.content and needs_default_agent_for_pipeline(command.content):
+                    # Re-parse with default agent prepended
+                    prefixed = prepend_default_agent(command.content, default_agent)
+                    agent_command = parse_command(prefixed)
+                else:
+                    # Route to default agent
+                    agent_command = Command(
+                        type=CommandType.AGENT,
+                        agent_id=default_agent,
+                        agent_ids=[default_agent],
+                        content=command.content,
+                    )
                 task = asyncio.create_task(self._handle_agent_command(agent_command, output))
                 self._pending_tasks.add(task)
                 task.add_done_callback(self._pending_tasks.discard)

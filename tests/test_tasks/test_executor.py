@@ -294,6 +294,30 @@ class TestNotifyInPipeline:
 
             assert result.success
 
+    @pytest.mark.asyncio
+    async def test_notify_receives_previous_stage_output(self):
+        """@notify receives injected output from previous pipeline stage."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Here is a funny joke!")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command("@pm tell joke -> @notify")
+            result = await executor.execute(cmd)
+
+            assert result.success
+            # Check that emit_sync was called with the previous stage output injected
+            mock_bus.emit_sync.assert_called_once()
+            call_args = mock_bus.emit_sync.call_args
+            message_data = call_args[1] if call_args[1] else call_args[0][1]
+            # The message should contain the output from @pm
+            assert "Here is a funny joke!" in message_data.get("message", "")
+
 
 class TestNotifyFailureHandling:
     """Tests for @notify failure scenarios."""
