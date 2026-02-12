@@ -1,6 +1,6 @@
 """Tests for REPL system commands."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from teambot.repl.commands import (
     CommandResult,
@@ -418,137 +418,30 @@ class TestResetAgentCommand:
         assert result.success is False
 
 
-class TestNotifyCommand:
-    """Tests for /notify command."""
+class TestLegacyNotifyCommandRemoved:
+    """Tests that /notify is removed (superseded by @notify pseudo-agent)."""
 
-    def test_notify_without_args_shows_usage(self):
-        """Test /notify without arguments returns usage help."""
-        commands = SystemCommands(config={"notifications": {"enabled": True}})
-        result = commands.notify([])
-
-        assert result.success is False
-        assert "Usage:" in result.output
-        assert "/notify" in result.output
-
-    def test_notify_without_config_shows_error(self):
-        """Test /notify without config shows helpful error."""
-        commands = SystemCommands(config=None)
-        result = commands.notify(["test"])
-
-        assert result.success is False
-        assert "not configured" in result.output
-        assert "teambot init" in result.output
-
-    def test_notify_with_disabled_notifications_shows_error(self):
-        """Test /notify with disabled notifications shows error."""
-        commands = SystemCommands(config={"notifications": {"enabled": False}})
-        result = commands.notify(["test"])
-
-        assert result.success is False
-        assert "not enabled" in result.output
-
-    def test_notify_with_no_channels_shows_error(self):
-        """Test /notify with no channels shows error."""
-        commands = SystemCommands(config={"notifications": {"enabled": True, "channels": []}})
-        result = commands.notify(["test"])
-
-        assert result.success is False
-        assert "No notification channels" in result.output
-
-    def test_notify_with_empty_channels_shows_error(self):
-        """Test /notify with empty channels list shows error."""
-        commands = SystemCommands(
-            config={"notifications": {"enabled": True}}  # No channels key
-        )
-        result = commands.notify(["test"])
-
-        assert result.success is False
-        assert "No notification channels" in result.output
-
-    def test_notify_dispatch_routes_to_handler(self):
-        """Test /notify is dispatched correctly."""
-        commands = SystemCommands(config=None)
+    def test_notify_command_returns_unknown(self):
+        """Test /notify returns unknown command error."""
+        commands = SystemCommands()
         result = commands.dispatch("notify", ["test"])
 
-        # Should fail due to no config, but demonstrates routing works
         assert result.success is False
-        assert "not configured" in result.output
+        assert "Unknown command" in result.output
+        assert "/notify" in result.output
 
-    def test_help_includes_notify(self):
-        """Test /help output includes /notify command."""
+    def test_help_does_not_include_slash_notify(self):
+        """Test /help output does not include /notify command."""
         commands = SystemCommands()
         result = commands.help([])
 
         assert result.success is True
-        assert "/notify" in result.output
+        assert "/notify" not in result.output
 
-    def test_notify_joins_multiple_args(self):
-        """Test /notify joins multiple arguments into message."""
-        # This test verifies the message joining works even if sending fails
-        commands = SystemCommands(config=None)
-        result = commands.notify(["Hello", "World", "Test"])
-
-        # Failed due to no config, but we can verify it tried
-        assert result.success is False
-        # The error message proves it processed the command
-
-    @patch("teambot.notifications.config.create_event_bus_from_config")
-    def test_notify_success(self, mock_create_bus):
-        """Test /notify successfully sends message."""
-        mock_bus = MagicMock()
-        mock_bus._channels = [MagicMock()]
-        mock_create_bus.return_value = mock_bus
-
-        commands = SystemCommands(
-            config={"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
-        )
-        result = commands.notify(["Hello", "World"])
+    def test_help_includes_at_notify(self):
+        """Test /help output includes @notify pseudo-agent."""
+        commands = SystemCommands()
+        result = commands.help([])
 
         assert result.success is True
-        assert "✅" in result.output
-        assert "Hello World" in result.output
-        mock_bus.emit_sync.assert_called_once_with("custom_message", {"message": "Hello World"})
-
-    @patch("teambot.notifications.config.create_event_bus_from_config")
-    def test_notify_with_single_word(self, mock_create_bus):
-        """Test /notify with single word message."""
-        mock_bus = MagicMock()
-        mock_bus._channels = [MagicMock()]
-        mock_create_bus.return_value = mock_bus
-
-        commands = SystemCommands(
-            config={"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
-        )
-        result = commands.notify(["Test"])
-
-        assert result.success is True
-        assert "Test" in result.output
-        mock_bus.emit_sync.assert_called_once_with("custom_message", {"message": "Test"})
-
-    @patch("teambot.notifications.config.create_event_bus_from_config")
-    def test_notify_eventbus_creation_fails(self, mock_create_bus):
-        """Test /notify when EventBus creation returns None."""
-        mock_create_bus.return_value = None
-
-        commands = SystemCommands(
-            config={"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
-        )
-        result = commands.notify(["test"])
-
-        assert result.success is False
-        assert "Failed to create" in result.output
-
-    @patch("teambot.notifications.config.create_event_bus_from_config")
-    def test_notify_eventbus_no_channels(self, mock_create_bus):
-        """Test /notify when EventBus has no channels after creation."""
-        mock_bus = MagicMock()
-        mock_bus._channels = []  # Empty channels
-        mock_create_bus.return_value = mock_bus
-
-        commands = SystemCommands(
-            config={"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
-        )
-        result = commands.notify(["test"])
-
-        assert result.success is False
-        assert "Failed to create" in result.output
+        assert "@notify" in result.output

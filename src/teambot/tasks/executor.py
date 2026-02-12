@@ -8,15 +8,51 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from teambot.notifications.config import create_event_bus_from_config
 from teambot.repl.parser import Command, CommandType
 from teambot.tasks.formatting import format_agent_header
 from teambot.tasks.manager import TaskManager
-from teambot.tasks.models import Task, TaskStatus
+from teambot.tasks.models import Task, TaskResult, TaskStatus
 
 if TYPE_CHECKING:
     from teambot.ui.agent_state import AgentStatusManager
 
 logger = logging.getLogger(__name__)
+
+# Pseudo-agents that bypass Copilot SDK execution
+PSEUDO_AGENTS = {"notify"}
+
+
+def is_pseudo_agent(agent_id: str) -> bool:
+    """Check if agent is a pseudo-agent (not using SDK).
+
+    Args:
+        agent_id: The agent identifier to check.
+
+    Returns:
+        True if agent is a pseudo-agent, False otherwise.
+    """
+    return agent_id in PSEUDO_AGENTS
+
+
+# Constants for notification truncation
+MAX_NOTIFICATION_LENGTH = 500
+TRUNCATION_SUFFIX = "..."
+
+
+def truncate_for_notification(text: str, max_length: int = MAX_NOTIFICATION_LENGTH) -> str:
+    """Truncate text for notification readability.
+
+    Args:
+        text: Text to potentially truncate.
+        max_length: Maximum length before truncation.
+
+    Returns:
+        Original text if under limit, otherwise truncated with suffix.
+    """
+    if len(text) <= max_length:
+        return text
+    return text[:max_length] + TRUNCATION_SUFFIX
 
 
 @dataclass
@@ -63,6 +99,7 @@ class TaskExecutor:
         on_stage_output: Callable | None = None,
         on_pipeline_complete: Callable | None = None,
         agent_status_manager: AgentStatusManager | None = None,
+        config: dict | None = None,
     ):
         """Initialize executor.
 
@@ -77,6 +114,7 @@ class TaskExecutor:
             on_stage_output: Callback for intermediate output (agent_id, output).
             on_pipeline_complete: Callback when pipeline completes (clears progress).
             agent_status_manager: Optional manager for agent status updates.
+            config: Optional configuration dict for notification settings.
         """
         self._sdk_client = sdk_client
         self._on_task_complete = on_task_complete
@@ -86,6 +124,7 @@ class TaskExecutor:
         self._on_stage_output = on_stage_output
         self._on_pipeline_complete = on_pipeline_complete
         self._agent_status = agent_status_manager
+        self._config = config
 
         # Create manager with our executor function
         self._manager = TaskManager(
@@ -129,6 +168,66 @@ class TaskExecutor:
         """Mark agent as idle in status manager."""
         if self._agent_status:
             self._agent_status.set_idle(agent_id)
+
+    async def _handle_notify(self, message: str, background: bool) -> ExecutionResult:
+        """Handle @notify pseudo-agent.
+
+        Sends notification to all configured channels without invoking Copilot SDK.
+
+        Args:
+            message: Notification message (may include interpolated $ref content).
+            background: Whether running in background mode.
+
+        Returns:
+            ExecutionResult with confirmation output.
+        """
+        logger.debug(f"@notify: Handling notification, message length={len(message)}")
+
+        # Truncate if message too long
+        message = truncate_for_notification(message)
+
+        try:
+            if self._config:
+                logger.debug("@notify: Config available, checking notification settings")
+                notifications = self._config.get("notifications", {})
+
+                # Check if notifications are explicitly disabled
+                # Default to False if 'enabled' key is missing for safety
+                if not notifications.get("enabled", False):
+                    output = "⚠️ Notifications are disabled"
+                    logger.warning("@notify: Notifications are disabled in config")
+                else:
+                    # Notifications are enabled, try to create event bus
+                    event_bus = create_event_bus_from_config(self._config)
+                    if event_bus and event_bus._channels:
+                        channel_names = [type(ch).__name__ for ch in event_bus._channels]
+                        logger.debug(f"@notify: Emitting to channels: {channel_names}")
+                        event_bus.emit_sync("custom_message", {"message": message})
+                        output = "Notification sent ✅"
+                        logger.debug("@notify: emit_sync completed")
+                    else:
+                        output = "⚠️ No notification channels configured"
+                        logger.warning("@notify: Notifications enabled but no channels configured")
+            else:
+                output = "⚠️ No notification configuration available"
+                logger.warning("@notify: No config available")
+        except Exception as e:
+            # Generic output without exception details to avoid leaking secrets
+            output = "⚠️ Notification failed (see logs)"
+            # Log only exception type to avoid exposing sensitive data (e.g., URLs with tokens)
+            logger.warning(f"@notify failed: {type(e).__name__}")
+
+        # Store result for potential $notify references
+        synthetic_result = TaskResult(task_id="notify", output=output, success=True)
+        self._manager._agent_results["notify"] = synthetic_result
+
+        return ExecutionResult(
+            success=True,  # Always succeed to not break pipeline
+            output=output,
+            task_id=None,
+            task_ids=[],
+            background=background,
+        )
 
     async def _execute_agent_task(
         self, agent_id: str, prompt: str, model: str | None = None
@@ -237,6 +336,10 @@ class TaskExecutor:
         else:
             prompt = command.content
 
+        # Handle @notify pseudo-agent
+        if is_pseudo_agent(agent_id):
+            return await self._handle_notify(prompt, command.background)
+
         # Custom agents in .github/agents/ handle persona context
         task = self._manager.create_task(
             agent_id=agent_id,
@@ -317,6 +420,32 @@ class TaskExecutor:
         sections.append(f"=== Your Task ===\n{prompt}")
         return "\n".join(sections)
 
+    def _inject_pipeline_outputs(self, prompt: str, dep_task_ids: list[str]) -> str:
+        """Inject previous pipeline stage outputs into prompt.
+
+        Args:
+            prompt: Original prompt/message for the current stage.
+            dep_task_ids: List of task IDs from previous stage.
+
+        Returns:
+            Prompt with previous outputs prepended.
+        """
+        sections = []
+        for task_id in dep_task_ids:
+            task = self._manager.get_task(task_id)
+            result = self._manager.get_result(task_id)
+            agent_name = task.agent_id if task else task_id
+            if result and result.success:
+                sections.append(f"=== Output from @{agent_name} ===\n{result.output}\n")
+            else:
+                error_msg = result.error if result else "Task result missing"
+                sections.append(f"=== Output from @{agent_name} ===\n[Failed: {error_msg}]\n")
+
+        if sections:
+            sections.append(f"=== Your Task ===\n{prompt}")
+            return "\n".join(sections)
+        return prompt
+
     async def _execute_multiagent(self, command: Command) -> ExecutionResult:
         """Execute multi-agent fan-out command.
 
@@ -326,12 +455,40 @@ class TaskExecutor:
         Returns:
             ExecutionResult with combined outputs.
         """
+        # Check for $ref dependencies
+        if command.references:
+            # Validate all referenced agents exist
+            from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
+
+            invalid_refs = [
+                ref for ref in command.references if AGENT_ALIASES.get(ref, ref) not in VALID_AGENTS
+            ]
+            if invalid_refs:
+                valid_list = ", ".join(sorted(VALID_AGENTS))
+                return ExecutionResult(
+                    success=False,
+                    output="",
+                    error=f"Unknown agent ref: ${invalid_refs[0]}. Valid: {valid_list}",
+                )
+
+            # Wait for any referenced agents that are currently running
+            await self._wait_for_references(command.references)
+
+            # Build prompt with injected outputs
+            prompt = self._inject_references(command.content, command.references)
+        else:
+            prompt = command.content
+
+        # Separate pseudo-agents from real agents
+        pseudo_agents = [a for a in command.agent_ids if is_pseudo_agent(a)]
+        real_agents = [a for a in command.agent_ids if not is_pseudo_agent(a)]
+
         tasks = []
-        for agent_id in command.agent_ids:
+        for agent_id in real_agents:
             # Custom agents in .github/agents/ handle persona context
             task = self._manager.create_task(
                 agent_id=agent_id,
-                prompt=command.content,
+                prompt=prompt,
                 background=command.background,
                 model=command.model,
             )
@@ -356,7 +513,7 @@ class TaskExecutor:
             for task in tasks:
                 if self._on_task_started:
                     self._on_task_started(task)
-                self._status_running(task.agent_id, command.content[:40] if command.content else "")
+                self._status_running(task.agent_id, prompt[:40] if prompt else "")
 
             try:
                 # Execute all in parallel and wait
@@ -386,6 +543,12 @@ class TaskExecutor:
                         # Notify task complete
                         if self._on_task_complete:
                             self._on_task_complete(task, result)
+
+                # Handle pseudo-agents (e.g., @notify)
+                for agent_id in pseudo_agents:
+                    if agent_id == "notify":
+                        notify_result = await self._handle_notify(prompt, command.background)
+                        outputs.append(f"=== @notify ===\n{notify_result.output}")
             except asyncio.CancelledError:
                 for task in tasks:
                     self._status_failed(task.agent_id)
@@ -434,6 +597,9 @@ class TaskExecutor:
         all_task_ids: list[str] = []
         previous_task_ids: list[str] = []
         stage_task_map: dict[int, list[str]] = {}  # stage_index -> task_ids
+        # Track pseudo-agents per stage for inline handling
+        # stage_index -> list of (agent_id, prompt, dependency_task_ids)
+        pseudo_agent_stages: dict[int, list[tuple[str, str, list[str]]]] = {}
 
         # Create tasks for each stage with dependencies
         for i, stage in enumerate(command.pipeline):
@@ -445,6 +611,14 @@ class TaskExecutor:
                     prompt = self._inject_references(stage.content, command.references)
                 else:
                     prompt = stage.content
+
+                # Handle pseudo-agents differently - don't create tasks for them
+                if is_pseudo_agent(agent_id):
+                    # Store prompt and dependencies for later injection
+                    if i not in pseudo_agent_stages:
+                        pseudo_agent_stages[i] = []
+                    pseudo_agent_stages[i].append((agent_id, prompt, previous_task_ids.copy()))
+                    continue
 
                 # Custom agents in .github/agents/ handle persona context
                 task = self._manager.create_task(
@@ -458,7 +632,10 @@ class TaskExecutor:
                 all_task_ids.append(task.id)
 
             stage_task_map[i] = stage_task_ids
-            previous_task_ids = stage_task_ids
+            # Only update previous_task_ids if we created real tasks
+            # (pseudo-agents don't produce task IDs, so keep previous for next stage)
+            if stage_task_ids:
+                previous_task_ids = stage_task_ids
 
         total_stages = len(command.pipeline)
 
@@ -483,16 +660,24 @@ class TaskExecutor:
             errors = []
 
             for stage_index, stage_task_ids in stage_task_map.items():
-                # Notify stage change
+                # Notify stage change (include both real and pseudo agents)
                 stage_agents = [
                     t.agent_id
                     for tid in stage_task_ids
                     if (t := self._manager.get_task(tid)) is not None
                 ]
+                # Add pseudo-agents to the stage agents list for notification
+                if stage_index in pseudo_agent_stages:
+                    # Only extract agent_id for stage notification (prompt and deps not needed)
+                    pseudo_agents = [
+                        agent_id for agent_id, _, _ in pseudo_agent_stages[stage_index]
+                    ]
+                    stage_agents.extend(pseudo_agents)
+
                 if self._on_stage_change:
                     self._on_stage_change(stage_index + 1, total_stages, stage_agents)
 
-                # Execute tasks in this stage
+                # Execute real agent tasks in this stage
                 for task_id in stage_task_ids:
                     task = self._manager.get_task(task_id)
                     if not task:
@@ -549,6 +734,17 @@ class TaskExecutor:
                         else:
                             errors.append(f"@{task.agent_id}: {result.error}")
                             final_outputs.append(f"{header}\n[Failed: {result.error}]")
+
+                # After all real tasks, execute any pseudo-agents for this stage
+                if stage_index in pseudo_agent_stages:
+                    for agent_id, prompt, dep_task_ids in pseudo_agent_stages[stage_index]:
+                        # Inject previous stage outputs into notify message
+                        if dep_task_ids:
+                            notify_prompt = self._inject_pipeline_outputs(prompt, dep_task_ids)
+                        else:
+                            notify_prompt = prompt
+                        notify_result = await self._handle_notify(notify_prompt, command.background)
+                        final_outputs.append(f"=== @{agent_id} ===\n{notify_result.output}")
 
             # Signal pipeline completion to clear progress display
             if self._on_pipeline_complete:

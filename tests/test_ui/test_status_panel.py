@@ -10,7 +10,7 @@ class TestStatusPanel:
     """Tests for StatusPanel widget."""
 
     def test_renders_all_agents(self):
-        """Panel renders all 6 default agents."""
+        """Panel renders all 7 default agents including notify."""
         from teambot.ui.widgets.status_panel import StatusPanel
 
         manager = AgentStatusManager()
@@ -18,7 +18,7 @@ class TestStatusPanel:
 
         content = panel._format_status()
 
-        for agent in ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]:
+        for agent in ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer", "notify"]:
             assert agent in content
 
     def test_shows_idle_indicator_for_idle_agents(self):
@@ -303,3 +303,44 @@ class TestStatusPanelDefaultIndicator:
         lines = content.split("\n")
         builder_line = [line for line in lines if "builder-1" in line][0]
         assert "★" in builder_line
+
+
+class TestStatusPanelNotifyAgent:
+    """Tests for @notify pseudo-agent in status panel."""
+
+    def test_notify_agent_included_in_status(self):
+        """Panel renders notify pseudo-agent."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        panel = StatusPanel(manager)
+
+        content = panel._format_status()
+        assert "notify" in content
+
+    def test_notify_agent_shows_na_model(self):
+        """Notify agent displays (n/a) instead of model name."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        panel = StatusPanel(manager)
+
+        content = panel._format_status()
+        # Find the notify line
+        lines = content.split("\n")
+        notify_lines = [line for line in lines if "notify" in line]
+        assert len(notify_lines) >= 1
+        notify_line = notify_lines[0]
+        assert "(n/a)" in notify_line
+
+    def test_all_seven_agents_rendered(self):
+        """Panel renders all 7 agents including notify."""
+        from teambot.ui.widgets.status_panel import StatusPanel
+
+        manager = AgentStatusManager()
+        panel = StatusPanel(manager)
+
+        content = panel._format_status()
+        expected_agents = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer", "notify"]
+        for agent in expected_agents:
+            assert agent in content

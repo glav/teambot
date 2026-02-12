@@ -16,8 +16,8 @@ class RouterError(Exception):
     pass
 
 
-# Valid agent IDs
-VALID_AGENTS = {"pm", "ba", "writer", "builder-1", "builder-2", "reviewer"}
+# Valid agent IDs (includes pseudo-agents like "notify")
+VALID_AGENTS = {"pm", "ba", "writer", "builder-1", "builder-2", "reviewer", "notify"}
 
 # Aliases that map to canonical agent IDs
 AGENT_ALIASES = {

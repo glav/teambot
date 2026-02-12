@@ -11,6 +11,29 @@ The notification system uses an event-driven architecture that:
 - Keeps secrets in environment variables (never in config files)
 - Fails gracefully without blocking workflow execution
 
+## Sending Notifications with `@notify`
+
+In interactive mode, use the `@notify` pseudo-agent to send notifications through all configured channels:
+
+```bash
+# Send a standalone notification
+@notify "Build complete!"
+
+# Use in pipelines with $ref for dynamic content
+@pm Create plan -> @builder-1 Implement $pm -> @notify "Feature done!"
+
+# Chain notifications at any point
+@pm Plan -> @notify "Planning done" -> @builder-1 $pm -> @notify "Build complete"
+```
+
+The `@notify` agent:
+- Sends to all configured notification channels
+- Supports `$ref` syntax for including agent output in messages
+- Returns a confirmation that downstream agents can reference
+- Appears in agent status display with model shown as "(n/a)"
+
+> **Note:** Configure at least one notification channel (see below) before using `@notify`.
+
 ## Supported Channels
 
 | Channel | Status | Description |

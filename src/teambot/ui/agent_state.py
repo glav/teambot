@@ -69,8 +69,8 @@ class AgentStatus:
         )
 
 
-# Default agent IDs
-DEFAULT_AGENTS = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]
+# Default agent IDs (includes pseudo-agents like "notify")
+DEFAULT_AGENTS = ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer", "notify"]
 
 
 @dataclass

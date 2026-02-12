@@ -127,7 +127,10 @@ class StatusPanel(Static):
                 line += " [bold cyan]★[/bold cyan]"
 
             # Add model indicator if set - with nice abbreviated display
-            if status.model:
+            # Pseudo-agents like "notify" show "(n/a)" instead of model
+            if agent_id == "notify":
+                line += " [dim italic](n/a)[/dim italic]"
+            elif status.model:
                 model_display = self._format_model_name(status.model)
                 line += f" [dim italic]({model_display})[/dim italic]"
 

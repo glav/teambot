@@ -87,6 +87,23 @@ When in interactive mode (`teambot run` without objective):
 | `/model @agent <model>` | Set model for agent |
 | `/model @agent clear` | Clear model override |
 
+### Notification Pseudo-Agent
+
+The `@notify` pseudo-agent sends notifications through all configured channels:
+
+```bash
+# Send a standalone notification
+@notify "Build complete!"
+
+# Use in pipelines with $ref for dynamic content
+@pm Create plan -> @builder-1 Implement $pm -> @notify "Feature done: $builder-1"
+
+# Notify at any point in a pipeline
+@pm Plan -> @notify "Planning done" -> @builder-1 $pm
+```
+
+The `@notify` agent returns a confirmation message that downstream agents can reference. See the [Notifications Guide](notifications.md) for channel configuration.
+
 ---
 
 ## Next Steps

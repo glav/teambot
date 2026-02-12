@@ -100,6 +100,7 @@ teambot: /cancel 1
 | `@a task -> @b task` | Pipeline with dependency | `@pm Plan -> @builder-1 Implement` |
 | `@a,b t1 -> @c t2` | Parallel then pipeline | `@pm,ba Analyze -> @builder-1 Build` |
 | `@a task $b` | Reference agent output | `@pm Summarize $ba` |
+| `@notify "msg"` | Send notification | `@pm Plan -> @notify "Done!"` |
 | `/tasks` | List all tasks | |
 | `/task <id>` | View task details | `/task 1` |
 | `/cancel <id>` | Cancel task | `/cancel 3` |
@@ -154,16 +155,19 @@ This validation applies to all command forms — single agent, multi-agent, pipe
 
 ### Valid Agent IDs
 
-| Agent ID | Aliases |
-|----------|---------|
-| `pm` | `project_manager` |
-| `ba` | `business_analyst` |
-| `writer` | `technical_writer` |
-| `builder-1` | — |
-| `builder-2` | — |
-| `reviewer` | — |
+| Agent ID | Aliases | Notes |
+|----------|---------|-------|
+| `pm` | `project_manager` | |
+| `ba` | `business_analyst` | |
+| `writer` | `technical_writer` | |
+| `builder-1` | — | |
+| `builder-2` | — | |
+| `reviewer` | — | |
+| `notify` | — | Pseudo-agent for notifications |
 
 You can use either the short ID or the alias form (e.g., `@project_manager` resolves to `@pm`).
+
+> **Note:** `@notify` is a pseudo-agent that sends notifications rather than calling an AI model. See [Notifications Guide](notifications.md) for setup.
 
 ## Multi-Line Input
 

@@ -134,7 +134,10 @@ class EventBus:
             event_type: Event type identifier
             data: Event data dict
         """
+        logger.debug(f"emit_sync called: event_type={event_type}")
+
         if not self._channels:
+            logger.debug("emit_sync: No channels configured, returning early")
             return
 
         event = NotificationEvent(event_type=event_type, data=data)
@@ -151,11 +154,20 @@ class EventBus:
 
         try:
             loop = asyncio.get_running_loop()
+            scheduled_count = 0
             for channel in self._channels:
-                if channel.enabled and channel.supports_event(event_type):
+                enabled = channel.enabled
+                supports = channel.supports_event(event_type)
+                logger.debug(
+                    f"emit_sync: Channel {type(channel).__name__} - "
+                    f"enabled={enabled}, supports_event({event_type})={supports}"
+                )
+                if enabled and supports:
                     task = loop.create_task(self._safe_send(channel, event))
                     self._pending_tasks.add(task)
                     task.add_done_callback(self._pending_tasks.discard)
+                    scheduled_count += 1
+            logger.debug(f"emit_sync: Scheduled {scheduled_count} notification task(s)")
         except RuntimeError:
             # No running event loop - skip notifications
             logger.debug("No event loop running, skipping notification")
