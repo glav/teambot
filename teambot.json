@@ -82,5 +82,15 @@
       "test",
       "post_review"
     ]
+  },
+ "notifications": {
+    "enabled": true,
+    "channels": [
+      {
+        "type": "telegram",
+        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}"
+      }
+    ]
   }
 }

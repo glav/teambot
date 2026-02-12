@@ -10,12 +10,16 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dotenv import load_dotenv
+
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
+from teambot.notifications.config import create_event_bus_from_config
 from teambot.visualization.animation import play_startup_animation
 from teambot.visualization.console import ConsoleDisplay
 
 if TYPE_CHECKING:
+    from teambot.notifications.event_bus import EventBus
     from teambot.orchestration import ExecutionLoop, ExecutionResult
 
 
@@ -65,6 +69,82 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _should_setup_notifications(display: ConsoleDisplay) -> bool:
+    """Ask user if they want to configure notifications."""
+    import sys
+
+    # Skip in non-interactive mode (e.g., testing)
+    if not sys.stdin.isatty():
+        return False
+
+    display.print_success("")
+    display.print_success("=== Optional: Real-Time Notifications ===")
+    display.print_success("TeamBot can send notifications via Telegram when stages complete.")
+    try:
+        response = input("Enable real-time notifications? [y/N]: ").strip().lower()
+        return response in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        return False
+
+
+def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool:
+    """Guide user through Telegram notification setup."""
+    display.print_success("")
+    display.print_success("=== Telegram Bot Setup ===")
+    display.print_success("1. Open Telegram and search for @BotFather")
+    display.print_success("2. Send /newbot and follow the prompts")
+    display.print_success("3. Copy the bot token you receive")
+    display.print_success("")
+
+    try:
+        proceed = input("Ready to enter credentials? [Y/n]: ").strip().lower()
+        if proceed in ("n", "no"):
+            display.print_warning("Skipping notification setup")
+            return False
+
+        # Get bot token env var name (with default)
+        token_env = input("Environment variable for bot token [TEAMBOT_TELEGRAM_TOKEN]: ").strip()
+        if not token_env:
+            token_env = "TEAMBOT_TELEGRAM_TOKEN"
+
+        # Get chat ID env var name (with default)
+        display.print_success("")
+        display.print_success("To get your chat ID:")
+        display.print_success("1. Send any message to your new bot")
+        display.print_success("2. Visit: https://api.telegram.org/bot<TOKEN>/getUpdates")
+        display.print_success("3. Look for 'chat':{'id': <YOUR_CHAT_ID>}")
+        display.print_success("")
+        chat_id_env = input("Environment variable for chat ID [TEAMBOT_TELEGRAM_CHAT_ID]: ").strip()
+        if not chat_id_env:
+            chat_id_env = "TEAMBOT_TELEGRAM_CHAT_ID"
+
+        # Add notifications config
+        config["notifications"] = {
+            "enabled": True,
+            "channels": [
+                {
+                    "type": "telegram",
+                    "token": f"${{{token_env}}}",
+                    "chat_id": f"${{{chat_id_env}}}",
+                }
+            ],
+        }
+
+        display.print_success("")
+        display.print_success("Notification configuration added!")
+        display.print_success("")
+        display.print_warning("IMPORTANT: Set these environment variables:")
+        display.print_warning(f"  export {token_env}='your-bot-token'")
+        display.print_warning(f"  export {chat_id_env}='your-chat-id'")
+        display.print_success("")
+
+        return True
+
+    except (EOFError, KeyboardInterrupt):
+        display.print_warning("\nSkipping notification setup")
+        return False
+
+
 def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Initialize TeamBot configuration."""
     config_path = Path("teambot.json")
@@ -76,6 +156,11 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     # Create default config
     config = create_default_config()
+
+    # Optional notification setup
+    if _should_setup_notifications(display):
+        _setup_telegram_notifications(config, display)
+
     loader = ConfigLoader()
     loader.save(config, config_path)
 
@@ -182,6 +267,7 @@ async def _run_orchestration_async(
     loop: ExecutionLoop,
     display: ConsoleDisplay,
     on_progress: Callable[[str, dict], None],
+    event_bus: EventBus | None = None,
 ) -> ExecutionResult:
     """Async implementation of orchestration run."""
     from teambot.copilot.sdk_client import CopilotSDKClient
@@ -196,6 +282,9 @@ async def _run_orchestration_async(
         return await loop.run(sdk_client=sdk_client, on_progress=on_progress)
     finally:
         await sdk_client.stop()
+        # Drain pending notifications before shutdown
+        if event_bus is not None:
+            await event_bus.drain(timeout=5.0)
 
 
 def _run_orchestration(
@@ -227,6 +316,10 @@ def _run_orchestration(
         display.print_error(str(e))
         return 1
 
+    # Create EventBus for notifications
+    feature_name = objective_path.stem
+    event_bus = create_event_bus_from_config(config, feature_name=feature_name)
+
     # Setup signal handler for cancellation
     cancel_count = [0]  # Use list to allow modification in nested function
 
@@ -245,8 +338,19 @@ def _run_orchestration(
     signal.signal(signal.SIGINT, handle_interrupt)
 
     def on_progress(event_type: str, data: dict) -> None:
+        # Console display logic
         if event_type == "stage_changed":
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+        elif event_type == "orchestration_started":
+            objective = data.get("objective_name", "orchestration run")
+            display.print_success(f"🚀 Starting: {objective}")
+        elif event_type == "orchestration_completed":
+            objective = data.get("objective_name", "orchestration run")
+            status = data.get("status", "complete")
+            duration = data.get("duration_seconds", 0)
+            duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
+            emoji = "✅" if status == "complete" else "⚠️"
+            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
@@ -269,8 +373,12 @@ def _run_orchestration(
             iterations = data.get("iterations_used", 4)
             display.print_error(f"Acceptance tests still failing after {iterations} fix attempts")
 
+        # Emit to EventBus for notifications (non-blocking)
+        if event_bus is not None:
+            event_bus.emit_sync(event_type, data)
+
     try:
-        result = asyncio.run(_run_orchestration_async(loop, display, on_progress))
+        result = asyncio.run(_run_orchestration_async(loop, display, on_progress, event_bus))
 
         if result == ExecutionResult.COMPLETE:
             display.print_success("Objective completed!")
@@ -297,6 +405,7 @@ async def _run_orchestration_resume_async(
     loop: ExecutionLoop,
     display: ConsoleDisplay,
     on_progress: Callable[[str, dict], None],
+    event_bus: EventBus | None = None,
 ) -> ExecutionResult:
     """Async implementation of orchestration resume."""
     from teambot.copilot.sdk_client import CopilotSDKClient
@@ -311,6 +420,9 @@ async def _run_orchestration_resume_async(
         return await loop.run(sdk_client=sdk_client, on_progress=on_progress)
     finally:
         await sdk_client.stop()
+        # Drain pending notifications before shutdown
+        if event_bus is not None:
+            await event_bus.drain(timeout=5.0)
 
 
 def _run_orchestration_resume(
@@ -338,6 +450,10 @@ def _run_orchestration_resume(
     display.print_success(f"Resuming from stage: {loop.current_stage.name}")
     display.print_success(f"Prior elapsed: {loop.time_manager.format_elapsed()}")
 
+    # Create EventBus for notifications
+    feature_name = getattr(loop, "objective_path", Path("resume")).stem
+    event_bus = create_event_bus_from_config(config, feature_name=feature_name)
+
     # Setup signal handler for cancellation
     cancel_count = [0]  # Use list to allow modification in nested function
 
@@ -356,8 +472,19 @@ def _run_orchestration_resume(
     signal.signal(signal.SIGINT, handle_interrupt)
 
     def on_progress(event_type: str, data: dict) -> None:
+        # Console display logic
         if event_type == "stage_changed":
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+        elif event_type == "orchestration_started":
+            objective = data.get("objective_name", "orchestration run")
+            display.print_success(f"🚀 Starting: {objective}")
+        elif event_type == "orchestration_completed":
+            objective = data.get("objective_name", "orchestration run")
+            status = data.get("status", "complete")
+            duration = data.get("duration_seconds", 0)
+            duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
+            emoji = "✅" if status == "complete" else "⚠️"
+            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
@@ -380,8 +507,12 @@ def _run_orchestration_resume(
             iterations = data.get("iterations_used", 4)
             display.print_error(f"Acceptance tests still failing after {iterations} fix attempts")
 
+        # Emit to EventBus for notifications (non-blocking)
+        if event_bus is not None:
+            event_bus.emit_sync(event_type, data)
+
     try:
-        result = asyncio.run(_run_orchestration_resume_async(loop, display, on_progress))
+        result = asyncio.run(_run_orchestration_resume_async(loop, display, on_progress, event_bus))
 
         if result == ExecutionResult.COMPLETE:
             display.print_success("Objective completed!")
@@ -434,6 +565,9 @@ def cmd_status(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
 def main() -> int:
     """Main CLI entry point."""
+    # Load environment variables from .env file if it exists
+    load_dotenv()
+
     parser = create_parser()
     args = parser.parse_args()
 

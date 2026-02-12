@@ -30,6 +30,12 @@ VALID_OVERLAY_POSITIONS = {
     "bottom-left",
 }
 
+NOTIFICATION_CHANNEL_TYPES = {"telegram"}
+
+REQUIRED_CHANNEL_FIELDS = {
+    "telegram": {"token", "chat_id"},
+}
+
 
 def create_default_config() -> dict[str, Any]:
     """Create default configuration with MVP agents."""
@@ -151,6 +157,10 @@ class ConfigLoader:
             if not isinstance(config["show_startup_animation"], bool):
                 raise ConfigError("'show_startup_animation' must be a boolean")
 
+        # Validate notifications config if present
+        if "notifications" in config:
+            self._validate_notifications(config["notifications"])
+
     def _validate_agent(self, agent: dict[str, Any], seen_ids: set[str]) -> None:
         """Validate a single agent configuration."""
         if "id" not in agent:
@@ -217,6 +227,58 @@ class ConfigLoader:
             if not isinstance(overlay["enabled"], bool):
                 raise ConfigError("'overlay.enabled' must be a boolean")
 
+    def _validate_notifications(self, notifications: dict[str, Any]) -> None:
+        """Validate notifications configuration."""
+        if not isinstance(notifications, dict):
+            raise ConfigError("'notifications' must be an object")
+
+        if "enabled" in notifications:
+            if not isinstance(notifications["enabled"], bool):
+                raise ConfigError("'notifications.enabled' must be a boolean")
+
+        if "channels" in notifications:
+            channels = notifications["channels"]
+            if not isinstance(channels, list):
+                raise ConfigError("'notifications.channels' must be a list")
+
+            for i, channel in enumerate(channels):
+                self._validate_notification_channel(channel, i)
+
+    def _validate_notification_channel(self, channel: dict[str, Any], index: int) -> None:
+        """Validate a single notification channel configuration."""
+        if not isinstance(channel, dict):
+            raise ConfigError(f"notifications.channels[{index}] must be an object")
+
+        if "type" not in channel:
+            raise ConfigError(f"notifications.channels[{index}] must have a 'type' field")
+
+        channel_type = channel["type"]
+        if channel_type not in NOTIFICATION_CHANNEL_TYPES:
+            raise ConfigError(
+                f"Invalid channel type '{channel_type}' at notifications.channels[{index}]. "
+                f"Valid types: {NOTIFICATION_CHANNEL_TYPES}"
+            )
+
+        # Validate required fields for this channel type
+        required = REQUIRED_CHANNEL_FIELDS.get(channel_type, set())
+        for field in required:
+            if field not in channel:
+                raise ConfigError(
+                    f"notifications.channels[{index}] (type: {channel_type}) "
+                    f"is missing required field '{field}'"
+                )
+
+        # Validate dry_run if present
+        if "dry_run" in channel:
+            if not isinstance(channel["dry_run"], bool):
+                raise ConfigError(f"'dry_run' in notifications.channels[{index}] must be a boolean")
+
+        # Validate events filter if present
+        if "events" in channel:
+            events = channel["events"]
+            if not isinstance(events, list):
+                raise ConfigError(f"'events' in notifications.channels[{index}] must be a list")
+
     def _apply_defaults(self, config: dict[str, Any]) -> None:
         """Apply default values for missing optional fields."""
         if "teambot_dir" not in config:
@@ -242,3 +304,14 @@ class ConfigLoader:
         # Apply animation defaults
         if "show_startup_animation" not in config:
             config["show_startup_animation"] = True
+
+        # Apply notifications defaults
+        if "notifications" in config:
+            notifications = config["notifications"]
+            if "enabled" not in notifications:
+                notifications["enabled"] = True
+            if "channels" not in notifications:
+                notifications["channels"] = []
+            for channel in notifications.get("channels", []):
+                if "dry_run" not in channel:
+                    channel["dry_run"] = False

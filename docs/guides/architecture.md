@@ -115,6 +115,10 @@ Supports **expected-error scenarios**: when a scenario's expected result describ
 
 During the `IMPLEMENTATION` stage, `builder-1` and `builder-2` execute concurrently. Tasks are split from the implementation plan and assigned to parallel agents via `asyncio.gather()`.
 
+### Parallel Stage Executor (`orchestration/parallel_stage_executor.py`)
+
+Executes entire workflow stages concurrently when configured in `parallel_groups` (e.g., `RESEARCH` and `TEST_STRATEGY` run in parallel after `SPEC_REVIEW`). Each parallel stage must use a **different work_agent** — sharing the same agent across parallel stages causes SDK session conflicts and is rejected at startup.
+
 ### Time Manager (`orchestration/time_manager.py`)
 
 Enforces a wall-clock time limit (default: 8 hours, configurable via `--max-hours`). Triggers graceful shutdown when the limit is reached.
@@ -268,6 +272,7 @@ Workflow stage definitions:
 - Stage order, descriptions, and exit criteria
 - Agent assignments (`work_agent`, `review_agent`)
 - Review/acceptance test flags
+- Parallel stage groups (stages in a group must use different `work_agent` values)
 - Artifact output paths
 - SDD prompt template paths
 

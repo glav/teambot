@@ -199,4 +199,4 @@ class TestModuleImports:
         import teambot.visualization.console
         import teambot.window_manager
 
-        assert teambot.__version__ == "0.1.0"
+        assert teambot.__version__ == "0.2.0"
