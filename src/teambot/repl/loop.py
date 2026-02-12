@@ -55,7 +55,7 @@ class REPLLoop:
             default_agent = config["default_agent"]
 
         self._router = AgentRouter(default_agent=default_agent)
-        self._commands = SystemCommands(router=self._router)
+        self._commands = SystemCommands(router=self._router, config=config)
         self._running = False
         self._interrupted = False
         self._sdk_connected = False

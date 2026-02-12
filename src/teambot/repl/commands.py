@@ -94,6 +94,7 @@ Available commands:
   /help          - Show this help message
   /help agent    - Show agent-specific help
   /help parallel - Show parallel execution help
+  /notify <msg>  - Send test notification to all channels
   /status        - Show agent status with models
   /models        - List available AI models
   /model <a> <m> - Set model for agent in session
@@ -612,6 +613,7 @@ class SystemCommands:
         executor: Optional["TaskExecutor"] = None,
         overlay: Optional["OverlayRenderer"] = None,
         router: Optional["AgentRouter"] = None,
+        config: dict | None = None,
     ):
         """Initialize system commands.
 
@@ -620,11 +622,13 @@ class SystemCommands:
             executor: Optional task executor for task commands.
             overlay: Optional overlay renderer for overlay commands.
             router: Optional agent router for default agent commands.
+            config: Optional configuration dict for notification settings.
         """
         self._orchestrator = orchestrator
         self._executor: TaskExecutor | None = executor
         self._overlay: OverlayRenderer | None = overlay
         self._router = router
+        self._config = config
         self._history: list[dict[str, Any]] = []
         self._session_model_overrides: dict[str, str] = {}
 
@@ -684,6 +688,7 @@ class SystemCommands:
             "model": self.model,
             "use-agent": self.use_agent,
             "reset-agent": self.reset_agent,
+            "notify": self.notify,
         }
 
         handler = handlers.get(command)
@@ -753,3 +758,71 @@ class SystemCommands:
     def reset_agent(self, args: list[str]) -> CommandResult:
         """Handle /reset-agent command."""
         return handle_reset_agent(args, self._router)
+
+    def notify(self, args: list[str]) -> CommandResult:
+        """Handle /notify command - send test notification.
+
+        Args:
+            args: Message words to send as notification.
+
+        Returns:
+            CommandResult with success or error message.
+        """
+        # Check for missing message argument
+        if not args:
+            return CommandResult(
+                output=(
+                    "Usage: /notify <message>\n\n"
+                    "Send a test notification to all configured channels."
+                ),
+                success=False,
+            )
+
+        # Check if config available
+        if not self._config:
+            return CommandResult(
+                output="❌ Notifications not configured.\n"
+                "Run `teambot init` or add `notifications` section to teambot.json.",
+                success=False,
+            )
+
+        # Check if notifications enabled
+        notifications = self._config.get("notifications", {})
+        if not notifications.get("enabled", False):
+            return CommandResult(
+                output="❌ Notifications not enabled.\n"
+                "Set `notifications.enabled: true` in teambot.json.",
+                success=False,
+            )
+
+        # Check for channels
+        if not notifications.get("channels"):
+            return CommandResult(
+                output="❌ No notification channels configured.\n"
+                "Add channels to `notifications.channels` in teambot.json.",
+                success=False,
+            )
+
+        message = " ".join(args)
+
+        # Create EventBus and send
+        try:
+            from teambot.notifications.config import create_event_bus_from_config
+
+            event_bus = create_event_bus_from_config(self._config)
+            if not event_bus or not event_bus._channels:
+                return CommandResult(
+                    output="❌ Failed to create notification channels.\n"
+                    "Check your notification configuration.",
+                    success=False,
+                )
+
+            # Emit custom message event (synchronously schedule)
+            event_bus.emit_sync("custom_message", {"message": message})
+
+            return CommandResult(output=f"✅ Notification sent: {message}")
+        except Exception as e:
+            return CommandResult(
+                output=f"❌ Failed to send notification: {e}",
+                success=False,
+            )

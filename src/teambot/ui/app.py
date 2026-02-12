@@ -52,7 +52,7 @@ class TeamBotApp(App):
         self._router = router
         self._sdk_client = sdk_client
         self._config = config
-        self._commands = SystemCommands(executor=executor, router=router)
+        self._commands = SystemCommands(executor=executor, router=router, config=config)
         self._pending_tasks: set[asyncio.Task] = set()
         # Centralized agent status manager
         self._agent_status = AgentStatusManager()

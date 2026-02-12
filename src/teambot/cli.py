@@ -10,6 +10,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dotenv import load_dotenv
+
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
 from teambot.notifications.config import create_event_bus_from_config
@@ -339,6 +341,16 @@ def _run_orchestration(
         # Console display logic
         if event_type == "stage_changed":
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+        elif event_type == "orchestration_started":
+            objective = data.get("objective_name", "orchestration run")
+            display.print_success(f"🚀 Starting: {objective}")
+        elif event_type == "orchestration_completed":
+            objective = data.get("objective_name", "orchestration run")
+            status = data.get("status", "complete")
+            duration = data.get("duration_seconds", 0)
+            duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
+            emoji = "✅" if status == "complete" else "⚠️"
+            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
@@ -463,6 +475,16 @@ def _run_orchestration_resume(
         # Console display logic
         if event_type == "stage_changed":
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+        elif event_type == "orchestration_started":
+            objective = data.get("objective_name", "orchestration run")
+            display.print_success(f"🚀 Starting: {objective}")
+        elif event_type == "orchestration_completed":
+            objective = data.get("objective_name", "orchestration run")
+            status = data.get("status", "complete")
+            duration = data.get("duration_seconds", 0)
+            duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
+            emoji = "✅" if status == "complete" else "⚠️"
+            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
@@ -543,6 +565,9 @@ def cmd_status(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
 def main() -> int:
     """Main CLI entry point."""
+    # Load environment variables from .env file if it exists
+    load_dotenv()
+
     parser = create_parser()
     args = parser.parse_args()
 

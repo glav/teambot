@@ -40,6 +40,12 @@ class MessageTemplates:
             "Acceptance tests still failing after {iterations_used} attempts."
         ),
         "review_progress": ("📝 <b>Review Progress</b>\nStage: {stage}\n{message}"),
+        # Orchestration lifecycle events
+        "orchestration_started": "🚀 <b>Starting</b>: {objective_name}",
+        "orchestration_completed": (
+            "✅ <b>Completed</b>: {objective_name}\n⏱️ Duration: {duration}"
+        ),
+        "custom_message": "📢 {message}",
     }
 
     def render(self, event: NotificationEvent) -> str:
@@ -76,6 +82,19 @@ class MessageTemplates:
         elif event.event_type == "acceptance_test_stage_complete":
             failed = event.data.get("failed", 0)
             context["emoji"] = STATUS_EMOJI["success"] if failed == 0 else STATUS_EMOJI["failure"]
+        elif event.event_type == "orchestration_started":
+            # Fallback for missing objective_name
+            if "objective_name" not in context or not context["objective_name"]:
+                context["objective_name"] = "orchestration run"
+        elif event.event_type == "orchestration_completed":
+            # Fallback for missing objective_name
+            if "objective_name" not in context or not context["objective_name"]:
+                context["objective_name"] = "orchestration run"
+            # Format duration from seconds
+            duration_secs = event.data.get("duration_seconds", 0)
+            minutes = int(duration_secs // 60)
+            seconds = int(duration_secs % 60)
+            context["duration"] = f"{minutes}m {seconds}s"
 
         # Format stages list if present
         if "stages" in context and isinstance(context["stages"], list):

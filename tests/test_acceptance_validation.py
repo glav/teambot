@@ -1601,3 +1601,455 @@ parallel_groups:
         # Verify error mentions invalid stage
         error_msg = str(exc_info.value)
         assert "NONEXISTENT_STAGE" in error_msg
+
+
+# =============================================================================
+# Notification UX Improvements Acceptance Tests
+# =============================================================================
+
+
+class TestNotificationUXAcceptance:
+    """Acceptance tests for notification UX improvements.
+
+    These tests validate header/footer notifications and /notify command.
+    """
+
+    # -------------------------------------------------------------------------
+    # AT-001: Header Notification on Run Start
+    # -------------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_001_header_notification_emitted_on_run_start(self, tmp_path: Path) -> None:
+        """Validate orchestration emits started event with objective name.
+
+        Steps:
+        1. Create ExecutionLoop with objective file
+        2. Call run() with on_progress callback
+        3. Verify orchestration_started event emitted with objective_name
+        """
+        from unittest.mock import AsyncMock
+
+        from teambot.orchestration.execution_loop import ExecutionLoop
+
+        # Create objective file with proper frontmatter
+        objective_content = """# Objective: my-feature objective
+
+## Goals
+1. Test goal
+
+## Success Criteria
+- [ ] Test criteria
+"""
+        objective_path = tmp_path / "objective.md"
+        objective_path.write_text(objective_content)
+
+        # Create teambot dir with feature spec
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+        feature_dir = teambot_dir / "my-feature-objective"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text("# Feature Spec\n\n## Overview\nTest.")
+
+        # Create ExecutionLoop with real objective file
+        loop = ExecutionLoop(
+            objective_path=objective_path,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=8.0,
+        )
+
+        # Track emitted events
+        events: list[tuple[str, dict]] = []
+
+        def on_progress(event_type: str, data: dict) -> None:
+            events.append((event_type, data))
+
+        # Mock SDK client
+        mock_sdk = AsyncMock()
+        mock_sdk.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
+
+        # Run - loop will emit started event immediately, then complete
+        await loop.run(sdk_client=mock_sdk, on_progress=on_progress)
+
+        # Verify orchestration_started was emitted
+        started_events = [e for e in events if e[0] == "orchestration_started"]
+        assert len(started_events) == 1, f"Expected 1 started event, got {len(started_events)}"
+
+        event_data = started_events[0][1]
+        assert "my-feature objective" in event_data["objective_name"]
+        assert "objective_path" in event_data
+
+    def test_at_001_started_template_renders_objective_name(self) -> None:
+        """Validate started template renders with objective name."""
+        from teambot.notifications.events import NotificationEvent
+        from teambot.notifications.templates import MessageTemplates
+
+        templates = MessageTemplates()
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            feature_name="my-feature",
+            data={"objective_name": "my-feature objective"},
+        )
+
+        result = templates.render(event)
+
+        assert "🚀" in result
+        assert "Starting" in result
+        assert "my-feature objective" in result
+
+    # -------------------------------------------------------------------------
+    # AT-002: Footer Notification on Run Complete
+    # -------------------------------------------------------------------------
+    @pytest.mark.asyncio
+    async def test_at_002_footer_notification_emitted_on_complete(self, tmp_path: Path) -> None:
+        """Validate orchestration emits completed event with duration.
+
+        Steps:
+        1. Create ExecutionLoop and run until completion
+        2. Verify orchestration_completed event emitted
+        3. Verify event includes duration_seconds
+        """
+        from unittest.mock import AsyncMock
+
+        from teambot.orchestration.execution_loop import ExecutionLoop
+
+        # Create objective file
+        objective_content = """# Objective: my-feature objective
+
+## Goals
+1. Test goal
+
+## Success Criteria
+- [ ] Test criteria
+"""
+        objective_path = tmp_path / "objective.md"
+        objective_path.write_text(objective_content)
+
+        # Create teambot dir with feature spec
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+        feature_dir = teambot_dir / "my-feature-objective"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text("# Feature Spec\n\n## Overview\nTest.")
+
+        loop = ExecutionLoop(
+            objective_path=objective_path,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=8.0,
+        )
+
+        events: list[tuple[str, dict]] = []
+
+        def on_progress(event_type: str, data: dict) -> None:
+            events.append((event_type, data))
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
+
+        # Run to completion
+        await loop.run(sdk_client=mock_sdk, on_progress=on_progress)
+
+        # Verify orchestration_completed was emitted
+        completed_events = [e for e in events if e[0] == "orchestration_completed"]
+        assert len(completed_events) == 1, (
+            f"Expected 1 completed event, got {len(completed_events)}"
+        )
+
+        event_data = completed_events[0][1]
+        assert "my-feature objective" in event_data["objective_name"]
+        assert "duration_seconds" in event_data
+        assert isinstance(event_data["duration_seconds"], (int, float))
+
+    def test_at_002_completed_template_includes_duration(self) -> None:
+        """Validate completed template renders with duration."""
+        from teambot.notifications.events import NotificationEvent
+        from teambot.notifications.templates import MessageTemplates
+
+        templates = MessageTemplates()
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            feature_name="my-feature",
+            data={
+                "objective_name": "my-feature objective",
+                "duration_seconds": 125,  # 2m 5s
+            },
+        )
+
+        result = templates.render(event)
+
+        assert "✅" in result
+        assert "Completed" in result
+        assert "my-feature objective" in result
+        assert "2m 5s" in result
+
+    # -------------------------------------------------------------------------
+    # AT-003: /notify Command Success
+    # -------------------------------------------------------------------------
+    def test_at_003_notify_command_sends_message(self) -> None:
+        """Validate /notify sends message and returns success.
+
+        Steps:
+        1. Create SystemCommands with valid notification config
+        2. Call notify() with message
+        3. Verify success response
+        """
+        from unittest.mock import MagicMock, patch
+
+        from teambot.repl.commands import SystemCommands
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TELEGRAM_BOT_TOKEN}",
+                        "chat_id": "${TELEGRAM_CHAT_ID}",
+                    }
+                ],
+            }
+        }
+
+        commands = SystemCommands(router=None, config=config)
+
+        # Mock EventBus creation to avoid actual network calls
+        mock_event_bus = MagicMock()
+        mock_event_bus._channels = [MagicMock()]  # Has channels
+
+        with patch(
+            "teambot.notifications.config.create_event_bus_from_config",
+            return_value=mock_event_bus,
+        ):
+            result = commands.notify(["Hello", "from", "TeamBot!"])
+
+        assert result.success is True
+        assert "✅ Notification sent: Hello from TeamBot!" in result.output
+
+    def test_at_003_custom_message_template_renders(self) -> None:
+        """Validate custom_message template renders user message."""
+        from teambot.notifications.events import NotificationEvent
+        from teambot.notifications.templates import MessageTemplates
+
+        templates = MessageTemplates()
+        event = NotificationEvent(
+            event_type="custom_message",
+            feature_name="test",
+            data={"message": "Hello from TeamBot!"},
+        )
+
+        result = templates.render(event)
+
+        assert "Hello from TeamBot!" in result
+        assert "📢" in result
+
+    # -------------------------------------------------------------------------
+    # AT-004: /notify Without Message Shows Help
+    # -------------------------------------------------------------------------
+    def test_at_004_notify_without_args_shows_usage(self) -> None:
+        """Validate /notify without args shows usage help.
+
+        Steps:
+        1. Create SystemCommands
+        2. Call notify() with empty args
+        3. Verify usage help returned
+        """
+        from teambot.repl.commands import SystemCommands
+
+        commands = SystemCommands(router=None, config=None)
+
+        result = commands.notify([])
+
+        assert result.success is False
+        assert "Usage: /notify <message>" in result.output
+        assert "Send a test notification" in result.output
+
+    # -------------------------------------------------------------------------
+    # AT-005: /notify With Missing Configuration
+    # -------------------------------------------------------------------------
+    def test_at_005_notify_without_config_shows_error(self) -> None:
+        """Validate /notify without config shows actionable error.
+
+        Steps:
+        1. Create SystemCommands with no config
+        2. Call notify() with message
+        3. Verify error guides user to teambot init
+        """
+        from teambot.repl.commands import SystemCommands
+
+        commands = SystemCommands(router=None, config=None)
+
+        result = commands.notify(["Test", "message"])
+
+        assert result.success is False
+        assert "❌ Notifications not configured" in result.output
+        assert "teambot init" in result.output
+        assert "notifications" in result.output
+
+    def test_at_005_notify_disabled_shows_error(self) -> None:
+        """Validate /notify with disabled notifications shows error."""
+        from teambot.repl.commands import SystemCommands
+
+        config = {"notifications": {"enabled": False}}
+        commands = SystemCommands(router=None, config=config)
+
+        result = commands.notify(["Test"])
+
+        assert result.success is False
+        assert "❌ Notifications not enabled" in result.output
+
+    def test_at_005_notify_no_channels_shows_error(self) -> None:
+        """Validate /notify with no channels shows error."""
+        from teambot.repl.commands import SystemCommands
+
+        config = {"notifications": {"enabled": True, "channels": []}}
+        commands = SystemCommands(router=None, config=config)
+
+        result = commands.notify(["Test"])
+
+        assert result.success is False
+        assert "❌ No notification channels configured" in result.output
+
+    # -------------------------------------------------------------------------
+    # AT-006: Header/Footer with Missing Objective Name
+    # -------------------------------------------------------------------------
+    def test_at_006_started_fallback_when_name_missing(self) -> None:
+        """Validate started template uses fallback when name missing."""
+        from teambot.notifications.events import NotificationEvent
+        from teambot.notifications.templates import MessageTemplates
+
+        templates = MessageTemplates()
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            feature_name="feature",
+            data={},  # No objective_name
+        )
+
+        result = templates.render(event)
+
+        assert "Starting" in result
+        assert "orchestration run" in result
+
+    def test_at_006_started_fallback_when_name_empty(self) -> None:
+        """Validate started template uses fallback when name empty."""
+        from teambot.notifications.events import NotificationEvent
+        from teambot.notifications.templates import MessageTemplates
+
+        templates = MessageTemplates()
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            feature_name="feature",
+            data={"objective_name": ""},
+        )
+
+        result = templates.render(event)
+
+        assert "Starting" in result
+        assert "orchestration run" in result
+
+    def test_at_006_completed_fallback_when_name_missing(self) -> None:
+        """Validate completed template uses fallback when name missing."""
+        from teambot.notifications.events import NotificationEvent
+        from teambot.notifications.templates import MessageTemplates
+
+        templates = MessageTemplates()
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            feature_name="feature",
+            data={"duration_seconds": 60},  # No objective_name
+        )
+
+        result = templates.render(event)
+
+        assert "Completed" in result
+        assert "orchestration run" in result
+
+    @pytest.mark.asyncio
+    async def test_at_006_execution_loop_fallback_to_feature_name(self, tmp_path: Path) -> None:
+        """Validate ExecutionLoop uses feature_name when objective has no explicit description.
+
+        When the objective parsing derives feature_name from title (no separate description),
+        that feature_name is used in events.
+        """
+        from unittest.mock import AsyncMock
+
+        from teambot.orchestration.execution_loop import ExecutionLoop
+
+        # Objective with minimal content - feature_name derived from title
+        objective_content = """# My Task
+
+## Goals
+1. Do the thing
+
+## Success Criteria
+- [ ] Thing is done
+"""
+        objective_path = tmp_path / "objective.md"
+        objective_path.write_text(objective_content)
+
+        # Create teambot dir with feature spec
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+        feature_dir = teambot_dir / "my-task"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text("# Feature Spec\n\n## Overview\nTest.")
+
+        loop = ExecutionLoop(
+            objective_path=objective_path,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=8.0,
+        )
+
+        events: list[tuple[str, dict]] = []
+
+        def on_progress(event_type: str, data: dict) -> None:
+            events.append((event_type, data))
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
+
+        await loop.run(sdk_client=mock_sdk, on_progress=on_progress)
+
+        # Should have emitted started event with the feature_name
+        started_events = [e for e in events if e[0] == "orchestration_started"]
+        assert len(started_events) == 1
+        # Feature name is derived from "# My Task" -> "my-task"
+        assert started_events[0][1]["objective_name"] is not None
+
+    # -------------------------------------------------------------------------
+    # AT-007: /help Includes /notify
+    # -------------------------------------------------------------------------
+    def test_at_007_help_includes_notify_command(self) -> None:
+        """Validate /help output includes /notify command.
+
+        Steps:
+        1. Call handle_help() with no args
+        2. Verify output includes /notify
+        """
+        from teambot.repl.commands import handle_help
+
+        result = handle_help([])
+
+        assert "/notify" in result.output
+        assert "notification" in result.output.lower()
+
+    def test_at_007_help_notify_has_description(self) -> None:
+        """Validate /notify in help has meaningful description."""
+        from teambot.repl.commands import handle_help
+
+        result = handle_help([])
+
+        # Find the line with /notify
+        lines = result.output.split("\n")
+        notify_lines = [line for line in lines if "/notify" in line]
+
+        assert len(notify_lines) >= 1
+        # Should have description after command
+        notify_line = notify_lines[0]
+        assert "<msg>" in notify_line or "message" in notify_line.lower()

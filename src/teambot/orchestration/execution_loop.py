@@ -150,15 +150,32 @@ class ExecutionLoop:
         self.review_iterator = ReviewIterator(sdk_client, self.teambot_dir)
         self.time_manager.start()
 
+        # Emit orchestration started event
+        if on_progress:
+            objective_name = (
+                self.objective.title
+                if hasattr(self.objective, "title") and self.objective.title
+                else self.feature_name
+            )
+            on_progress(
+                "orchestration_started",
+                {
+                    "objective_name": objective_name,
+                    "objective_path": str(self.objective_path) if self.objective_path else None,
+                },
+            )
+
         try:
             while self.current_stage != WorkflowStage.COMPLETE:
                 # Check cancellation
                 if self.cancelled:
+                    self._emit_completed_event(on_progress, "cancelled")
                     self._save_state(ExecutionResult.CANCELLED)
                     return ExecutionResult.CANCELLED
 
                 # Check timeout
                 if self.time_manager.is_expired():
+                    self._emit_completed_event(on_progress, "timeout")
                     self._save_state(ExecutionResult.TIMEOUT)
                     return ExecutionResult.TIMEOUT
 
@@ -176,6 +193,7 @@ class ExecutionLoop:
                 if parallel_group:
                     success = await self._execute_parallel_group(parallel_group, on_progress)
                     if not success:
+                        self._emit_completed_event(on_progress, "error")
                         self._save_state(ExecutionResult.ERROR)
                         return ExecutionResult.ERROR
                     # Skip to the 'before' stage (e.g., PLAN) after parallel group
@@ -187,6 +205,7 @@ class ExecutionLoop:
                     # Execute acceptance test stage with retry loop
                     await self._execute_acceptance_test_with_retry(stage, on_progress)
                     if not self.acceptance_tests_passed:
+                        self._emit_completed_event(on_progress, "acceptance_test_failed")
                         self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
                         return ExecutionResult.ACCEPTANCE_TEST_FAILED
                 elif stage in self.stages_config.review_stages:
@@ -201,11 +220,13 @@ class ExecutionLoop:
                             "BLOCKED: Cannot proceed with post-review - "
                             "acceptance tests have not been executed or did not pass."
                         )
+                        self._emit_completed_event(on_progress, "acceptance_test_failed")
                         self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
                         return ExecutionResult.ACCEPTANCE_TEST_FAILED
 
                     result = await self._execute_review_stage(stage, on_progress)
                     if result == ReviewStatus.FAILED:
+                        self._emit_completed_event(on_progress, "review_failed")
                         self._save_state(ExecutionResult.REVIEW_FAILED)
                         return ExecutionResult.REVIEW_FAILED
                 else:
@@ -217,12 +238,40 @@ class ExecutionLoop:
                 # Save state after each stage completion for resumability
                 self._save_state()
 
+            self._emit_completed_event(on_progress, "complete")
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
         except Exception:
+            self._emit_completed_event(on_progress, "error")
             self._save_state(ExecutionResult.ERROR)
             raise
+
+    def _emit_completed_event(
+        self,
+        on_progress: Callable[[str, Any], None] | None,
+        status: str,
+    ) -> None:
+        """Emit orchestration_completed event.
+
+        Args:
+            on_progress: Progress callback (may be None)
+            status: Completion status (complete, cancelled, timeout, error, etc.)
+        """
+        if on_progress:
+            objective_name = (
+                self.objective.title
+                if hasattr(self.objective, "title") and self.objective.title
+                else self.feature_name
+            )
+            on_progress(
+                "orchestration_completed",
+                {
+                    "objective_name": objective_name,
+                    "status": status,
+                    "duration_seconds": self.time_manager.elapsed_seconds,
+                },
+            )
 
     def _get_parallel_group_for_stage(self, stage: WorkflowStage) -> ParallelGroupConfig | None:
         """Find parallel group that starts with this stage.

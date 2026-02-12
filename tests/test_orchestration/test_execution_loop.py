@@ -1172,3 +1172,183 @@ class TestStatePersistenceWithParallelGroups:
         assert len(incomplete) == 1
         assert WorkflowStage.TEST_STRATEGY in incomplete
         assert WorkflowStage.RESEARCH not in incomplete  # Already completed
+
+
+class TestOrchestrationLifecycleEvents:
+    """Tests for orchestration lifecycle event emission."""
+
+    @pytest.fixture
+    def mock_sdk_client(self) -> AsyncMock:
+        """Create mock SDK client that approves all reviews."""
+        client = AsyncMock()
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed successfully."
+        return client
+
+    @pytest.fixture
+    def loop(self, objective_file: Path, teambot_dir_with_spec: Path) -> ExecutionLoop:
+        """Create ExecutionLoop instance with feature spec."""
+        return ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir_with_spec,
+            max_hours=8.0,
+        )
+
+    @pytest.mark.asyncio
+    async def test_emits_started_event_at_run_entry(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Emits orchestration_started at run() entry."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        # First event should be orchestration_started
+        started_events = [c for c in progress_calls if c[0] == "orchestration_started"]
+        assert len(started_events) == 1
+        assert started_events[0][0] == "orchestration_started"
+
+    @pytest.mark.asyncio
+    async def test_started_event_includes_objective_name(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Started event includes objective_name from objective."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        started_events = [c for c in progress_calls if c[0] == "orchestration_started"]
+        assert len(started_events) == 1
+        data = started_events[0][1]
+        assert "objective_name" in data
+        # Should have a non-empty objective name
+        assert data["objective_name"]
+
+    @pytest.mark.asyncio
+    async def test_started_event_includes_objective_path(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Started event includes objective_path."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        started_events = [c for c in progress_calls if c[0] == "orchestration_started"]
+        data = started_events[0][1]
+        assert "objective_path" in data
+        assert data["objective_path"] is not None
+
+    @pytest.mark.asyncio
+    async def test_emits_completed_event_on_success(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Emits orchestration_completed on successful completion."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        result = await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        assert result == ExecutionResult.COMPLETE
+        completed_events = [c for c in progress_calls if c[0] == "orchestration_completed"]
+        assert len(completed_events) == 1
+        data = completed_events[0][1]
+        assert data["status"] == "complete"
+
+    @pytest.mark.asyncio
+    async def test_completed_event_includes_duration(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Completed event includes duration_seconds."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        completed_events = [c for c in progress_calls if c[0] == "orchestration_completed"]
+        data = completed_events[0][1]
+        assert "duration_seconds" in data
+        # Duration should be a non-negative number
+        assert data["duration_seconds"] >= 0
+
+    @pytest.mark.asyncio
+    async def test_completed_event_on_cancellation(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Emits orchestration_completed with cancelled status."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        # Cancel immediately
+        loop.cancel()
+
+        result = await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        assert result == ExecutionResult.CANCELLED
+        completed_events = [c for c in progress_calls if c[0] == "orchestration_completed"]
+        assert len(completed_events) == 1
+        data = completed_events[0][1]
+        assert data["status"] == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_completed_event_on_timeout(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Emits orchestration_completed with timeout status."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            max_hours=0,  # Immediately expired
+        )
+        progress_calls: list[tuple[str, dict]] = []
+
+        result = await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        assert result == ExecutionResult.TIMEOUT
+        completed_events = [c for c in progress_calls if c[0] == "orchestration_completed"]
+        assert len(completed_events) == 1
+        data = completed_events[0][1]
+        assert data["status"] == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_lifecycle_events_order(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """orchestration_started comes before completed."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop.run(
+            mock_sdk_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        # Find indices of lifecycle events
+        started_idx = next(
+            i for i, c in enumerate(progress_calls) if c[0] == "orchestration_started"
+        )
+        completed_idx = next(
+            i for i, c in enumerate(progress_calls) if c[0] == "orchestration_completed"
+        )
+
+        # Started should come before completed
+        assert started_idx < completed_idx
+        # Started should be first event
+        assert started_idx == 0

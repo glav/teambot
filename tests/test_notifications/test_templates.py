@@ -234,3 +234,157 @@ class TestMessageTemplates:
 
         # Numeric values should work fine
         assert "10/10" in result
+
+
+class TestOrchestrationStartedTemplate:
+    """Tests for orchestration_started template rendering."""
+
+    @pytest.fixture
+    def templates(self) -> MessageTemplates:
+        return MessageTemplates()
+
+    def test_render_with_objective_name(self, templates: MessageTemplates) -> None:
+        """Renders with objective name when provided."""
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            data={"objective_name": "my-feature", "objective_path": "/path/to/obj.md"},
+        )
+        result = templates.render(event)
+        assert "🚀" in result
+        assert "Starting" in result
+        assert "my-feature" in result
+
+    def test_render_fallback_when_name_missing(self, templates: MessageTemplates) -> None:
+        """Falls back to generic text when objective_name missing."""
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            data={"objective_path": "/path/to/obj.md"},
+        )
+        result = templates.render(event)
+        assert "orchestration run" in result.lower()
+
+    def test_render_fallback_when_name_empty(self, templates: MessageTemplates) -> None:
+        """Falls back to generic text when objective_name is empty string."""
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            data={"objective_name": "", "objective_path": "/path/to/obj.md"},
+        )
+        result = templates.render(event)
+        assert "orchestration run" in result.lower()
+
+    def test_escapes_html_in_objective_name(self, templates: MessageTemplates) -> None:
+        """HTML characters in objective_name are escaped."""
+        event = NotificationEvent(
+            event_type="orchestration_started",
+            data={"objective_name": "<script>alert('xss')</script>"},
+        )
+        result = templates.render(event)
+        assert "&lt;script&gt;" in result
+        assert "<script>" not in result
+
+
+class TestOrchestrationCompletedTemplate:
+    """Tests for orchestration_completed template rendering."""
+
+    @pytest.fixture
+    def templates(self) -> MessageTemplates:
+        return MessageTemplates()
+
+    def test_render_with_duration(self, templates: MessageTemplates) -> None:
+        """Renders with formatted duration."""
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            data={
+                "objective_name": "my-feature",
+                "duration_seconds": 125,  # 2m 5s
+            },
+        )
+        result = templates.render(event)
+        assert "✅" in result
+        assert "Completed" in result
+        assert "my-feature" in result
+        assert "2m 5s" in result
+
+    def test_render_fallback_when_name_missing(self, templates: MessageTemplates) -> None:
+        """Falls back to generic text when objective_name missing."""
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            data={"duration_seconds": 60},
+        )
+        result = templates.render(event)
+        assert "orchestration run" in result.lower()
+
+    def test_render_fallback_when_name_empty(self, templates: MessageTemplates) -> None:
+        """Falls back to generic text when objective_name is empty string."""
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            data={"objective_name": "", "duration_seconds": 60},
+        )
+        result = templates.render(event)
+        assert "orchestration run" in result.lower()
+
+    def test_duration_zero_seconds(self, templates: MessageTemplates) -> None:
+        """Handles zero duration gracefully."""
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            data={"objective_name": "test", "duration_seconds": 0},
+        )
+        result = templates.render(event)
+        assert "0m 0s" in result
+
+    def test_duration_large_value(self, templates: MessageTemplates) -> None:
+        """Handles large duration values."""
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            data={"objective_name": "test", "duration_seconds": 7265},  # 2h 1m 5s
+        )
+        result = templates.render(event)
+        # Should show 121m 5s (minutes only, no hours)
+        assert "121m 5s" in result
+
+    def test_escapes_html_in_objective_name(self, templates: MessageTemplates) -> None:
+        """HTML characters in objective_name are escaped."""
+        event = NotificationEvent(
+            event_type="orchestration_completed",
+            data={"objective_name": "<b>test</b>", "duration_seconds": 60},
+        )
+        result = templates.render(event)
+        assert "&lt;b&gt;test&lt;/b&gt;" in result
+        assert "<b>test</b>" not in result
+
+
+class TestCustomMessageTemplate:
+    """Tests for custom_message template rendering."""
+
+    @pytest.fixture
+    def templates(self) -> MessageTemplates:
+        return MessageTemplates()
+
+    def test_render_user_message(self, templates: MessageTemplates) -> None:
+        """Renders user message."""
+        event = NotificationEvent(
+            event_type="custom_message",
+            data={"message": "Hello from TeamBot!"},
+        )
+        result = templates.render(event)
+        assert "📢" in result
+        assert "Hello from TeamBot!" in result
+
+    def test_escapes_html_in_message(self, templates: MessageTemplates) -> None:
+        """HTML in user message is escaped."""
+        event = NotificationEvent(
+            event_type="custom_message",
+            data={"message": "<b>bold</b>"},
+        )
+        result = templates.render(event)
+        assert "&lt;b&gt;bold&lt;/b&gt;" in result
+        assert "<b>bold</b>" not in result
+
+    def test_multiword_message(self, templates: MessageTemplates) -> None:
+        """Renders multi-word message correctly."""
+        event = NotificationEvent(
+            event_type="custom_message",
+            data={"message": "This is a test notification with multiple words"},
+        )
+        result = templates.render(event)
+        assert "This is a test notification with multiple words" in result
