@@ -7,6 +7,7 @@ import importlib.metadata
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
+from teambot import __version__
 from teambot.config.schema import MODEL_INFO, VALID_MODELS, validate_model
 from teambot.repl.router import VALID_AGENTS
 
@@ -87,7 +88,7 @@ Task management:
         sdk_version = "unknown"
 
     return CommandResult(
-        output=f"""TeamBot Interactive Mode (Copilot SDK: {sdk_version})
+        output=f"""TeamBot v{__version__} (Copilot SDK: {sdk_version})
 
 Available commands:
   @agent <task>  - Send task to agent (pm, ba, writer, builder-1, builder-2, reviewer)
