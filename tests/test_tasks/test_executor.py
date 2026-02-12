@@ -108,6 +108,18 @@ class TestNotifyHandler:
             assert "⚠️" in result.output or "No notification channels" in result.output
 
     @pytest.mark.asyncio
+    async def test_handle_notify_disabled(self):
+        """Test handling when notifications are explicitly disabled."""
+        config = {"notifications": {"enabled": False}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        result = await executor._handle_notify("Test", background=False)
+
+        assert result.success  # Still succeeds
+        assert "⚠️" in result.output
+        assert "disabled" in result.output.lower()
+
+    @pytest.mark.asyncio
     async def test_handle_notify_no_config(self):
         """Test handling when no config available."""
         executor = TaskExecutor(sdk_client=AsyncMock(), config=None)

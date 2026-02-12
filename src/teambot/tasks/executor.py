@@ -188,17 +188,26 @@ class TaskExecutor:
 
         try:
             if self._config:
-                logger.debug("@notify: Config available, creating event bus")
-                event_bus = create_event_bus_from_config(self._config)
-                if event_bus and event_bus._channels:
-                    channel_names = [type(ch).__name__ for ch in event_bus._channels]
-                    logger.debug(f"@notify: Emitting to channels: {channel_names}")
-                    event_bus.emit_sync("custom_message", {"message": message})
-                    output = "Notification sent ✅"
-                    logger.debug("@notify: emit_sync completed")
+                logger.debug("@notify: Config available, checking notification settings")
+                notifications = self._config.get("notifications", {})
+
+                # Check if notifications are explicitly disabled
+                # Default to False if 'enabled' key is missing for safety
+                if not notifications.get("enabled", False):
+                    output = "⚠️ Notifications are disabled"
+                    logger.warning("@notify: Notifications are disabled in config")
                 else:
-                    output = "⚠️ No notification channels configured"
-                    logger.warning("@notify: No notification channels configured")
+                    # Notifications are enabled, try to create event bus
+                    event_bus = create_event_bus_from_config(self._config)
+                    if event_bus and event_bus._channels:
+                        channel_names = [type(ch).__name__ for ch in event_bus._channels]
+                        logger.debug(f"@notify: Emitting to channels: {channel_names}")
+                        event_bus.emit_sync("custom_message", {"message": message})
+                        output = "Notification sent ✅"
+                        logger.debug("@notify: emit_sync completed")
+                    else:
+                        output = "⚠️ No notification channels configured"
+                        logger.warning("@notify: Notifications enabled but no channels configured")
             else:
                 output = "⚠️ No notification configuration available"
                 logger.warning("@notify: No config available")
