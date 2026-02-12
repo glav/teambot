@@ -1789,7 +1789,8 @@ class TestNotificationUXAcceptance:
     # -------------------------------------------------------------------------
     # AT-003: @notify Pseudo-Agent Success (legacy /notify removed)
     # -------------------------------------------------------------------------
-    def test_at_003_notify_agent_sends_message(self) -> None:
+    @pytest.mark.asyncio
+    async def test_at_003_notify_agent_sends_message(self) -> None:
         """Validate @notify agent sends message.
 
         Steps:
@@ -1797,7 +1798,7 @@ class TestNotificationUXAcceptance:
         2. Execute @notify command
         3. Verify notification is sent via EventBus
         """
-        import pytest
+        from unittest.mock import AsyncMock, MagicMock, patch
 
         from teambot.tasks.executor import TaskExecutor
 
@@ -1814,26 +1815,21 @@ class TestNotificationUXAcceptance:
             }
         }
 
-        async def test():
-            from unittest.mock import AsyncMock, MagicMock, patch
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
 
-            mock_sdk = AsyncMock()
-            executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+        mock_event_bus = MagicMock()
+        mock_event_bus._channels = [MagicMock()]
 
-            mock_event_bus = MagicMock()
-            mock_event_bus._channels = [MagicMock()]
+        with patch(
+            "teambot.tasks.executor.create_event_bus_from_config",
+            return_value=mock_event_bus,
+        ):
+            result = await executor._handle_notify("Hello from TeamBot!", background=False)
 
-            with patch(
-                "teambot.tasks.executor.create_event_bus_from_config",
-                return_value=mock_event_bus,
-            ):
-                result = await executor._handle_notify("Hello from TeamBot!", background=False)
-
-            assert result.success is True
-            assert "Notification sent" in result.output
-            mock_event_bus.emit_sync.assert_called()
-
-        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
+        assert result.success is True
+        assert "Notification sent" in result.output
+        mock_event_bus.emit_sync.assert_called()
 
     def test_at_003_custom_message_template_renders(self) -> None:
         """Validate custom_message template renders user message."""
@@ -1875,7 +1871,8 @@ class TestNotificationUXAcceptance:
     # -------------------------------------------------------------------------
     # AT-005: @notify Graceful Failure
     # -------------------------------------------------------------------------
-    def test_at_005_notify_without_config_returns_warning(self) -> None:
+    @pytest.mark.asyncio
+    async def test_at_005_notify_without_config_returns_warning(self) -> None:
         """Validate @notify without config returns warning but succeeds.
 
         Steps:
@@ -1883,70 +1880,57 @@ class TestNotificationUXAcceptance:
         2. Execute _handle_notify()
         3. Verify warning output but success (non-blocking)
         """
-        import pytest
+        from unittest.mock import AsyncMock
 
         from teambot.tasks.executor import TaskExecutor
 
-        async def test():
-            from unittest.mock import AsyncMock
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk, config=None)
 
-            mock_sdk = AsyncMock()
-            executor = TaskExecutor(sdk_client=mock_sdk, config=None)
+        result = await executor._handle_notify("Test message", background=False)
 
-            result = await executor._handle_notify("Test message", background=False)
+        # Should return warning but still succeed (non-blocking)
+        assert result.success is True
+        assert "notification" in result.output.lower()
 
-            # Should return warning but still succeed (non-blocking)
-            assert result.success is True
-            assert "notification" in result.output.lower()
-
-        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
-
-    def test_at_005_notify_disabled_returns_warning(self) -> None:
+    @pytest.mark.asyncio
+    async def test_at_005_notify_disabled_returns_warning(self) -> None:
         """Validate @notify with disabled notifications returns warning."""
-        import pytest
+        from unittest.mock import AsyncMock
 
         from teambot.tasks.executor import TaskExecutor
 
-        async def test():
-            from unittest.mock import AsyncMock
+        mock_sdk = AsyncMock()
+        config = {"notifications": {"enabled": False}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
 
-            mock_sdk = AsyncMock()
-            config = {"notifications": {"enabled": False}}
-            executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+        result = await executor._handle_notify("Test", background=False)
 
+        # Should succeed (non-blocking) but may include warning
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_at_005_notify_no_channels_returns_warning(self) -> None:
+        """Validate @notify with no channels returns warning."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from teambot.tasks.executor import TaskExecutor
+
+        mock_sdk = AsyncMock()
+        config = {"notifications": {"enabled": True, "channels": []}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        mock_event_bus = MagicMock()
+        mock_event_bus._channels = []  # No channels
+
+        with patch(
+            "teambot.tasks.executor.create_event_bus_from_config",
+            return_value=mock_event_bus,
+        ):
             result = await executor._handle_notify("Test", background=False)
 
-            # Should succeed (non-blocking) but may include warning
-            assert result.success is True
-
-        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
-
-    def test_at_005_notify_no_channels_returns_warning(self) -> None:
-        """Validate @notify with no channels returns warning."""
-        import pytest
-
-        from teambot.tasks.executor import TaskExecutor
-
-        async def test():
-            from unittest.mock import AsyncMock, MagicMock, patch
-
-            mock_sdk = AsyncMock()
-            config = {"notifications": {"enabled": True, "channels": []}}
-            executor = TaskExecutor(sdk_client=mock_sdk, config=config)
-
-            mock_event_bus = MagicMock()
-            mock_event_bus._channels = []  # No channels
-
-            with patch(
-                "teambot.tasks.executor.create_event_bus_from_config",
-                return_value=mock_event_bus,
-            ):
-                result = await executor._handle_notify("Test", background=False)
-
-            # Should succeed (non-blocking) even if no channels
-            assert result.success is True
-
-        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
+        # Should succeed (non-blocking) even if no channels
+        assert result.success is True
 
     # -------------------------------------------------------------------------
     # AT-006: Header/Footer with Missing Objective Name
