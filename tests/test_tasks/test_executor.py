@@ -1047,6 +1047,82 @@ class TestExecutorReferences:
         assert captured_prompts[0] == "Create a plan"
         assert "=== Output from" not in captured_prompts[0]
 
+    @pytest.mark.asyncio
+    async def test_multiagent_with_reference(self):
+        """Test that multiagent commands properly inject references."""
+        captured_prompts = []
+
+        async def capture_execute(agent_id, prompt):
+            captured_prompts.append((agent_id, prompt))
+            return f"{agent_id} output"
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = capture_execute
+
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        # First run ba
+        await executor.execute(parse_command("@ba Analyze requirements"))
+
+        # Clear captured prompts to focus on multiagent command
+        captured_prompts.clear()
+
+        # Now run multiagent command that references ba
+        cmd = parse_command("@pm,builder-1 Implement $ba")
+        await executor.execute(cmd)
+
+        # Both agents should receive the injected output
+        assert len(captured_prompts) == 2
+        pm_prompt = captured_prompts[0][1]
+        builder_prompt = captured_prompts[1][1]
+
+        # Check PM received BA's output
+        assert "=== Output from @ba ===" in pm_prompt
+        assert "ba output" in pm_prompt
+        assert "=== Your Task ===" in pm_prompt
+        assert "Implement $ba" in pm_prompt
+
+        # Check builder-1 received BA's output
+        assert "=== Output from @ba ===" in builder_prompt
+        assert "ba output" in builder_prompt
+        assert "=== Your Task ===" in builder_prompt
+        assert "Implement $ba" in builder_prompt
+
+    @pytest.mark.asyncio
+    async def test_multiagent_with_reference_and_notify(self):
+        """Test that @notify in multiagent commands receives injected references."""
+        captured_prompts = []
+
+        async def capture_execute(agent_id, prompt):
+            captured_prompts.append((agent_id, prompt))
+            return f"{agent_id} output"
+
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = capture_execute
+
+        # Create executor without notification config (we just test prompt injection)
+        executor = TaskExecutor(sdk_client=mock_sdk)
+
+        # First run ba
+        await executor.execute(parse_command("@ba Analyze requirements"))
+
+        # Clear captured prompts to focus on multiagent command
+        captured_prompts.clear()
+
+        # Now run multiagent command with @notify that references ba
+        cmd = parse_command('@pm,notify "Done: $ba"')
+        result = await executor.execute(cmd)
+
+        # PM should receive injected output
+        assert len(captured_prompts) == 1  # just pm
+        pm_prompt = captured_prompts[0][1]
+        assert "=== Output from @ba ===" in pm_prompt
+        assert "ba output" in pm_prompt
+        assert 'Done: $ba' in pm_prompt
+
+        # @notify output should be present in result
+        assert "=== @notify ===" in result.output
+
 
 class TestPipelineStageCallbacks:
     """Tests for pipeline stage change and output callbacks."""

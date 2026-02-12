@@ -444,6 +444,30 @@ class TaskExecutor:
         Returns:
             ExecutionResult with combined outputs.
         """
+        # Check for $ref dependencies
+        if command.references:
+            # Validate all referenced agents exist
+            from teambot.repl.router import AGENT_ALIASES, VALID_AGENTS
+
+            invalid_refs = [
+                ref for ref in command.references if AGENT_ALIASES.get(ref, ref) not in VALID_AGENTS
+            ]
+            if invalid_refs:
+                valid_list = ", ".join(sorted(VALID_AGENTS))
+                return ExecutionResult(
+                    success=False,
+                    output="",
+                    error=f"Unknown agent ref: ${invalid_refs[0]}. Valid: {valid_list}",
+                )
+
+            # Wait for any referenced agents that are currently running
+            await self._wait_for_references(command.references)
+
+            # Build prompt with injected outputs
+            prompt = self._inject_references(command.content, command.references)
+        else:
+            prompt = command.content
+
         # Separate pseudo-agents from real agents
         pseudo_agents = [a for a in command.agent_ids if is_pseudo_agent(a)]
         real_agents = [a for a in command.agent_ids if not is_pseudo_agent(a)]
@@ -453,7 +477,7 @@ class TaskExecutor:
             # Custom agents in .github/agents/ handle persona context
             task = self._manager.create_task(
                 agent_id=agent_id,
-                prompt=command.content,
+                prompt=prompt,
                 background=command.background,
                 model=command.model,
             )
@@ -478,7 +502,7 @@ class TaskExecutor:
             for task in tasks:
                 if self._on_task_started:
                     self._on_task_started(task)
-                self._status_running(task.agent_id, command.content[:40] if command.content else "")
+                self._status_running(task.agent_id, prompt[:40] if prompt else "")
 
             try:
                 # Execute all in parallel and wait
@@ -512,9 +536,7 @@ class TaskExecutor:
                 # Handle pseudo-agents (e.g., @notify)
                 for agent_id in pseudo_agents:
                     if agent_id == "notify":
-                        notify_result = await self._handle_notify(
-                            command.content, command.background
-                        )
+                        notify_result = await self._handle_notify(prompt, command.background)
                         outputs.append(f"=== @notify ===\n{notify_result.output}")
             except asyncio.CancelledError:
                 for task in tasks:
