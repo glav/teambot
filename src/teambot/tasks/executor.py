@@ -192,6 +192,7 @@ class TaskExecutor:
                 notifications = self._config.get("notifications", {})
 
                 # Check if notifications are explicitly disabled
+                # Default to False if 'enabled' key is missing for safety
                 if not notifications.get("enabled", False):
                     output = "⚠️ Notifications are disabled"
                     logger.warning("@notify: Notifications are disabled in config")
