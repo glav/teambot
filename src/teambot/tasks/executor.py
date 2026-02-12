@@ -564,9 +564,9 @@ class TaskExecutor:
         all_task_ids: list[str] = []
         previous_task_ids: list[str] = []
         stage_task_map: dict[int, list[str]] = {}  # stage_index -> task_ids
-        # Track pseudo-agent stages for inline handling
-        # stage_index -> (agent_id, prompt, dependency_task_ids)
-        pseudo_agent_stages: dict[int, tuple[str, str, list[str]]] = {}
+        # Track pseudo-agents per stage for inline handling
+        # stage_index -> list of (agent_id, prompt, dependency_task_ids)
+        pseudo_agent_stages: dict[int, list[tuple[str, str, list[str]]]] = {}
 
         # Create tasks for each stage with dependencies
         for i, stage in enumerate(command.pipeline):
@@ -582,7 +582,9 @@ class TaskExecutor:
                 # Handle pseudo-agents differently - don't create tasks for them
                 if is_pseudo_agent(agent_id):
                     # Store prompt and dependencies for later injection
-                    pseudo_agent_stages[i] = (agent_id, prompt, previous_task_ids.copy())
+                    if i not in pseudo_agent_stages:
+                        pseudo_agent_stages[i] = []
+                    pseudo_agent_stages[i].append((agent_id, prompt, previous_task_ids.copy()))
                     continue
 
                 # Custom agents in .github/agents/ handle persona context
@@ -625,28 +627,24 @@ class TaskExecutor:
             errors = []
 
             for stage_index, stage_task_ids in stage_task_map.items():
-                # Handle pseudo-agent stages inline (e.g., @notify)
-                if stage_index in pseudo_agent_stages:
-                    agent_id, prompt, dep_task_ids = pseudo_agent_stages[stage_index]
-                    # Inject previous stage outputs into notify message
-                    if dep_task_ids:
-                        notify_prompt = self._inject_pipeline_outputs(prompt, dep_task_ids)
-                    else:
-                        notify_prompt = prompt
-                    notify_result = await self._handle_notify(notify_prompt, command.background)
-                    final_outputs.append(f"=== @notify ===\n{notify_result.output}")
-                    continue
-
-                # Notify stage change
+                # Notify stage change (include both real and pseudo agents)
                 stage_agents = [
                     t.agent_id
                     for tid in stage_task_ids
                     if (t := self._manager.get_task(tid)) is not None
                 ]
+                # Add pseudo-agents to the stage agents list for notification
+                if stage_index in pseudo_agent_stages:
+                    pseudo_agents = [
+                        agent_id
+                        for agent_id, _, _ in pseudo_agent_stages[stage_index]
+                    ]
+                    stage_agents.extend(pseudo_agents)
+
                 if self._on_stage_change:
                     self._on_stage_change(stage_index + 1, total_stages, stage_agents)
 
-                # Execute tasks in this stage
+                # Execute real agent tasks in this stage
                 for task_id in stage_task_ids:
                     task = self._manager.get_task(task_id)
                     if not task:
@@ -703,6 +701,17 @@ class TaskExecutor:
                         else:
                             errors.append(f"@{task.agent_id}: {result.error}")
                             final_outputs.append(f"{header}\n[Failed: {result.error}]")
+
+                # After all real tasks, execute any pseudo-agents for this stage
+                if stage_index in pseudo_agent_stages:
+                    for agent_id, prompt, dep_task_ids in pseudo_agent_stages[stage_index]:
+                        # Inject previous stage outputs into notify message
+                        if dep_task_ids:
+                            notify_prompt = self._inject_pipeline_outputs(prompt, dep_task_ids)
+                        else:
+                            notify_prompt = prompt
+                        notify_result = await self._handle_notify(notify_prompt, command.background)
+                        final_outputs.append(f"=== @{agent_id} ===\n{notify_result.output}")
 
             # Signal pipeline completion to clear progress display
             if self._on_pipeline_complete:

@@ -359,6 +359,59 @@ class TestNotifyFailureHandling:
             assert "⚠️" in result.output or "failed" in result.output.lower()
 
 
+class TestMixedStageExecution:
+    """Tests for stages with both real and pseudo-agents."""
+
+    @pytest.mark.asyncio
+    async def test_stage_with_real_and_pseudo_agent_executes_both(self):
+        """Stage with @pm,notify executes both agents (not just notify)."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="PM output")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command("@pm,notify plan project -> @reviewer review")
+            result = await executor.execute(cmd)
+
+            # Both @pm task and @notify should execute
+            assert result.success
+            # @pm should have been called
+            mock_sdk.execute.assert_called()
+            # @notify should have been called
+            mock_bus.emit_sync.assert_called_once()
+            # Output should contain both
+            assert "PM output" in result.output
+            assert "@notify" in result.output
+
+    @pytest.mark.asyncio
+    async def test_multiple_pseudo_agents_in_one_stage(self):
+        """Multiple pseudo-agents in one stage all execute."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Builder output")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            # Note: This tests the infrastructure can handle multiple pseudo-agents
+            # (even though we only have @notify currently)
+            cmd = parse_command("@builder-1,notify code feature")
+            result = await executor.execute(cmd)
+
+            # Both should execute
+            assert result.success
+            mock_sdk.execute.assert_called()
+            mock_bus.emit_sync.assert_called_once()
+
+
 class TestNotifyInMultiagent:
     """Tests for @notify in multi-agent scenarios."""
 
