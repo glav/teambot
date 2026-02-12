@@ -212,8 +212,10 @@ class TaskExecutor:
                 output = "⚠️ No notification configuration available"
                 logger.warning("@notify: No config available")
         except Exception as e:
-            output = f"⚠️ Notification failed: {e}"
-            logger.warning(f"@notify failed: {e}")
+            # Generic output without exception details to avoid leaking secrets
+            output = "⚠️ Notification failed (see logs)"
+            # Log only exception type to avoid exposing sensitive data (e.g., URLs with tokens)
+            logger.warning(f"@notify failed: {type(e).__name__}")
 
         # Store result for potential $notify references
         synthetic_result = TaskResult(task_id="notify", output=output, success=True)

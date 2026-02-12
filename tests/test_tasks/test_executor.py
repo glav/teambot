@@ -356,19 +356,55 @@ class TestNotifyFailureHandling:
 
     @pytest.mark.asyncio
     async def test_failure_output_contains_warning(self):
-        """Failure output indicates warning."""
+        """Failure output indicates warning without leaking exception details."""
         config = {"notifications": {"enabled": True}}
         executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
 
         with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
             mock_bus = MagicMock()
             mock_bus._channels = [MagicMock()]
-            mock_bus.emit_sync.side_effect = Exception("Test error")
+            # Use an exception with sensitive data to verify it's not leaked
+            mock_bus.emit_sync.side_effect = Exception(
+                "https://api.telegram.org/bot123456:SENSITIVE_TOKEN/sendMessage"
+            )
             mock_create.return_value = mock_bus
 
             result = await executor._handle_notify("Test", background=False)
 
+            # Verify warning indicator is present
             assert "⚠️" in result.output or "failed" in result.output.lower()
+            # Verify sensitive data is NOT in output
+            assert "SENSITIVE_TOKEN" not in result.output
+            assert "123456" not in result.output
+            assert "api.telegram.org" not in result.output
+
+    @pytest.mark.asyncio
+    async def test_failure_logging_does_not_leak_details(self):
+        """Logger output does not include exception details that might contain secrets."""
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            with patch("teambot.tasks.executor.logger") as mock_logger:
+                mock_bus = MagicMock()
+                mock_bus._channels = [MagicMock()]
+                # Exception with URL containing token
+                mock_bus.emit_sync.side_effect = Exception(
+                    "HTTPError at https://api.telegram.org/bot123456:SECRET_TOKEN/sendMessage"
+                )
+                mock_create.return_value = mock_bus
+
+                await executor._handle_notify("Test", background=False)
+
+                # Verify logger.warning was called
+                mock_logger.warning.assert_called_once()
+                log_message = mock_logger.warning.call_args[0][0]
+
+                # Verify log contains only exception type, not details
+                assert "Exception" in log_message
+                assert "SECRET_TOKEN" not in log_message
+                assert "api.telegram.org" not in log_message
+                assert "123456" not in log_message
 
 
 class TestMixedStageExecution:
