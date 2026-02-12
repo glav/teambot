@@ -57,7 +57,7 @@ class MessageTemplates:
         Returns:
             Formatted message string
         """
-        template = self.TEMPLATES.get(event.event_type, self._default_template())
+        template = self.TEMPLATES.get(event.event_type) or self._default_template()
 
         # Build context from event - escape all string values from event.data
         context: dict[str, Any] = {
