@@ -401,8 +401,11 @@ class TestMixedStageExecution:
             mock_bus._channels = [MagicMock()]
             mock_create.return_value = mock_bus
 
-            # Test with @pm (consistent with first test) and @notify
-            # This validates infrastructure can handle multiple pseudo-agents per stage
+            # Test validates infrastructure can handle multiple agents per stage:
+            # - @pm is a real agent (creates task, executes via SDK)
+            # - @notify is a pseudo-agent (no task, executes inline)
+            # The data structure supports multiple pseudo-agents even though
+            # we currently only have @notify
             cmd = parse_command("@pm,notify create documentation")
             result = await executor.execute(cmd)
 
