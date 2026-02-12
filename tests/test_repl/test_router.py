@@ -47,7 +47,8 @@ class TestAgentRouterValidation:
         assert "builder-1" in agents
         assert "builder-2" in agents
         assert "reviewer" in agents
-        assert len(agents) == 6
+        assert "notify" in agents
+        assert len(agents) == 7
 
 
 class TestAgentRouterRouting:
@@ -298,6 +299,43 @@ class TestRouterWithDefaultAgent:
         assert len(history) == 1
         assert history[0]["agent_id"] == "pm"
         assert history[0]["content"] == "Create a plan"
+
+
+class TestNotifyAgentRecognition:
+    """Tests for @notify pseudo-agent recognition."""
+
+    def test_notify_is_valid_agent(self):
+        """Test that 'notify' is recognized as valid agent ID."""
+        from teambot.repl.router import VALID_AGENTS
+
+        assert "notify" in VALID_AGENTS
+
+    def test_existing_agents_still_valid(self):
+        """Regression: existing agents remain valid."""
+        from teambot.repl.router import VALID_AGENTS
+
+        expected = {"pm", "ba", "writer", "builder-1", "builder-2", "reviewer", "notify"}
+        assert VALID_AGENTS == expected
+
+    def test_notify_is_valid_via_router(self):
+        """Test notify is valid through router.is_valid_agent()."""
+        router = AgentRouter()
+        assert router.is_valid_agent("notify") is True
+
+    def test_invalid_agents_still_rejected(self):
+        """Test that invalid agent IDs are still rejected."""
+        from teambot.repl.router import VALID_AGENTS
+
+        for invalid in ["unknown", "admin", "builder-3", "Notify", "NOTIFY"]:
+            assert invalid not in VALID_AGENTS
+
+    def test_get_all_agents_includes_notify(self):
+        """Test that get_all_agents() includes notify."""
+        router = AgentRouter()
+        agents = router.get_all_agents()
+
+        assert "notify" in agents
+        assert len(agents) == 7
 
 
 class TestRouterDefaultAgentMutation:

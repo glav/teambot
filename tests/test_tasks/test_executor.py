@@ -1,12 +1,379 @@
 """Tests for TaskExecutor - bridges REPL commands to TaskManager."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from teambot.repl.parser import parse_command
 from teambot.tasks.executor import TaskExecutor
-from teambot.tasks.models import TaskStatus
+from teambot.tasks.models import TaskResult, TaskStatus
+
+
+class TestPseudoAgentDetection:
+    """Tests for pseudo-agent detection."""
+
+    def test_notify_is_pseudo_agent(self):
+        """Test that 'notify' is identified as pseudo-agent."""
+        from teambot.tasks.executor import is_pseudo_agent
+
+        assert is_pseudo_agent("notify") is True
+
+    def test_regular_agents_not_pseudo(self):
+        """Test that regular agents are not pseudo-agents."""
+        from teambot.tasks.executor import is_pseudo_agent
+
+        for agent in ["pm", "ba", "writer", "builder-1", "builder-2", "reviewer"]:
+            assert is_pseudo_agent(agent) is False
+
+    def test_pseudo_agents_constant_exists(self):
+        """Test that PSEUDO_AGENTS constant exists."""
+        from teambot.tasks.executor import PSEUDO_AGENTS
+
+        assert "notify" in PSEUDO_AGENTS
+
+
+class TestNotifyHandler:
+    """Tests for @notify pseudo-agent handler."""
+
+    @pytest.fixture
+    def mock_config(self):
+        return {
+            "notifications": {
+                "enabled": True,
+                "channels": [{"type": "telegram", "token": "test", "chat_id": "123"}],
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_handle_notify_returns_confirmation(self, mock_config):
+        """Test that _handle_notify returns confirmation message."""
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=mock_config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            result = await executor._handle_notify("Test message", background=False)
+
+            assert result.success
+            assert "Notification sent" in result.output
+            assert "✅" in result.output
+
+    @pytest.mark.asyncio
+    async def test_handle_notify_calls_event_bus(self, mock_config):
+        """Test that EventBus.emit_sync is called."""
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=mock_config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            await executor._handle_notify("Test message", background=False)
+
+            mock_bus.emit_sync.assert_called_once_with(
+                "custom_message", {"message": "Test message"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_handle_notify_no_sdk_call(self, mock_config):
+        """Test that SDK is not called for @notify."""
+        mock_sdk = AsyncMock()
+        executor = TaskExecutor(sdk_client=mock_sdk, config=mock_config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            await executor._handle_notify("Test", background=False)
+
+            mock_sdk.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handle_notify_no_channels_configured(self):
+        """Test handling when no channels configured."""
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = []  # No channels
+            mock_create.return_value = mock_bus
+
+            result = await executor._handle_notify("Test", background=False)
+
+            assert result.success  # Still succeeds
+            assert "⚠️" in result.output or "No notification channels" in result.output
+
+    @pytest.mark.asyncio
+    async def test_handle_notify_no_config(self):
+        """Test handling when no config available."""
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=None)
+
+        result = await executor._handle_notify("Test", background=False)
+
+        assert result.success  # Still succeeds
+        assert "⚠️" in result.output
+
+
+class TestTruncationForNotification:
+    """Tests for output truncation helper."""
+
+    def test_short_text_unchanged(self):
+        """Text under limit is unchanged."""
+        from teambot.tasks.executor import truncate_for_notification
+
+        text = "a" * 400
+        assert truncate_for_notification(text) == text
+
+    def test_long_text_truncated(self):
+        """Text over limit is truncated with suffix."""
+        from teambot.tasks.executor import truncate_for_notification
+
+        text = "a" * 600
+        result = truncate_for_notification(text)
+        assert len(result) == 500 + len("...")
+        assert result.endswith("...")
+
+    def test_exactly_at_limit_unchanged(self):
+        """Text exactly at limit is unchanged."""
+        from teambot.tasks.executor import truncate_for_notification
+
+        text = "a" * 500
+        assert truncate_for_notification(text) == text
+
+    def test_one_over_limit_truncated(self):
+        """Text one char over limit is truncated."""
+        from teambot.tasks.executor import truncate_for_notification
+
+        text = "a" * 501
+        result = truncate_for_notification(text)
+        assert len(result) == 500 + len("...")
+
+
+class TestNotifyResultStorage:
+    """Tests for @notify result storage."""
+
+    @pytest.mark.asyncio
+    async def test_result_stored_after_notify(self):
+        """Test that result is stored in _agent_results."""
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            await executor._handle_notify("Test", background=False)
+
+            result = executor._manager.get_agent_result("notify")
+            assert result is not None
+            assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_result_output_matches(self):
+        """Test that stored result contains confirmation."""
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            await executor._handle_notify("Test", background=False)
+
+            result = executor._manager.get_agent_result("notify")
+            assert "Notification sent" in result.output
+
+
+class TestNotifySimpleExecution:
+    """Tests for @notify in simple execution."""
+
+    @pytest.mark.asyncio
+    async def test_notify_command_no_sdk(self):
+        """@notify command does not call SDK."""
+        mock_sdk = AsyncMock()
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command('@notify "Test message"')
+            result = await executor.execute(cmd)
+
+            mock_sdk.execute.assert_not_called()
+            assert result.success
+
+    @pytest.mark.asyncio
+    async def test_notify_with_ref_interpolation(self):
+        """@notify interpolates $ref tokens."""
+        mock_sdk = AsyncMock()
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        # Pre-populate pm result
+        executor._manager._agent_results["pm"] = TaskResult(
+            task_id="t1", output="PM output here", success=True
+        )
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command('@notify "Result: $pm"')
+            await executor.execute(cmd)
+
+            # Verify interpolated message was sent
+            call_args = mock_bus.emit_sync.call_args
+            assert "PM output here" in call_args[0][1]["message"]
+
+
+class TestNotifyInPipeline:
+    """Tests for @notify in pipeline execution."""
+
+    @pytest.mark.asyncio
+    async def test_notify_at_pipeline_end(self):
+        """@notify executes at end of pipeline."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="SDK output")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command('@pm plan -> @notify "Plan done"')
+            result = await executor.execute(cmd)
+
+            assert result.success
+            mock_bus.emit_sync.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_notify_at_pipeline_start(self):
+        """@notify executes at start of pipeline."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="SDK output")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command('@notify "Starting" -> @pm plan')
+            result = await executor.execute(cmd)
+
+            assert result.success
+
+    @pytest.mark.asyncio
+    async def test_notify_in_pipeline_middle(self):
+        """@notify executes in middle of pipeline."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="SDK output")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command('@pm plan -> @notify "Middle" -> @reviewer review')
+            result = await executor.execute(cmd)
+
+            assert result.success
+
+
+class TestNotifyFailureHandling:
+    """Tests for @notify failure scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_channel_failure_pipeline_continues(self):
+        """Notification failure doesn't break pipeline."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="SDK output")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_bus.emit_sync.side_effect = Exception("Network error")
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command('@pm plan -> @notify "Test" -> @reviewer review')
+            result = await executor.execute(cmd)
+
+            # Pipeline should still succeed
+            assert result.success
+
+    @pytest.mark.asyncio
+    async def test_failure_output_contains_warning(self):
+        """Failure output indicates warning."""
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_bus.emit_sync.side_effect = Exception("Test error")
+            mock_create.return_value = mock_bus
+
+            result = await executor._handle_notify("Test", background=False)
+
+            assert "⚠️" in result.output or "failed" in result.output.lower()
+
+
+class TestNotifyInMultiagent:
+    """Tests for @notify in multi-agent scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_notify_in_multiagent_fanout(self):
+        """@notify works in multi-agent comma syntax."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="Task done")
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            cmd = parse_command("@pm,notify do something")
+            result = await executor.execute(cmd)
+
+            # Should succeed with both outputs
+            assert result.success
+            assert "Notification sent" in result.output or "notification" in result.output.lower()
+
+    @pytest.mark.asyncio
+    async def test_notify_only_multiagent(self):
+        """@notify as the only agent in multiagent command."""
+        config = {"notifications": {"enabled": True}}
+        executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            # Single agent but could be in comma syntax
+            cmd = parse_command('@notify "Test message"')
+            result = await executor.execute(cmd)
+
+            assert result.success
 
 
 class TestTaskExecutorBasic:
@@ -1045,4 +1412,4 @@ class TestTaskExecutorAgentValidation:
         result = await executor.execute(cmd)
 
         assert not result.success
-        assert "ba, builder-1, builder-2, pm, reviewer, writer" in result.error
+        assert "ba, builder-1, builder-2, notify, pm, reviewer, writer" in result.error

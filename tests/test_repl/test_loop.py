@@ -1,11 +1,12 @@
 """Tests for REPL loop."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from teambot.repl.loop import REPLLoop
-from teambot.repl.parser import CommandType
+from teambot.repl.parser import Command, CommandType
+from teambot.tasks.executor import is_pseudo_agent
 
 
 class TestREPLLoopInit:
@@ -310,3 +311,132 @@ class TestLegacyMultiLineInput:
             mock_prompt.ask.side_effect = KeyboardInterrupt
             result = await repl._get_input()
         assert result is None
+
+
+class TestPseudoAgentRouting:
+    """Tests for routing pseudo-agents like @notify to the executor."""
+
+    @pytest.mark.asyncio
+    async def test_simple_notify_routes_to_executor(self):
+        """Simple @notify command routes to executor, not SDK."""
+        mock_sdk = AsyncMock()
+        mock_console = MagicMock()
+        config = {"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
+
+        repl = REPLLoop(console=mock_console, sdk_client=mock_sdk, config=config)
+        repl._sdk_connected = True
+
+        # Initialize executor
+        from teambot.tasks.executor import TaskExecutor
+
+        repl._executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            config=config,
+            on_task_complete=repl._on_task_complete,
+            on_task_started=repl._on_task_started,
+        )
+
+        # Create a simple @notify command (no pipeline, no multi-agent)
+        command = Command(
+            type=CommandType.AGENT,
+            agent_id="notify",
+            agent_ids=["notify"],
+            content="Build complete!",
+            command="",
+            args=None,
+            background=False,
+            is_pipeline=False,
+            pipeline=None,
+        )
+
+        # Mock the event bus to avoid real notifications
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            result = await repl._handle_advanced_command(command)
+
+            # Should succeed
+            assert "Notification sent" in result or "✅" in result
+            # SDK should NOT be called
+            mock_sdk.execute.assert_not_called()
+
+    def test_is_pseudo_agent_notify(self):
+        """is_pseudo_agent correctly identifies 'notify'."""
+        assert is_pseudo_agent("notify") is True
+        assert is_pseudo_agent("pm") is False
+        assert is_pseudo_agent("builder-1") is False
+
+    @pytest.mark.asyncio
+    async def test_notify_pipeline_still_works(self):
+        """Pipeline with @notify still routes correctly."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="PM output")
+        mock_console = MagicMock()
+        config = {"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
+
+        repl = REPLLoop(console=mock_console, sdk_client=mock_sdk, config=config)
+        repl._sdk_connected = True
+
+        from teambot.tasks.executor import TaskExecutor
+
+        repl._executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            config=config,
+            on_task_complete=repl._on_task_complete,
+            on_task_started=repl._on_task_started,
+        )
+
+        # Create a pipeline with notify
+        from teambot.repl.parser import parse_command
+
+        command = parse_command('@pm create plan -> @notify "Plan ready"')
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            await repl._handle_advanced_command(command)
+
+            # Both PM and notify should work
+            mock_sdk.execute.assert_called()
+            mock_bus.emit_sync.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_multiagent_with_notify_still_works(self):
+        """Multi-agent @pm,notify still routes correctly."""
+        mock_sdk = AsyncMock()
+        mock_sdk.execute = AsyncMock(return_value="PM output")
+        mock_console = MagicMock()
+        config = {"notifications": {"enabled": True, "channels": [{"type": "telegram"}]}}
+
+        repl = REPLLoop(console=mock_console, sdk_client=mock_sdk, config=config)
+        repl._sdk_connected = True
+
+        from teambot.tasks.executor import TaskExecutor
+
+        repl._executor = TaskExecutor(
+            sdk_client=mock_sdk,
+            config=config,
+            on_task_complete=repl._on_task_complete,
+            on_task_started=repl._on_task_started,
+        )
+
+        # Create a multi-agent command
+        from teambot.repl.parser import parse_command
+
+        command = parse_command("@pm,notify analyze task")
+
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
+            mock_bus = MagicMock()
+            mock_bus._channels = [MagicMock()]
+            mock_create.return_value = mock_bus
+
+            await repl._handle_advanced_command(command)
+
+            # PM should be called
+            mock_sdk.execute.assert_called()
+            # Notify should also run
+            mock_bus.emit_sync.assert_called()

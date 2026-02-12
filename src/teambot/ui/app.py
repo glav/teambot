@@ -13,6 +13,7 @@ from textual.widgets import Static
 
 from teambot.repl.commands import SystemCommands
 from teambot.repl.parser import Command, CommandType, parse_command
+from teambot.tasks.executor import is_pseudo_agent
 from teambot.ui.agent_state import AgentState, AgentStatusManager
 from teambot.ui.widgets import InputPane, OutputPane, StatusPanel
 
@@ -198,6 +199,7 @@ class TeamBotApp(App):
                 and not command.is_pipeline
                 and len(command.agent_ids) == 1
                 and not command.references  # Don't bypass executor if has $refs
+                and not is_pseudo_agent(agent_id)  # Pseudo-agents handled by executor
             ):
                 # Mark as streaming in centralized state
                 self._agent_status.set_streaming(agent_id)

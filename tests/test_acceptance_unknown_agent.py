@@ -198,8 +198,14 @@ class TestAcceptanceUnknownAgentValidation:
 
     @pytest.mark.asyncio
     async def test_at_006_each_agent_dispatches_to_sdk(self):
-        """Each valid agent command dispatches to SDK."""
+        """Each valid agent command dispatches to SDK (except pseudo-agents)."""
+        from teambot.tasks.executor import PSEUDO_AGENTS
+
         for agent_id in sorted(VALID_AGENTS):
+            # Skip pseudo-agents like "notify" that don't dispatch to SDK
+            if agent_id in PSEUDO_AGENTS:
+                continue
+
             mock_sdk = AsyncMock()
             mock_sdk.execute = AsyncMock(return_value=f"{agent_id} output")
             executor = TaskExecutor(sdk_client=mock_sdk)
@@ -224,7 +230,7 @@ class TestAcceptanceUnknownAgentValidation:
 
         assert not result.success
         assert "Unknown agent: 'buidler-1'" in result.error
-        assert "ba, builder-1, builder-2, pm, reviewer, writer" in result.error
+        assert "ba, builder-1, builder-2, notify, pm, reviewer, writer" in result.error
         mock_sdk.execute.assert_not_called()
 
     def test_at_007_typo_not_valid_in_router(self):

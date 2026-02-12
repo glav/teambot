@@ -877,11 +877,11 @@ class TestUnknownAgentValidationAcceptance:
         assert result.error is None or "Unknown agent" not in (result.error or "")
 
     # ------------------------------------------------------------------
-    # AT-006: All Six Valid Agents Work (Regression)
+    # AT-006: All Seven Valid Agents Work (Including Notify)
     # ------------------------------------------------------------------
     @pytest.mark.asyncio
-    async def test_at_006_all_six_agents_accepted_by_router(self):
-        """All 6 valid agents are accepted by the router without error."""
+    async def test_at_006_all_seven_agents_accepted_by_router(self):
+        """All 7 valid agents are accepted by the router without error."""
         router = AgentRouter()
         mock_handler = AsyncMock(return_value="done")
         router.register_agent_handler(mock_handler)
@@ -891,11 +891,11 @@ class TestUnknownAgentValidationAcceptance:
             result = await router.route(command)
             assert result == "done"
 
-        assert mock_handler.call_count == 6
+        assert mock_handler.call_count == 7
 
     @pytest.mark.asyncio
-    async def test_at_006_all_six_agents_accepted_by_executor(self):
-        """All 6 valid agents dispatched without validation error via executor."""
+    async def test_at_006_all_seven_agents_accepted_by_executor(self):
+        """All 7 valid agents dispatched without validation error via executor."""
         mock_sdk = AsyncMock()
         mock_sdk.execute = AsyncMock(return_value="Done")
         executor = TaskExecutor(sdk_client=mock_sdk)
@@ -907,8 +907,8 @@ class TestUnknownAgentValidationAcceptance:
                 f"Agent '{agent_id}' was incorrectly rejected"
             )
 
-    def test_at_006_all_six_agents_have_status_entries(self):
-        """All 6 valid agents have default status entries."""
+    def test_at_006_all_seven_agents_have_status_entries(self):
+        """All 7 valid agents have default status entries."""
         manager = AgentStatusManager()
         for agent_id in sorted(VALID_AGENTS):
             status = manager.get(agent_id)
@@ -1787,19 +1787,19 @@ class TestNotificationUXAcceptance:
         assert "2m 5s" in result
 
     # -------------------------------------------------------------------------
-    # AT-003: /notify Command Success
+    # AT-003: @notify Pseudo-Agent Success (legacy /notify removed)
     # -------------------------------------------------------------------------
-    def test_at_003_notify_command_sends_message(self) -> None:
-        """Validate /notify sends message and returns success.
+    def test_at_003_notify_agent_sends_message(self) -> None:
+        """Validate @notify agent sends message.
 
         Steps:
-        1. Create SystemCommands with valid notification config
-        2. Call notify() with message
-        3. Verify success response
+        1. Create TaskExecutor with valid notification config
+        2. Execute @notify command
+        3. Verify notification is sent via EventBus
         """
-        from unittest.mock import MagicMock, patch
+        import pytest
 
-        from teambot.repl.commands import SystemCommands
+        from teambot.tasks.executor import TaskExecutor
 
         config = {
             "notifications": {
@@ -1814,20 +1814,26 @@ class TestNotificationUXAcceptance:
             }
         }
 
-        commands = SystemCommands(router=None, config=config)
+        async def test():
+            from unittest.mock import AsyncMock, MagicMock, patch
 
-        # Mock EventBus creation to avoid actual network calls
-        mock_event_bus = MagicMock()
-        mock_event_bus._channels = [MagicMock()]  # Has channels
+            mock_sdk = AsyncMock()
+            executor = TaskExecutor(sdk_client=mock_sdk, config=config)
 
-        with patch(
-            "teambot.notifications.config.create_event_bus_from_config",
-            return_value=mock_event_bus,
-        ):
-            result = commands.notify(["Hello", "from", "TeamBot!"])
+            mock_event_bus = MagicMock()
+            mock_event_bus._channels = [MagicMock()]
 
-        assert result.success is True
-        assert "✅ Notification sent: Hello from TeamBot!" in result.output
+            with patch(
+                "teambot.tasks.executor.create_event_bus_from_config",
+                return_value=mock_event_bus,
+            ):
+                result = await executor._handle_notify("Hello from TeamBot!", background=False)
+
+            assert result.success is True
+            assert "Notification sent" in result.output
+            mock_event_bus.emit_sync.assert_called()
+
+        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
 
     def test_at_003_custom_message_template_renders(self) -> None:
         """Validate custom_message template renders user message."""
@@ -1847,71 +1853,100 @@ class TestNotificationUXAcceptance:
         assert "📢" in result
 
     # -------------------------------------------------------------------------
-    # AT-004: /notify Without Message Shows Help
+    # AT-004: Legacy /notify Removed
     # -------------------------------------------------------------------------
-    def test_at_004_notify_without_args_shows_usage(self) -> None:
-        """Validate /notify without args shows usage help.
+    def test_at_004_legacy_notify_command_removed(self) -> None:
+        """Validate /notify returns unknown command (superseded by @notify).
 
         Steps:
         1. Create SystemCommands
-        2. Call notify() with empty args
-        3. Verify usage help returned
+        2. Call dispatch() with "notify"
+        3. Verify unknown command error
         """
         from teambot.repl.commands import SystemCommands
 
         commands = SystemCommands(router=None, config=None)
 
-        result = commands.notify([])
+        result = commands.dispatch("notify", ["test"])
 
         assert result.success is False
-        assert "Usage: /notify <message>" in result.output
-        assert "Send a test notification" in result.output
+        assert "Unknown command" in result.output
 
     # -------------------------------------------------------------------------
-    # AT-005: /notify With Missing Configuration
+    # AT-005: @notify Graceful Failure
     # -------------------------------------------------------------------------
-    def test_at_005_notify_without_config_shows_error(self) -> None:
-        """Validate /notify without config shows actionable error.
+    def test_at_005_notify_without_config_returns_warning(self) -> None:
+        """Validate @notify without config returns warning but succeeds.
 
         Steps:
-        1. Create SystemCommands with no config
-        2. Call notify() with message
-        3. Verify error guides user to teambot init
+        1. Create TaskExecutor with no config
+        2. Execute _handle_notify()
+        3. Verify warning output but success (non-blocking)
         """
-        from teambot.repl.commands import SystemCommands
+        import pytest
 
-        commands = SystemCommands(router=None, config=None)
+        from teambot.tasks.executor import TaskExecutor
 
-        result = commands.notify(["Test", "message"])
+        async def test():
+            from unittest.mock import AsyncMock
 
-        assert result.success is False
-        assert "❌ Notifications not configured" in result.output
-        assert "teambot init" in result.output
-        assert "notifications" in result.output
+            mock_sdk = AsyncMock()
+            executor = TaskExecutor(sdk_client=mock_sdk, config=None)
 
-    def test_at_005_notify_disabled_shows_error(self) -> None:
-        """Validate /notify with disabled notifications shows error."""
-        from teambot.repl.commands import SystemCommands
+            result = await executor._handle_notify("Test message", background=False)
 
-        config = {"notifications": {"enabled": False}}
-        commands = SystemCommands(router=None, config=config)
+            # Should return warning but still succeed (non-blocking)
+            assert result.success is True
+            assert "notification" in result.output.lower()
 
-        result = commands.notify(["Test"])
+        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
 
-        assert result.success is False
-        assert "❌ Notifications not enabled" in result.output
+    def test_at_005_notify_disabled_returns_warning(self) -> None:
+        """Validate @notify with disabled notifications returns warning."""
+        import pytest
 
-    def test_at_005_notify_no_channels_shows_error(self) -> None:
-        """Validate /notify with no channels shows error."""
-        from teambot.repl.commands import SystemCommands
+        from teambot.tasks.executor import TaskExecutor
 
-        config = {"notifications": {"enabled": True, "channels": []}}
-        commands = SystemCommands(router=None, config=config)
+        async def test():
+            from unittest.mock import AsyncMock
 
-        result = commands.notify(["Test"])
+            mock_sdk = AsyncMock()
+            config = {"notifications": {"enabled": False}}
+            executor = TaskExecutor(sdk_client=mock_sdk, config=config)
 
-        assert result.success is False
-        assert "❌ No notification channels configured" in result.output
+            result = await executor._handle_notify("Test", background=False)
+
+            # Should succeed (non-blocking) but may include warning
+            assert result.success is True
+
+        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
+
+    def test_at_005_notify_no_channels_returns_warning(self) -> None:
+        """Validate @notify with no channels returns warning."""
+        import pytest
+
+        from teambot.tasks.executor import TaskExecutor
+
+        async def test():
+            from unittest.mock import AsyncMock, MagicMock, patch
+
+            mock_sdk = AsyncMock()
+            config = {"notifications": {"enabled": True, "channels": []}}
+            executor = TaskExecutor(sdk_client=mock_sdk, config=config)
+
+            mock_event_bus = MagicMock()
+            mock_event_bus._channels = []  # No channels
+
+            with patch(
+                "teambot.tasks.executor.create_event_bus_from_config",
+                return_value=mock_event_bus,
+            ):
+                result = await executor._handle_notify("Test", background=False)
+
+            # Should succeed (non-blocking) even if no channels
+            assert result.success is True
+
+        pytest.importorskip("asyncio").get_event_loop().run_until_complete(test())
 
     # -------------------------------------------------------------------------
     # AT-006: Header/Footer with Missing Objective Name
@@ -2023,31 +2058,31 @@ class TestNotificationUXAcceptance:
         assert started_events[0][1]["objective_name"] is not None
 
     # -------------------------------------------------------------------------
-    # AT-007: /help Includes /notify
+    # AT-007: /help Includes @notify
     # -------------------------------------------------------------------------
-    def test_at_007_help_includes_notify_command(self) -> None:
-        """Validate /help output includes /notify command.
+    def test_at_007_help_includes_notify_agent(self) -> None:
+        """Validate /help output includes @notify pseudo-agent.
 
         Steps:
         1. Call handle_help() with no args
-        2. Verify output includes /notify
+        2. Verify output includes @notify
         """
         from teambot.repl.commands import handle_help
 
         result = handle_help([])
 
-        assert "/notify" in result.output
+        assert "@notify" in result.output
         assert "notification" in result.output.lower()
 
     def test_at_007_help_notify_has_description(self) -> None:
-        """Validate /notify in help has meaningful description."""
+        """Validate @notify in help has meaningful description."""
         from teambot.repl.commands import handle_help
 
         result = handle_help([])
 
-        # Find the line with /notify
+        # Find the line with @notify
         lines = result.output.split("\n")
-        notify_lines = [line for line in lines if "/notify" in line]
+        notify_lines = [line for line in lines if "@notify" in line]
 
         assert len(notify_lines) >= 1
         # Should have description after command

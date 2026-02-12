@@ -274,9 +274,9 @@ class TestAT006AllValidAgents:
         # No unknown-agent error
         assert result.error is None or "Unknown agent" not in (result.error or "")
 
-    def test_at_006_all_six_agents_in_valid_set(self):
-        """VALID_AGENTS contains exactly the expected 6 agents."""
-        expected = {"pm", "ba", "writer", "builder-1", "builder-2", "reviewer"}
+    def test_at_006_all_seven_agents_in_valid_set(self):
+        """VALID_AGENTS contains exactly the expected 7 agents (including notify)."""
+        expected = {"pm", "ba", "writer", "builder-1", "builder-2", "reviewer", "notify"}
         assert VALID_AGENTS == expected
 
     def test_at_006_status_manager_initialises_all_six(self):

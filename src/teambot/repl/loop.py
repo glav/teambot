@@ -14,7 +14,7 @@ from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
 from teambot.repl.commands import SystemCommands
 from teambot.repl.parser import CommandType, ParseError, parse_command
 from teambot.repl.router import AgentRouter, RouterError
-from teambot.tasks.executor import TaskExecutor
+from teambot.tasks.executor import TaskExecutor, is_pseudo_agent
 from teambot.tasks.models import Task, TaskResult
 from teambot.ui.agent_state import AgentStatusManager
 from teambot.visualization.overlay import OverlayPosition, OverlayRenderer
@@ -48,6 +48,7 @@ class REPLLoop:
         """
         self._console = console or Console()
         self._sdk_client = sdk_client or CopilotSDKClient()
+        self._config = config
 
         # Extract default agent from config if provided
         default_agent = None
@@ -285,6 +286,7 @@ class REPLLoop:
             on_stage_output=self._on_stage_output,
             on_pipeline_complete=self._on_pipeline_complete,
             agent_status_manager=self._agent_status,
+            config=self._config,
         )
         self._commands.set_executor(self._executor)
 
@@ -326,6 +328,7 @@ class REPLLoop:
                             or len(command.agent_ids) > 1
                             or command.background
                             or command.references  # Has $ref dependencies
+                            or (command.agent_id and is_pseudo_agent(command.agent_id))
                         ):
                             # Use task executor for parallel/pipeline/background/references
                             result = await self._handle_advanced_command(command)
@@ -434,7 +437,7 @@ async def run_interactive_mode(console: Console | None = None, config: dict | No
         except Exception:
             pass  # Will show error when command is executed
 
-        executor = TaskExecutor(sdk_client=sdk_client)
+        executor = TaskExecutor(sdk_client=sdk_client, config=config)
 
         # Extract default agent from config if provided
         default_agent = None
