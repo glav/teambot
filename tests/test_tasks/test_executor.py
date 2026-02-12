@@ -392,7 +392,7 @@ class TestMixedStageExecution:
     async def test_multiple_pseudo_agents_in_one_stage(self):
         """Multiple pseudo-agents in one stage all execute."""
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(return_value="Builder output")
+        mock_sdk.execute = AsyncMock(return_value="PM output")
         config = {"notifications": {"enabled": True}}
         executor = TaskExecutor(sdk_client=mock_sdk, config=config)
 
@@ -401,9 +401,9 @@ class TestMixedStageExecution:
             mock_bus._channels = [MagicMock()]
             mock_create.return_value = mock_bus
 
-            # Note: This tests the infrastructure can handle multiple pseudo-agents
-            # (even though we only have @notify currently)
-            cmd = parse_command("@builder-1,notify code feature")
+            # Test with @pm (consistent with first test) and @notify
+            # This validates infrastructure can handle multiple pseudo-agents per stage
+            cmd = parse_command("@pm,notify create documentation")
             result = await executor.execute(cmd)
 
             # Both should execute

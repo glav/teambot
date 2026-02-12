@@ -635,9 +635,9 @@ class TaskExecutor:
                 ]
                 # Add pseudo-agents to the stage agents list for notification
                 if stage_index in pseudo_agent_stages:
+                    # Only extract agent_id for stage notification (prompt and deps not needed)
                     pseudo_agents = [
-                        agent_id
-                        for agent_id, _, _ in pseudo_agent_stages[stage_index]
+                        agent_id for agent_id, _, _ in pseudo_agent_stages[stage_index]
                     ]
                     stage_agents.extend(pseudo_agents)
 
