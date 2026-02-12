@@ -1166,7 +1166,7 @@ class TestExecutorReferences:
         pm_prompt = captured_prompts[0][1]
         assert "=== Output from @ba ===" in pm_prompt
         assert "ba output" in pm_prompt
-        assert 'Done: $ba' in pm_prompt
+        assert "Done: $ba" in pm_prompt
 
         # @notify output should be present in result
         assert "=== @notify ===" in result.output
