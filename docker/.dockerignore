@@ -1,0 +1,20 @@
+# Ignore unnecessary files in Docker build context
+.git
+.gitignore
+.github
+.vscode
+.devcontainer
+.agent
+.agent-tracking
+.teambot
+.ruff_cache
+.pytest_cache
+.coverage
+*.pyc
+__pycache__
+dist
+*.egg-info
+tests
+docs
+*.md
+!README.md

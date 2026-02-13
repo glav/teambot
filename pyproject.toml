@@ -1,9 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
 [project]
-name = "teambot"
-version = "0.1.0"
+name = "copilot-teambot"
+version = "0.2.0"
 description = "CLI wrapper for GitHub Copilot CLI enabling autonomous AI agent teams"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "TeamBot Contributors" }
+]
+keywords = ["copilot", "ai", "agent", "automation", "cli", "github"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+]
 dependencies = [
   "python-dotenv>=1.0.0",
   "python-frontmatter>=1.0.0",
@@ -12,6 +33,12 @@ dependencies = [
   "textual>=0.47.0",
   "httpx>=0.27.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/teambot-ai/teambot"
+Documentation = "https://github.com/teambot-ai/teambot/tree/main/docs"
+Repository = "https://github.com/teambot-ai/teambot"
+Issues = "https://github.com/teambot-ai/teambot/issues"
 
 [dependency-groups]
 dev = [
@@ -54,3 +81,6 @@ markers = [
 
 [tool.uv]
 package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/teambot"]
