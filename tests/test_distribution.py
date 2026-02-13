@@ -135,7 +135,7 @@ class TestDistributionArtifacts:
 
     def test_readme_has_installation_section(self):
         """Verify README has installation instructions."""
-        content = Path("README.md").read_text()
+        content = Path("README.md").read_text(encoding="utf-8")
         assert "## Installation" in content
         assert "pip install" in content
 

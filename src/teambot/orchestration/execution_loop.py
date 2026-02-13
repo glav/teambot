@@ -468,7 +468,7 @@ class ExecutionLoop:
 
         # Save report to artifacts
         report_path = self.teambot_dir / "artifacts" / "acceptance_test_results.md"
-        report_path.write_text(report)
+        report_path.write_text(report, encoding="utf-8")
 
         # Update tracking
         self.acceptance_tests_passed = self.acceptance_test_result.all_passed
@@ -776,7 +776,7 @@ class ExecutionLoop:
         # Check artifacts directory first
         artifacts_spec = self.teambot_dir / "artifacts" / "feature_spec.md"
         if artifacts_spec.exists():
-            return artifacts_spec.read_text()
+            return artifacts_spec.read_text(encoding="utf-8")
 
         # Check docs/feature-specs/
         feature_specs_dir = self.teambot_dir.parent.parent / "docs" / "feature-specs"
@@ -787,7 +787,7 @@ class ExecutionLoop:
                 # Case-insensitive matching with hyphens removed
                 normalized_spec = spec_file.stem.replace("-", "").lower()
                 if normalized_feature in normalized_spec:
-                    return spec_file.read_text()
+                    return spec_file.read_text(encoding="utf-8")
 
         return None
 
@@ -1005,7 +1005,7 @@ class ExecutionLoop:
         template_path = project_root / stage_config.prompt_template
         if template_path.exists():
             try:
-                return template_path.read_text()
+                return template_path.read_text(encoding="utf-8")
             except OSError:
                 return None
         return None
@@ -1067,7 +1067,7 @@ class ExecutionLoop:
             "parallel_group_status": self.parallel_group_status,
         }
 
-        state_file.write_text(json.dumps(state, indent=2))
+        state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
     @classmethod
     def resume(cls, teambot_dir: Path, config: dict[str, Any]) -> ExecutionLoop:
@@ -1094,7 +1094,7 @@ class ExecutionLoop:
         if state_file is None or not state_file.exists():
             raise ValueError("No orchestration state to resume")
 
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
 
         objective_path = Path(state["objective_file"])
 

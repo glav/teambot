@@ -79,7 +79,7 @@ def parse_objective_file(path: Path) -> ParsedObjective:
     if not path.exists():
         raise FileNotFoundError(f"Objective file not found: {path}")
 
-    content = path.read_text()
+    content = path.read_text(encoding="utf-8")
     sections = _extract_sections(content)
 
     # Try to find goals from various formats

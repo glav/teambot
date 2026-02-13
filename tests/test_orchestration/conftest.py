@@ -73,7 +73,7 @@ def minimal_objective_content() -> str:
 def objective_file(tmp_path: Path, sample_objective_content: str) -> Path:
     """Create a sample objective file."""
     path = tmp_path / "objective.md"
-    path.write_text(sample_objective_content)
+    path.write_text(sample_objective_content, encoding="utf-8")
     return path
 
 
@@ -81,7 +81,7 @@ def objective_file(tmp_path: Path, sample_objective_content: str) -> Path:
 def minimal_objective_file(tmp_path: Path, minimal_objective_content: str) -> Path:
     """Create a minimal objective file."""
     path = tmp_path / "minimal.md"
-    path.write_text(minimal_objective_content)
+    path.write_text(minimal_objective_content, encoding="utf-8")
     return path
 
 
@@ -121,6 +121,6 @@ def teambot_dir_with_spec(tmp_path: Path, sample_feature_spec_content: str) -> P
     feature_dir.mkdir()
     artifacts_dir = feature_dir / "artifacts"
     artifacts_dir.mkdir()
-    (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content)
+    (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content, encoding="utf-8")
 
     return dir_path

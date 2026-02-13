@@ -83,7 +83,7 @@ class TestAcceptanceScenarios:
         cmd_init(args, display)
 
         config_path = tmp_path / "teambot.json"
-        config = json.loads(config_path.read_text())
+        config = json.loads(config_path.read_text(encoding="utf-8"))
 
         assert "agents" in config
         assert isinstance(config["agents"], list)
@@ -253,7 +253,7 @@ class TestAcceptanceScenarios:
         import json
 
         feature_json = Path("features/teambot/devcontainer-feature.json")
-        content = json.loads(feature_json.read_text())
+        content = json.loads(feature_json.read_text(encoding="utf-8"))
 
         # Required fields per devcontainer spec
         assert "id" in content
@@ -271,7 +271,7 @@ class TestAcceptanceScenarios:
     def test_at_005_devcontainer_install_script_valid(self):
         """AT-005: Devcontainer install script has correct structure."""
         install_script = Path("features/teambot/install.sh")
-        content = install_script.read_text()
+        content = install_script.read_text(encoding="utf-8")
 
         # Script should install uv and copilot-teambot
         assert "#!/" in content  # Has shebang
@@ -290,7 +290,7 @@ class TestAcceptanceScenarios:
     def test_at_006_dockerfile_valid(self):
         """AT-006: Dockerfile has correct structure."""
         dockerfile = Path("docker/Dockerfile")
-        content = dockerfile.read_text()
+        content = dockerfile.read_text(encoding="utf-8")
 
         # Required Dockerfile elements
         assert "FROM" in content
@@ -302,7 +302,7 @@ class TestAcceptanceScenarios:
     def test_at_006_dockerfile_installs_teambot(self):
         """AT-006: Dockerfile installs TeamBot correctly."""
         dockerfile = Path("docker/Dockerfile")
-        content = dockerfile.read_text()
+        content = dockerfile.read_text(encoding="utf-8")
 
         # Check for proper installation steps
         assert "uv tool install" in content or "pip install" in content
@@ -311,7 +311,7 @@ class TestAcceptanceScenarios:
     def test_at_006_docker_entrypoint_correct(self):
         """AT-006: Docker entrypoint is teambot."""
         dockerfile = Path("docker/Dockerfile")
-        content = dockerfile.read_text()
+        content = dockerfile.read_text(encoding="utf-8")
 
         # Should have teambot as entrypoint
         assert 'ENTRYPOINT ["teambot"]' in content
@@ -354,7 +354,7 @@ class TestAcceptanceScenarios:
         ci_yml = Path(".github/workflows/ci.yml")
         assert ci_yml.exists()
 
-        content = yaml.safe_load(ci_yml.read_text())
+        content = yaml.safe_load(ci_yml.read_text(encoding="utf-8"))
 
         # Find the test job
         test_job = content["jobs"]["test"]

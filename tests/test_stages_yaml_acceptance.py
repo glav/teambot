@@ -23,7 +23,7 @@ class TestStagesYamlAcceptanceScenarios:
     def stages_yaml_content(self) -> str:
         """Load the actual stages.yaml content."""
         stages_path = Path("stages.yaml")
-        return stages_path.read_text()
+        return stages_path.read_text(encoding="utf-8")
 
     @pytest.fixture
     def stages_config(self):

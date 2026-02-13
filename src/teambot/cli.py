@@ -250,7 +250,7 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         if not objective_path.exists():
             display.print_error(f"Objective file not found: {objective_path}")
             return 1
-        objective = objective_path.read_text()
+        objective = objective_path.read_text(encoding="utf-8")
 
     play_startup_animation(
         console=display.console,

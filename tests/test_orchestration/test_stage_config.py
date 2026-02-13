@@ -51,7 +51,7 @@ stage_order:
 work_to_review_mapping: {}
 """
         config_file = tmp_path / "stages.yaml"
-        config_file.write_text(yaml_content)
+        config_file.write_text(yaml_content, encoding="utf-8")
 
         config = load_stages_config(config_file)
 
@@ -69,11 +69,17 @@ work_to_review_mapping: {}
     def test_load_default_when_no_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Load default configuration when no path provided and no stages.yaml exists."""
         # Change to temp directory without stages.yaml
+        import os
         import tempfile
 
+        original_dir = os.getcwd()
         with tempfile.TemporaryDirectory() as tmpdir:
-            monkeypatch.chdir(tmpdir)
-            config = load_stages_config(None)
+            try:
+                monkeypatch.chdir(tmpdir)
+                config = load_stages_config(None)
+            finally:
+                # Change back before temp dir cleanup (Windows compatibility)
+                monkeypatch.chdir(original_dir)
 
         # Should get default configuration with 14 stages
         assert WorkflowStage.SETUP in config.stages
@@ -112,7 +118,7 @@ stage_order:
 work_to_review_mapping: {}
 """
         stages_file = tmp_path / "stages.yaml"
-        stages_file.write_text(yaml_content)
+        stages_file.write_text(yaml_content, encoding="utf-8")
         monkeypatch.chdir(tmp_path)
 
         config = load_stages_config(None)
@@ -395,7 +401,7 @@ parallel_groups:
     before: PLAN
 """
         config_file = tmp_path / "stages.yaml"
-        config_file.write_text(yaml_content)
+        config_file.write_text(yaml_content, encoding="utf-8")
 
         config = load_stages_config(config_file)
 
@@ -431,7 +437,7 @@ stage_order:
 work_to_review_mapping: {}
 """
         config_file = tmp_path / "stages.yaml"
-        config_file.write_text(yaml_content)
+        config_file.write_text(yaml_content, encoding="utf-8")
 
         config = load_stages_config(config_file)
 
@@ -468,7 +474,7 @@ parallel_groups:
     before: COMPLETE
 """
         config_file = tmp_path / "stages.yaml"
-        config_file.write_text(yaml_content)
+        config_file.write_text(yaml_content, encoding="utf-8")
 
         with pytest.raises(ValueError, match="Invalid stage name in parallel group"):
             load_stages_config(config_file)
@@ -519,7 +525,7 @@ parallel_groups:
     before: COMPLETE
 """
         config_file = tmp_path / "stages.yaml"
-        config_file.write_text(yaml_content)
+        config_file.write_text(yaml_content, encoding="utf-8")
 
         with pytest.raises(ValueError, match="duplicate work_agent"):
             load_stages_config(config_file)
@@ -570,7 +576,7 @@ parallel_groups:
     before: COMPLETE
 """
         config_file = tmp_path / "stages.yaml"
-        config_file.write_text(yaml_content)
+        config_file.write_text(yaml_content, encoding="utf-8")
 
         config = load_stages_config(config_file)
         assert len(config.parallel_groups) == 1

@@ -105,7 +105,7 @@ class TestResumeAfterCancellation:
             },
         }
         state_file = feature_dir / "orchestration_state.json"
-        state_file.write_text(json.dumps(state))
+        state_file.write_text(json.dumps(state), encoding="utf-8")
 
         # Resume execution from the feature directory
         loop = ExecutionLoop.resume(feature_dir, {})
@@ -136,7 +136,7 @@ class TestResumeAfterCancellation:
         state_file = loop.teambot_dir / "orchestration_state.json"
         assert state_file.exists()
 
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         assert state["status"] == "cancelled"
 
 
@@ -288,7 +288,7 @@ class TestObjectiveFileFormats:
 - [ ] Third criterion pending
 """
         obj_file = tmp_path / "partial.md"
-        obj_file.write_text(content)
+        obj_file.write_text(content, encoding="utf-8")
 
         objective = parse_objective_file(obj_file)
 
@@ -327,7 +327,7 @@ The application uses React for frontend and Express for backend.
 """
         objective_file = tmp_path / "objectives" / "profile.md"
         objective_file.parent.mkdir(parents=True, exist_ok=True)
-        objective_file.write_text(objective_content)
+        objective_file.write_text(objective_content, encoding="utf-8")
 
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()
@@ -346,7 +346,7 @@ Implements user profile functionality.
 ## Technical Design
 Uses React components with Express API endpoints.
 """
-        (artifacts_dir / "feature_spec.md").write_text(feature_spec)
+        (artifacts_dir / "feature_spec.md").write_text(feature_spec, encoding="utf-8")
 
         # Mock successful execution
         mock_client = AsyncMock()
@@ -390,7 +390,7 @@ Uses React components with Express API endpoints.
 - [ ] Logic is correct
 """
         objective_file = tmp_path / "objective.md"
-        objective_file.write_text(objective_content)
+        objective_file.write_text(objective_content, encoding="utf-8")
 
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()

@@ -209,7 +209,7 @@ class AcceptanceTestExecutor:
         """
         content = self.spec_content
         if not content and self.spec_path:
-            content = self.spec_path.read_text()
+            content = self.spec_path.read_text(encoding="utf-8")
 
         if not content:
             return []
