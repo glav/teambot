@@ -368,9 +368,13 @@ class TestEventBusDrain:
     @pytest.mark.asyncio
     async def test_drain_timeout_logs_warning(self, mock_channel: MagicMock, caplog) -> None:
         """drain() logs warning if timeout is reached."""
+        cancel_event = asyncio.Event()
 
         async def very_slow_send(event):
-            await asyncio.sleep(10)
+            try:
+                await asyncio.wait_for(cancel_event.wait(), timeout=10)
+            except TimeoutError:
+                pass
 
         mock_channel.send = very_slow_send
         bus = EventBus()
@@ -384,6 +388,9 @@ class TestEventBusDrain:
 
         # Drain with short timeout - increased for cross-platform reliability
         await bus.drain(timeout=1.0)
+
+        # Signal cancellation to allow cleanup
+        cancel_event.set()
 
         assert "timeout" in caplog.text.lower()
         assert "still pending" in caplog.text.lower()
@@ -420,9 +427,13 @@ class TestEventBusClose:
     @pytest.mark.asyncio
     async def test_close_with_timeout(self, mock_channel: MagicMock, caplog) -> None:
         """close() respects timeout parameter."""
+        cancel_event = asyncio.Event()
 
         async def very_slow_send(event):
-            await asyncio.sleep(10)
+            try:
+                await asyncio.wait_for(cancel_event.wait(), timeout=10)
+            except TimeoutError:
+                pass
 
         mock_channel.send = very_slow_send
         bus = EventBus()
@@ -436,6 +447,9 @@ class TestEventBusClose:
 
         # Increased timeout for cross-platform reliability
         await bus.close(timeout=1.0)
+
+        # Signal cancellation to allow cleanup
+        cancel_event.set()
 
         # Channels should still be cleared even with timeout
         assert len(bus._channels) == 0
