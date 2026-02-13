@@ -379,8 +379,11 @@ class TestEventBusDrain:
         event = NotificationEvent(event_type="test", data={})
         await bus.emit(event)
 
-        # Drain with short timeout - increased for Windows reliability
-        await bus.drain(timeout=0.5)
+        # Give the task time to start
+        await asyncio.sleep(0.01)
+
+        # Drain with short timeout - increased for cross-platform reliability
+        await bus.drain(timeout=1.0)
 
         assert "timeout" in caplog.text.lower()
         assert "still pending" in caplog.text.lower()
@@ -428,8 +431,11 @@ class TestEventBusClose:
         event = NotificationEvent(event_type="test", data={})
         await bus.emit(event)
 
-        # Increased timeout for Windows reliability
-        await bus.close(timeout=0.5)
+        # Give the task time to start
+        await asyncio.sleep(0.01)
+
+        # Increased timeout for cross-platform reliability
+        await bus.close(timeout=1.0)
 
         # Channels should still be cleared even with timeout
         assert len(bus._channels) == 0
