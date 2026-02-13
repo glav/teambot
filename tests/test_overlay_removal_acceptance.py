@@ -113,9 +113,10 @@ class TestOverlayRemovalAcceptanceScenarios:
     def test_at_004_no_overlay_imports_in_commands(self):
         """Verify commands.py has no overlay imports."""
         import inspect
+        import sys
 
-        import teambot.repl.commands as commands_module
-
+        # Access module via sys.modules to avoid duplicate import style
+        commands_module = sys.modules["teambot.repl.commands"]
         source = inspect.getsource(commands_module)
 
         # Should not have OverlayRenderer import
