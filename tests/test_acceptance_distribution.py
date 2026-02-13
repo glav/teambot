@@ -322,7 +322,12 @@ class TestAcceptanceScenarios:
 
     def test_at_007_requires_python_310_plus(self):
         """AT-007: Package requires Python 3.10+."""
-        import tomllib
+        import sys
+
+        if sys.version_info >= (3, 11):  # noqa: UP036
+            import tomllib
+        else:
+            import tomli as tomllib
 
         with open("pyproject.toml", "rb") as f:
             config = tomllib.load(f)
@@ -332,7 +337,12 @@ class TestAcceptanceScenarios:
 
     def test_at_007_classifiers_include_all_versions(self):
         """AT-007: Package classifiers include Python 3.10, 3.11, 3.12."""
-        import tomllib
+        import sys
+
+        if sys.version_info >= (3, 11):  # noqa: UP036
+            import tomllib
+        else:
+            import tomli as tomllib
 
         with open("pyproject.toml", "rb") as f:
             config = tomllib.load(f)

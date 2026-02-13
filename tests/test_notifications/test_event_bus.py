@@ -379,8 +379,8 @@ class TestEventBusDrain:
         event = NotificationEvent(event_type="test", data={})
         await bus.emit(event)
 
-        # Drain with short timeout
-        await bus.drain(timeout=0.1)
+        # Drain with short timeout - increased for Windows reliability
+        await bus.drain(timeout=0.5)
 
         assert "timeout" in caplog.text.lower()
         assert "still pending" in caplog.text.lower()
@@ -428,7 +428,8 @@ class TestEventBusClose:
         event = NotificationEvent(event_type="test", data={})
         await bus.emit(event)
 
-        await bus.close(timeout=0.1)
+        # Increased timeout for Windows reliability
+        await bus.close(timeout=0.5)
 
         # Channels should still be cleared even with timeout
         assert len(bus._channels) == 0
