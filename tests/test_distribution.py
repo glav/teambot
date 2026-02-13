@@ -1,6 +1,11 @@
 """Tests for package distribution and installation."""
 
-import tomllib
+import sys
+
+if sys.version_info >= (3, 11):  # noqa: UP036
+    import tomllib
+else:
+    import tomli as tomllib
 from pathlib import Path
 from unittest.mock import patch
 
