@@ -108,7 +108,7 @@ class TaskExecutor:
             max_concurrent: Maximum concurrent tasks.
             default_timeout: Default task timeout in seconds.
             on_task_complete: Callback when task completes (for notifications).
-            on_task_started: Callback when task starts (for overlay updates).
+            on_task_started: Callback when task starts (for status updates).
             on_streaming_chunk: Callback for streaming chunks (agent_id, chunk).
             on_stage_change: Callback when pipeline stage changes (stage, total, agents).
             on_stage_output: Callback for intermediate output (agent_id, output).

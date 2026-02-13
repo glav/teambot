@@ -131,14 +131,11 @@ The interactive read-eval-print loop:
 
 ```
 User Input → Parser → Router/Executor → SDK Client → Output
-                                              ↓
-                                     Status Overlay Updates
 ```
 
 **Features:**
 - Rich console output with formatted agent responses
 - Signal handling for graceful shutdown (`Ctrl+C`)
-- Persistent status overlay showing running tasks
 
 ### Command Parser (`repl/parser.py`)
 
@@ -249,13 +246,9 @@ Textual-based terminal interface with:
 - **Status panel** — agent state and model assignments
 - Falls back to single-pane mode if terminal < 80 columns
 
-### Status Overlay (`visualization/overlay.py`)
-
-Persistent overlay showing real-time agent status during execution. Renders agent states (idle, working, reviewing) with progress indicators.
-
 ### Agent State Manager (`ui/agent_state.py`)
 
-Tracks per-agent status, model assignments, and activity. Provides the data model for status panel and overlay rendering.
+Tracks per-agent status, model assignments, and activity. Provides the data model for status panel rendering.
 
 ## Configuration
 

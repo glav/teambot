@@ -23,13 +23,6 @@ VALID_PERSONAS = {
     "reviewer",
 }
 
-VALID_OVERLAY_POSITIONS = {
-    "top-right",
-    "top-left",
-    "bottom-right",
-    "bottom-left",
-}
-
 NOTIFICATION_CHANNEL_TYPES = {"telegram"}
 
 REQUIRED_CHANNEL_FIELDS = {
@@ -148,10 +141,6 @@ class ConfigLoader:
         if "default_model" in config:
             self._validate_default_model(config["default_model"])
 
-        # Validate overlay config if present
-        if "overlay" in config:
-            self._validate_overlay(config["overlay"])
-
         # Validate animation config if present
         if "show_startup_animation" in config:
             if not isinstance(config["show_startup_animation"], bool):
@@ -209,23 +198,6 @@ class ConfigLoader:
                 f"Invalid default_model '{default_model}'. "
                 f"Use '/models' command to see available models."
             )
-
-    def _validate_overlay(self, overlay: dict[str, Any]) -> None:
-        """Validate overlay configuration."""
-        if not isinstance(overlay, dict):
-            raise ConfigError("'overlay' must be an object")
-
-        if "position" in overlay:
-            position = overlay["position"]
-            if position not in VALID_OVERLAY_POSITIONS:
-                raise ConfigError(
-                    f"Invalid overlay position '{position}'. "
-                    f"Valid positions: {VALID_OVERLAY_POSITIONS}"
-                )
-
-        if "enabled" in overlay:
-            if not isinstance(overlay["enabled"], bool):
-                raise ConfigError("'overlay.enabled' must be a boolean")
 
     def _validate_notifications(self, notifications: dict[str, Any]) -> None:
         """Validate notifications configuration."""
@@ -291,15 +263,6 @@ class ConfigLoader:
                 agent["parallel_capable"] = False
             if "workflow_stages" not in agent:
                 agent["workflow_stages"] = []
-
-        # Apply overlay defaults
-        if "overlay" not in config:
-            config["overlay"] = {}
-        overlay = config["overlay"]
-        if "enabled" not in overlay:
-            overlay["enabled"] = True
-        if "position" not in overlay:
-            overlay["position"] = "top-right"
 
         # Apply animation defaults
         if "show_startup_animation" not in config:

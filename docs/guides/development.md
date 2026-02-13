@@ -44,7 +44,7 @@ teambot/
 │   ├── repl/                 # Interactive REPL (parser, router, commands)
 │   ├── tasks/                # Task graph, execution, and output injection
 │   ├── ui/                   # Split-pane terminal interface (Textual)
-│   ├── visualization/        # Console formatting and status overlay
+│   ├── visualization/        # Console formatting and animations
 │   └── workflow/             # Workflow state machine
 ├── tests/                    # Test suite (1050 tests)
 └── docs/                     # Documentation

@@ -384,7 +384,7 @@ class TestAcceptanceScenarios:
             "ASCII fallback logo not found in non-UTF-8 output"
         )
 
-    # -- AT-008: Clean Handoff to Overlay --
+    # -- AT-008: Clean Handoff to Status Output --
 
     def test_at_008_animation_output_is_self_contained(self):
         """Animation produces clean output that doesn't corrupt subsequent prints."""

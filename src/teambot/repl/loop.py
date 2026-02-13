@@ -24,7 +24,6 @@ from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor, is_pseudo_agent
 from teambot.tasks.models import Task, TaskResult
 from teambot.ui.agent_state import AgentStatusManager
-from teambot.visualization.overlay import OverlayPosition, OverlayRenderer
 
 
 class REPLLoop:
@@ -35,14 +34,12 @@ class REPLLoop:
     - Agent command routing to SDK
     - System command handling
     - Signal handling (Ctrl+C)
-    - Persistent status overlay
     """
 
     def __init__(
         self,
         console: Console | None = None,
         sdk_client: CopilotSDKClient | None = None,
-        enable_overlay: bool = True,
         config: dict | None = None,
     ):
         """Initialize the REPL loop.
@@ -50,7 +47,6 @@ class REPLLoop:
         Args:
             console: Rich console for output.
             sdk_client: Copilot SDK client (created if not provided).
-            enable_overlay: Whether to enable status overlay.
             config: Optional configuration dict with default_agent setting.
         """
         self._console = console or Console()
@@ -70,23 +66,6 @@ class REPLLoop:
 
         # Task executor for parallel execution
         self._executor: TaskExecutor | None = None
-
-        # Status overlay - load position from config if provided
-        overlay_position = OverlayPosition.TOP_RIGHT  # default
-        if config and "overlay" in config:
-            overlay_config = config["overlay"]
-            if "position" in overlay_config:
-                try:
-                    overlay_position = OverlayPosition(overlay_config["position"])
-                except ValueError:
-                    pass  # Use default if invalid
-            if "enabled" in overlay_config:
-                enable_overlay = overlay_config["enabled"]
-
-        self._overlay = OverlayRenderer(
-            console=self._console, position=overlay_position, enabled=enable_overlay
-        )
-        self._commands.set_overlay(self._overlay)
 
         # Wire up handlers
         self._router.register_agent_handler(self._handle_agent_command)
@@ -159,16 +138,11 @@ class REPLLoop:
             task: The completed task.
             result: Task result.
         """
-        # Update overlay
-        self._overlay.on_task_completed(task, result)
-
         # Print notification
         if result.success:
-            self._overlay.print_with_overlay(
-                f"\n[green]✓ Task #{task.id} completed (@{task.agent_id})[/green]"
-            )
+            self._console.print(f"\n[green]✓ Task #{task.id} completed (@{task.agent_id})[/green]")
         else:
-            self._overlay.print_with_overlay(
+            self._console.print(
                 f"\n[red]✗ Task #{task.id} failed (@{task.agent_id}): {result.error}[/red]"
             )
 
@@ -178,7 +152,7 @@ class REPLLoop:
         Args:
             task: The started task.
         """
-        self._overlay.on_task_started(task)
+        pass  # No-op without overlay
 
     def _on_stage_change(self, current: int, total: int, agents: list[str]) -> None:
         """Callback when pipeline stage changes.
@@ -188,11 +162,11 @@ class REPLLoop:
             total: Total number of stages.
             agents: List of agent IDs in the current stage.
         """
-        self._overlay.on_pipeline_stage_change(current, total, agents)
+        pass  # No-op without overlay
 
     def _on_pipeline_complete(self) -> None:
         """Callback when pipeline completes."""
-        self._overlay.clear_pipeline_progress()
+        pass  # No-op without overlay
 
     def _on_stage_output(self, agent_id: str, output: str) -> None:
         """Callback for intermediate stage output.
@@ -201,7 +175,7 @@ class REPLLoop:
             agent_id: Agent that produced the output.
             output: The output text.
         """
-        self._overlay.print_with_overlay(f"\n[dim]─── @{agent_id} ───[/dim]\n{output}")
+        self._console.print(f"\n[dim]─── @{agent_id} ───[/dim]\n{output}")
 
     def _handle_raw_input(self, content: str) -> str:
         """Handle raw (non-command) input.
@@ -296,14 +270,6 @@ class REPLLoop:
             config=self._config,
         )
         self._commands.set_executor(self._executor)
-
-        # Start overlay if supported
-        if self._overlay.is_supported:
-            self._console.print("[green]✓ Status overlay enabled[/green]")
-            await self._overlay.start_spinner()
-            self._overlay.render()
-        else:
-            self._console.print("[dim]Status overlay not available in this terminal[/dim]")
 
         # Main loop
         try:
@@ -417,11 +383,6 @@ class REPLLoop:
         """Clean up resources."""
         self._restore_signal_handlers()
 
-        # Stop overlay spinner
-        if self._overlay:
-            await self._overlay.stop_spinner()
-            self._overlay.clear()
-
         if self._sdk_client:
             try:
                 await self._sdk_client.stop()
@@ -481,6 +442,6 @@ async def run_interactive_mode(console: Console | None = None, config: dict | No
             except Exception:
                 pass
     else:
-        # Legacy mode with overlay
+        # Legacy mode
         repl = REPLLoop(console=console, config=config)
         await repl.run()
