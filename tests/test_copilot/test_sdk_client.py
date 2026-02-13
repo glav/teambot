@@ -281,13 +281,16 @@ class TestCopilotSDKClientPersonaInjection:
         agents_dir = tmp_path / ".github" / "agents"
         agents_dir.mkdir(parents=True)
         agent_file = agents_dir / "pm.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: pm
 description: Project Manager Agent
 displayName: Project Manager
 ---
 
-You are the Project Manager agent responsible for planning and coordination.""")
+You are the Project Manager agent responsible for planning and coordination.""",
+            encoding="utf-8",
+        )
 
         # Setup agent loader with the temp directory
         loader = AgentLoader(repo_root=tmp_path)
@@ -376,12 +379,15 @@ You are the Project Manager agent responsible for planning and coordination.""")
         agents_dir = tmp_path / ".github" / "agents"
         agents_dir.mkdir(parents=True)
         agent_file = agents_dir / "builder.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: builder
 description: Builder Agent
 ---
 
-You are a skilled builder agent focused on implementing features.""")
+You are a skilled builder agent focused on implementing features.""",
+            encoding="utf-8",
+        )
 
         # Setup agent loader with the temp directory
         loader = AgentLoader(repo_root=tmp_path)
@@ -432,11 +438,14 @@ You are a skilled builder agent focused on implementing features.""")
         agents_dir = tmp_path / ".github" / "agents"
         agents_dir.mkdir(parents=True)
         agent_file = agents_dir / "reviewer.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: reviewer
 description: Reviewer Agent
 ---
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Setup agent loader with the temp directory
         loader = AgentLoader(repo_root=tmp_path)

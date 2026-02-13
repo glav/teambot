@@ -59,7 +59,7 @@ def parse_frontmatter(file_path: Path) -> tuple[dict[str, Any], str]:
         return dict(post.metadata), post.content
     except Exception:
         # If parsing fails, return empty metadata and full content
-        content = file_path.read_text()
+        content = file_path.read_text(encoding="utf-8")
         return {}, content
 
 

@@ -81,7 +81,7 @@ action_type: code_created
 This is the body content.
 """
         file_path = tmp_path / "test.md"
-        file_path.write_text(content)
+        file_path.write_text(content, encoding="utf-8")
 
         metadata, body = parse_frontmatter(file_path)
 
@@ -95,7 +95,7 @@ This is the body content.
 
         content = "# Just content, no frontmatter"
         file_path = tmp_path / "test.md"
-        file_path.write_text(content)
+        file_path.write_text(content, encoding="utf-8")
 
         metadata, body = parse_frontmatter(file_path)
 
@@ -121,7 +121,7 @@ action_type: code_created
         )
 
         file_path = tmp_path / "large.md"
-        file_path.write_text(content)
+        file_path.write_text(content, encoding="utf-8")
 
         metadata = scan_frontmatter_only(file_path)
 

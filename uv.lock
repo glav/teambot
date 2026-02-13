@@ -53,6 +53,51 @@ wheels = [
 ]
 
 [[package]]
+name = "copilot-teambot"
+version = "0.2.0"
+source = { editable = "." }
+dependencies = [
+    { name = "github-copilot-sdk" },
+    { name = "httpx" },
+    { name = "python-dotenv" },
+    { name = "python-frontmatter" },
+    { name = "rich" },
+    { name = "textual" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+    { name = "ruff" },
+    { name = "textual" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "github-copilot-sdk", specifier = "==0.1.23" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "python-frontmatter", specifier = ">=1.0.0" },
+    { name = "rich", specifier = ">=13.0.0" },
+    { name = "textual", specifier = ">=0.47.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=7.4.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-cov", specifier = ">=4.1.0" },
+    { name = "pytest-mock", specifier = ">=3.12.0" },
+    { name = "ruff", specifier = ">=0.8.0" },
+    { name = "textual", extras = ["dev"], specifier = ">=0.47.0" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0.0" },
+]
+
+[[package]]
 name = "coverage"
 version = "7.13.1"
 source = { registry = "https://pypi.org/simple" }
@@ -661,49 +706,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
-name = "teambot"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "github-copilot-sdk" },
-    { name = "httpx" },
-    { name = "python-dotenv" },
-    { name = "python-frontmatter" },
-    { name = "rich" },
-    { name = "textual" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
-    { name = "ruff" },
-    { name = "textual" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "github-copilot-sdk", specifier = "==0.1.23" },
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "python-frontmatter", specifier = ">=1.0.0" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "textual", specifier = ">=0.47.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=7.4.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "pytest-mock", specifier = ">=3.12.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "textual", extras = ["dev"], specifier = ">=0.47.0" },
 ]
 
 [[package]]

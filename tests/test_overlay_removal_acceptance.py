@@ -154,7 +154,7 @@ class TestOverlayRemovalAcceptanceScenarios:
                     {"id": "builder-1", "persona": "builder"},
                 ]
             }
-            config_path.write_text(json.dumps(config_data))
+            config_path.write_text(json.dumps(config_data), encoding="utf-8")
 
             loader = ConfigLoader()
             config = loader.load(config_path)
@@ -174,7 +174,7 @@ class TestOverlayRemovalAcceptanceScenarios:
                 ],
                 "overlay": {"enabled": True, "position": "top-right"},
             }
-            config_path.write_text(json.dumps(config_data))
+            config_path.write_text(json.dumps(config_data), encoding="utf-8")
 
             loader = ConfigLoader()
             # Should not raise ConfigError for overlay section
@@ -192,7 +192,7 @@ class TestOverlayRemovalAcceptanceScenarios:
                     {"id": "pm", "persona": "project_manager"},
                 ]
             }
-            config_path.write_text(json.dumps(config_data))
+            config_path.write_text(json.dumps(config_data), encoding="utf-8")
 
             loader = ConfigLoader()
             config = loader.load(config_path)

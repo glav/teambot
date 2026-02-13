@@ -1,0 +1,20 @@
+{
+    "id": "teambot",
+    "version": "1.0.0",
+    "name": "TeamBot - AI Agent Teams",
+    "description": "Installs TeamBot CLI for autonomous AI agent workflows with GitHub Copilot",
+    "documentationURL": "https://github.com/teambot-ai/teambot",
+    "options": {
+        "version": {
+            "type": "string",
+            "default": "latest",
+            "description": "TeamBot version to install (e.g., '0.2.0' or 'latest')"
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/python"
+    ],
+    "containerEnv": {
+        "TEAMBOT_INSTALLED": "true"
+    }
+}
