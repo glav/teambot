@@ -171,10 +171,7 @@ class TestOverlayRemovalAcceptanceScenarios:
                 "agents": [
                     {"id": "pm", "persona": "project_manager"},
                 ],
-                "overlay": {
-                    "enabled": True,
-                    "position": "top-right"
-                }
+                "overlay": {"enabled": True, "position": "top-right"},
             }
             config_path.write_text(json.dumps(config_data))
 
