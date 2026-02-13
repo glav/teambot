@@ -39,9 +39,9 @@ class TestOverlayRemovalAcceptanceScenarios:
         # (parameter was removed)
         import inspect
 
-        from teambot.repl.loop import REPLLoop
+        import teambot.repl.loop as loop_module
 
-        sig = inspect.signature(REPLLoop.__init__)
+        sig = inspect.signature(loop_module.REPLLoop.__init__)
         param_names = list(sig.parameters.keys())
 
         # enable_overlay parameter should not exist
