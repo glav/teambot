@@ -4,13 +4,9 @@ These tests validate the acceptance scenarios for the 'Run Directly' feature.
 Tests call REAL implementation code, not mocks.
 """
 
-import os
-import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 
 class TestAcceptanceScenarios:
@@ -99,7 +95,7 @@ class TestAcceptanceScenarios:
 
     def test_at_002_uvx_help_simulation(self):
         """AT-002: uvx copilot-teambot --help works (simulated via direct call)."""
-        from teambot.cli import create_parser, main
+        from teambot.cli import create_parser
 
         # Simulate uvx by directly calling the entry point
         parser = create_parser()
@@ -218,8 +214,6 @@ class TestAcceptanceScenarios:
 
     def test_at_004_main_returns_error_when_cli_missing(self):
         """AT-004: main() returns error code when Copilot CLI missing."""
-        import sys
-
         with patch("shutil.which", return_value=None):
             with patch.object(sys, "argv", ["teambot", "run"]):
                 from teambot.cli import main
@@ -380,8 +374,6 @@ class TestAcceptanceScenarios:
 
     def test_at_007_current_python_supported(self):
         """AT-007: Current Python version is supported."""
-        import sys
-
         major, minor = sys.version_info[:2]
 
         # Must be 3.10 or higher
