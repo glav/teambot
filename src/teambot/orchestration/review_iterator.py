@@ -123,7 +123,7 @@ class ReviewIterator:
         test_results_path = self.teambot_dir / "artifacts" / "test_results.md"
         if test_results_path.exists():
             try:
-                content = test_results_path.read_text()[:1500]
+                content = test_results_path.read_text(encoding="utf-8")[:1500]
                 evidence_parts.append("\n## Recent Test Results")
                 evidence_parts.append(content)
             except OSError:
@@ -475,5 +475,5 @@ Begin your review now.
 
 {"".join(history_sections)}
 """
-        report_path.write_text(content)
+        report_path.write_text(content, encoding="utf-8")
         return report_path

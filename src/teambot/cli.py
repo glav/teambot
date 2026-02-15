@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -21,6 +22,32 @@ from teambot.visualization.console import ConsoleDisplay
 if TYPE_CHECKING:
     from teambot.notifications.event_bus import EventBus
     from teambot.orchestration import ExecutionLoop, ExecutionResult
+
+
+COPILOT_CLI_INSTALL_URL = "https://githubnext.com/projects/copilot-cli/"
+
+
+def check_copilot_cli(display: ConsoleDisplay | None = None) -> bool:
+    """Check if Copilot CLI is installed and accessible.
+
+    Args:
+        display: Optional console display for output.
+
+    Returns:
+        True if Copilot CLI is available, False otherwise.
+    """
+    if shutil.which("copilot") is not None:
+        return True
+
+    # Print helpful error message
+    if display is None:
+        display = ConsoleDisplay()
+
+    display.print_error("GitHub Copilot CLI is required but not found.")
+    display.print_warning(f"Install from: {COPILOT_CLI_INSTALL_URL}")
+    display.print_warning("After installing, authenticate with: copilot auth")
+
+    return False
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -223,7 +250,7 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         if not objective_path.exists():
             display.print_error(f"Objective file not found: {objective_path}")
             return 1
-        objective = objective_path.read_text()
+        objective = objective_path.read_text(encoding="utf-8")
 
     play_startup_animation(
         console=display.console,
@@ -578,6 +605,9 @@ def main() -> int:
     if args.command == "init":
         return cmd_init(args, display)
     elif args.command == "run":
+        # Check Copilot CLI availability before running
+        if not check_copilot_cli(display):
+            return 1
         return cmd_run(args, display)
     elif args.command == "status":
         return cmd_status(args, display)

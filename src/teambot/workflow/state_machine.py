@@ -121,7 +121,7 @@ class WorkflowStateMachine:
     def _load_state(self) -> WorkflowState:
         """Load state from file."""
         try:
-            data = json.loads(self.state_file.read_text())
+            data = json.loads(self.state_file.read_text(encoding="utf-8"))
             return WorkflowState.from_dict(data)
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to load workflow state: {e}")
@@ -137,7 +137,7 @@ class WorkflowStateMachine:
 
     def save_state(self) -> None:
         """Save current state to file."""
-        self.state_file.write_text(json.dumps(self.state.to_dict(), indent=2))
+        self.state_file.write_text(json.dumps(self.state.to_dict(), indent=2), encoding="utf-8")
         logger.debug(f"Workflow state saved to {self.state_file}")
 
     def can_transition_to(self, target_stage: WorkflowStage) -> bool:

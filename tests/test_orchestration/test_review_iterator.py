@@ -334,7 +334,7 @@ class TestReviewIteratorFailureReport:
             context="Test",
         )
 
-        report_content = result.report_path.read_text()
+        report_content = result.report_path.read_text(encoding="utf-8")
         assert "IMPLEMENTATION_REVIEW" in report_content
 
 

@@ -177,7 +177,7 @@ class TestExecutionLoopStatePersistence:
 
         # State file is in feature-specific subdirectory
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
 
         assert "objective_file" in state
         assert "current_stage" in state
@@ -200,7 +200,7 @@ class TestExecutionLoopStatePersistence:
             "stage_outputs": {},
         }
         state_file = feature_dir / "orchestration_state.json"
-        state_file.write_text(json.dumps(state))
+        state_file.write_text(json.dumps(state), encoding="utf-8")
 
         loop = ExecutionLoop.resume(feature_dir, {})
 
@@ -229,7 +229,7 @@ class TestExecutionLoopStatePersistence:
             },
         }
         state_file = feature_dir / "orchestration_state.json"
-        state_file.write_text(json.dumps(state))
+        state_file.write_text(json.dumps(state), encoding="utf-8")
 
         loop = ExecutionLoop.resume(feature_dir, {})
 
@@ -259,7 +259,7 @@ class TestExecutionLoopStatePersistence:
             ],
         }
         state_file = feature_dir / "orchestration_state.json"
-        state_file.write_text(json.dumps(state))
+        state_file.write_text(json.dumps(state), encoding="utf-8")
 
         # Pass root teambot dir (not feature dir) — this is what the CLI does
         loop = ExecutionLoop.resume(teambot_dir, {})
@@ -290,7 +290,7 @@ class TestExecutionLoopStatePersistence:
             "stage_outputs": {},
         }
         old_state_file = old_dir / "orchestration_state.json"
-        old_state_file.write_text(json.dumps(old_state))
+        old_state_file.write_text(json.dumps(old_state), encoding="utf-8")
 
         new_dir = teambot_dir / "user-authentication"
         new_dir.mkdir(parents=True, exist_ok=True)
@@ -303,7 +303,7 @@ class TestExecutionLoopStatePersistence:
             "stage_outputs": {},
         }
         new_state_file = new_dir / "orchestration_state.json"
-        new_state_file.write_text(json.dumps(new_state))
+        new_state_file.write_text(json.dumps(new_state), encoding="utf-8")
 
         # Explicitly set mtimes to ensure old_state_file is older than new_state_file
         current_time = time.time()
@@ -337,7 +337,7 @@ class TestExecutionLoopStatePersistence:
             ],
         }
         state_file = feature_dir / "orchestration_state.json"
-        state_file.write_text(json.dumps(state))
+        state_file.write_text(json.dumps(state), encoding="utf-8")
 
         loop = ExecutionLoop.resume(feature_dir, {})
 
@@ -367,7 +367,7 @@ class TestExecutionLoopStatePersistence:
             "stage_outputs": {},
         }
         state_file = feature_dir / "orchestration_state.json"
-        state_file.write_text(json.dumps(state))
+        state_file.write_text(json.dumps(state), encoding="utf-8")
 
         loop = ExecutionLoop.resume(feature_dir, {})
 
@@ -392,7 +392,7 @@ class TestExecutionLoopStatePersistence:
 
         assert result == ExecutionResult.CANCELLED
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         assert state["status"] == "cancelled"
 
     @pytest.mark.asyncio
@@ -411,7 +411,7 @@ class TestExecutionLoopStatePersistence:
 
         assert result == ExecutionResult.TIMEOUT
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         assert state["status"] == "timeout"
 
     @pytest.mark.asyncio
@@ -433,7 +433,7 @@ class TestExecutionLoopStatePersistence:
 
         assert result == ExecutionResult.REVIEW_FAILED
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         assert state["status"] == "review_failed"
 
     @pytest.mark.asyncio
@@ -451,7 +451,7 @@ class TestExecutionLoopStatePersistence:
 
         assert result == ExecutionResult.COMPLETE
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         assert state["status"] == "complete"
 
     @pytest.mark.asyncio
@@ -471,7 +471,7 @@ class TestExecutionLoopStatePersistence:
             await loop.run(mock_client)
 
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         assert state["status"] == "error"
 
 
@@ -581,7 +581,7 @@ class TestExecutionLoopReviewOutputs:
 
         assert result == ExecutionResult.COMPLETE
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
 
         # Verify review stage outputs are in state
         stage_outputs = state.get("stage_outputs", {})
@@ -605,7 +605,7 @@ class TestExecutionLoopReviewOutputs:
         await loop.run(mock_client)
 
         state_file = loop.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
         stage_outputs = state.get("stage_outputs", {})
 
         # Check all review stages are stored
@@ -624,11 +624,14 @@ class TestPromptTemplateLoading:
         prompt_dir = tmp_path / ".agent" / "commands" / "sdd"
         prompt_dir.mkdir(parents=True)
         prompt_file = prompt_dir / "sdd.1-create-feature-spec.prompt.md"
-        prompt_file.write_text("# Create Feature Spec\n\nYou are creating a spec...")
+        prompt_file.write_text(
+            "# Create Feature Spec\n\nYou are creating a spec...", encoding="utf-8"
+        )
 
         # Create stages.yaml pointing to this prompt
         stages_yaml = tmp_path / "stages.yaml"
-        stages_yaml.write_text("""
+        stages_yaml.write_text(
+            """
 stages:
   SPEC:
     name: Specification
@@ -640,7 +643,9 @@ stages:
 stage_order:
   - SPEC
 work_to_review_mapping: {}
-""")
+""",
+            encoding="utf-8",
+        )
 
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -658,7 +663,8 @@ work_to_review_mapping: {}
     ) -> None:
         """Objective is not included when include_objective is false."""
         stages_yaml = tmp_path / "stages.yaml"
-        stages_yaml.write_text("""
+        stages_yaml.write_text(
+            """
 stages:
   SETUP:
     name: Setup
@@ -670,7 +676,9 @@ stages:
 stage_order:
   - SETUP
 work_to_review_mapping: {}
-""")
+""",
+            encoding="utf-8",
+        )
 
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -706,7 +714,8 @@ work_to_review_mapping: {}
     ) -> None:
         """Returns None when prompt template file doesn't exist."""
         stages_yaml = tmp_path / "stages.yaml"
-        stages_yaml.write_text("""
+        stages_yaml.write_text(
+            """
 stages:
   SPEC:
     name: Specification
@@ -718,7 +727,9 @@ stages:
 stage_order:
   - SPEC
 work_to_review_mapping: {}
-""")
+""",
+            encoding="utf-8",
+        )
 
         loop = ExecutionLoop(
             objective_path=objective_file,
@@ -751,7 +762,9 @@ class TestFeatureSpecFinding:
         feature_dir.mkdir(exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
-        (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content)
+        (artifacts_dir / "feature_spec.md").write_text(
+            sample_feature_spec_content, encoding="utf-8"
+        )
 
         spec_content = loop._find_feature_spec_content()
 
@@ -774,7 +787,9 @@ class TestFeatureSpecFinding:
 
         # Feature name is "user-authentication" from objective
         # Test with uppercase variation
-        (docs_dir / "User-Authentication-Spec.md").write_text(sample_feature_spec_content)
+        (docs_dir / "User-Authentication-Spec.md").write_text(
+            sample_feature_spec_content, encoding="utf-8"
+        )
 
         spec_content = loop._find_feature_spec_content()
 
@@ -797,7 +812,9 @@ class TestFeatureSpecFinding:
 
         # Feature name is "user-authentication"
         # Test with different hyphenation
-        (docs_dir / "userauthentication-spec.md").write_text(sample_feature_spec_content)
+        (docs_dir / "userauthentication-spec.md").write_text(
+            sample_feature_spec_content, encoding="utf-8"
+        )
 
         spec_content = loop._find_feature_spec_content()
 
@@ -819,11 +836,11 @@ class TestFeatureSpecFinding:
         feature_dir.mkdir(exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
-        (artifacts_dir / "feature_spec.md").write_text("Artifacts spec content")
+        (artifacts_dir / "feature_spec.md").write_text("Artifacts spec content", encoding="utf-8")
 
         docs_dir = teambot_dir.parent / "docs" / "feature-specs"
         docs_dir.mkdir(parents=True)
-        (docs_dir / "user-authentication.md").write_text("Docs spec content")
+        (docs_dir / "user-authentication.md").write_text("Docs spec content", encoding="utf-8")
 
         spec_content = loop._find_feature_spec_content()
 
@@ -1052,7 +1069,7 @@ class TestStatePersistenceWithParallelGroups:
         loop_with_parallel_groups._save_state()
 
         state_file = loop_with_parallel_groups.teambot_dir / "orchestration_state.json"
-        state = json.loads(state_file.read_text())
+        state = json.loads(state_file.read_text(encoding="utf-8"))
 
         assert "parallel_group_status" in state
         pgs = state["parallel_group_status"]["post_spec_review"]["stages"]
@@ -1086,7 +1103,8 @@ class TestStatePersistenceWithParallelGroups:
                         }
                     },
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         loop = ExecutionLoop.resume(teambot_dir, {})
@@ -1120,7 +1138,8 @@ class TestStatePersistenceWithParallelGroups:
                     "stage_outputs": {},
                     # NO parallel_group_status field - old format
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         loop = ExecutionLoop.resume(teambot_dir, {})
@@ -1159,7 +1178,8 @@ class TestStatePersistenceWithParallelGroups:
                         }
                     },
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         loop = ExecutionLoop.resume(teambot_dir_with_spec, {})

@@ -79,7 +79,7 @@ class TestParseObjectiveFile:
     def test_parse_empty_file_returns_defaults(self, tmp_path: Path) -> None:
         """Empty file returns defaults without error."""
         empty_file = tmp_path / "empty.md"
-        empty_file.write_text("")
+        empty_file.write_text("", encoding="utf-8")
         result = parse_objective_file(empty_file)
         assert result.title == "Untitled"
         assert result.goals == []

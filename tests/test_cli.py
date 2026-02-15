@@ -102,7 +102,7 @@ class TestCLIInit:
         monkeypatch.chdir(tmp_path)
 
         # Create existing config
-        (tmp_path / "teambot.json").write_text("{}")
+        (tmp_path / "teambot.json").write_text("{}", encoding="utf-8")
 
         args = argparse.Namespace(force=False)
         display = ConsoleDisplay()
@@ -120,7 +120,7 @@ class TestCLIInit:
         monkeypatch.chdir(tmp_path)
 
         # Create existing config
-        (tmp_path / "teambot.json").write_text("{}")
+        (tmp_path / "teambot.json").write_text("{}", encoding="utf-8")
 
         args = argparse.Namespace(force=True)
         display = ConsoleDisplay()
@@ -129,7 +129,7 @@ class TestCLIInit:
 
         assert result == 0
         # Should have real config now
-        config = json.loads((tmp_path / "teambot.json").read_text())
+        config = json.loads((tmp_path / "teambot.json").read_text(encoding="utf-8"))
         assert "agents" in config
 
 

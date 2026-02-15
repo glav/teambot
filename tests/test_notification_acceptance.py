@@ -284,8 +284,8 @@ class TestNotificationAcceptanceScenarios:
 
         # Verify it's valid JSON
         config_path = tmp_path / "teambot.json"
-        config_path.write_text(json.dumps(config, indent=2))
-        loaded = json.loads(config_path.read_text())
+        config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+        loaded = json.loads(config_path.read_text(encoding="utf-8"))
         assert loaded["notifications"]["enabled"] is True
 
     def test_at_006b_init_skips_in_noninteractive(self) -> None:
@@ -481,7 +481,7 @@ class TestNotificationAcceptanceIntegration:
         }
 
         config_path = tmp_path / "valid.json"
-        config_path.write_text(json.dumps(valid_config))
+        config_path.write_text(json.dumps(valid_config), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_path)
@@ -496,7 +496,7 @@ class TestNotificationAcceptanceIntegration:
         }
 
         invalid_path = tmp_path / "invalid.json"
-        invalid_path.write_text(json.dumps(invalid_config))
+        invalid_path.write_text(json.dumps(invalid_config), encoding="utf-8")
 
         with pytest.raises(ConfigError, match="missing required field 'chat_id'"):
             loader.load(invalid_path)

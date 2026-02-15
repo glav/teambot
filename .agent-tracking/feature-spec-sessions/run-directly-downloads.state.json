@@ -1,0 +1,65 @@
+{
+  "specFile": ".teambot/run-directly-downloads/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-13T03:00:24Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "success-metrics",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries",
+    "platform-requirements",
+    "distribution-methods",
+    "constraints"
+  ],
+  "answeredQuestions": {
+    "product-name": "TeamBot Distribution & Installation",
+    "target-users": "Evaluator, Python Developer, Existing Codebase Adopter, Devcontainer User, Windows Developer, Non-Python Developer",
+    "core-problem": "TeamBot requires cloning source repository, creating adoption friction",
+    "success-metrics": "pip install works, uvx works, devcontainer < 60s, Windows support",
+    "technical-stack": "Python (pyproject.toml, uv, pip)",
+    "testing-approach": "CI/CD testing of installation methods on all platforms",
+    "scope-boundaries": "PyPI, uvx, devcontainer, Docker; excluding binaries, Homebrew, Chocolatey",
+    "platform-requirements": "Python 3.10+, Windows 10/11, Linux, macOS",
+    "distribution-methods": "PyPI (copilot-teambot), uvx, devcontainer feature, Docker image",
+    "constraints": "Cannot bundle Copilot CLI, must work with github-copilot-sdk"
+  },
+  "referencesProcessed": [
+    {
+      "file": ".teambot/run-directly-downloads/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "timestamp": "2026-02-13T03:00:24Z",
+      "keyFindings": "6 personas defined, 6 goals identified, scope and constraints documented",
+      "integratedSections": ["problem-definition", "personas", "goals", "scope", "constraints"]
+    },
+    {
+      "file": "User-provided objective",
+      "status": "analyzed",
+      "timestamp": "2026-02-13T03:00:24Z",
+      "keyFindings": "Success criteria, context, constraints specified",
+      "integratedSections": ["goals", "success-metrics", "constraints"]
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "personas-documented",
+    "requirements-specified",
+    "acceptance-tests-defined",
+    "risks-identified"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  },
+  "validationStatus": {
+    "placeholders": 0,
+    "sectionsComplete": "18/18",
+    "technicalStack": "DEFINED",
+    "testingApproach": "DEFINED",
+    "acceptanceTests": 7
+  }
+}

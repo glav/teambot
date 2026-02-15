@@ -23,7 +23,7 @@ class TestConfigLoader:
             "teambot_dir": ".teambot",
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -46,7 +46,7 @@ class TestConfigLoader:
         from teambot.config.loader import ConfigError, ConfigLoader
 
         config_file = tmp_path / "invalid.json"
-        config_file.write_text("{ invalid json }")
+        config_file.write_text("{ invalid json }", encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -59,7 +59,7 @@ class TestConfigLoader:
 
         config_data = {"teambot_dir": ".teambot"}
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -72,7 +72,7 @@ class TestConfigLoader:
 
         config_data = {"agents": [{"persona": "builder"}]}
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -92,7 +92,7 @@ class TestConfigLoader:
             ]
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -140,7 +140,7 @@ class TestDefaultConfig:
         loader.save(config, config_file)
 
         assert config_file.exists()
-        loaded = json.loads(config_file.read_text())
+        loaded = json.loads(config_file.read_text(encoding="utf-8"))
         assert "agents" in loaded
 
 
@@ -158,7 +158,7 @@ class TestConfigValidation:
             ]
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -175,7 +175,7 @@ class TestConfigValidation:
             ]
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -191,7 +191,8 @@ class TestDefaultAgentConfig:
         from teambot.config.loader import ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text("""
+        config_file.write_text(
+            """
         {
             "agents": [
                 {"id": "pm", "persona": "project_manager"},
@@ -199,7 +200,9 @@ class TestDefaultAgentConfig:
             ],
             "default_agent": "pm"
         }
-        """)
+        """,
+            encoding="utf-8",
+        )
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -211,14 +214,17 @@ class TestDefaultAgentConfig:
         from teambot.config.loader import ConfigError, ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text("""
+        config_file.write_text(
+            """
         {
             "agents": [
                 {"id": "pm", "persona": "project_manager"}
             ],
             "default_agent": "unknown"
         }
-        """)
+        """,
+            encoding="utf-8",
+        )
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="Invalid default_agent"):
@@ -229,14 +235,17 @@ class TestDefaultAgentConfig:
         from teambot.config.loader import ConfigError, ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text("""
+        config_file.write_text(
+            """
         {
             "agents": [
                 {"id": "pm", "persona": "project_manager"}
             ],
             "default_agent": 123
         }
-        """)
+        """,
+            encoding="utf-8",
+        )
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="must be a string"):
@@ -247,13 +256,16 @@ class TestDefaultAgentConfig:
         from teambot.config.loader import ConfigLoader
 
         config_file = tmp_path / "teambot.json"
-        config_file.write_text("""
+        config_file.write_text(
+            """
         {
             "agents": [
                 {"id": "pm", "persona": "project_manager"}
             ]
         }
-        """)
+        """,
+            encoding="utf-8",
+        )
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -280,7 +292,7 @@ class TestAgentModelConfig:
             ]
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -302,7 +314,7 @@ class TestAgentModelConfig:
             ]
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -323,7 +335,7 @@ class TestAgentModelConfig:
             ]
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -343,7 +355,7 @@ class TestGlobalDefaultModel:
             "agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}],
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -359,7 +371,7 @@ class TestGlobalDefaultModel:
             "agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}],
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
 
@@ -372,7 +384,7 @@ class TestGlobalDefaultModel:
 
         config_data = {"agents": [{"id": "pm", "persona": "project_manager", "display_name": "PM"}]}
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -391,7 +403,7 @@ class TestAnimationConfig:
             "agents": [{"id": "pm", "persona": "project_manager"}],
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -407,7 +419,7 @@ class TestAnimationConfig:
             "show_startup_animation": False,
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -423,7 +435,7 @@ class TestAnimationConfig:
             "show_startup_animation": "yes",
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'show_startup_animation' must be a boolean"):
@@ -451,7 +463,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -468,7 +480,7 @@ class TestNotificationsConfigValidation:
             "notifications": "invalid",
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'notifications' must be an object"):
@@ -483,7 +495,7 @@ class TestNotificationsConfigValidation:
             "notifications": {"enabled": "yes"},
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'notifications.enabled' must be a boolean"):
@@ -498,7 +510,7 @@ class TestNotificationsConfigValidation:
             "notifications": {"channels": "invalid"},
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'notifications.channels' must be a list"):
@@ -515,7 +527,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="must have a 'type' field"):
@@ -532,7 +544,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="Invalid channel type 'unknown'"):
@@ -549,7 +561,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="missing required field 'token'"):
@@ -566,7 +578,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="missing required field 'chat_id'"):
@@ -583,7 +595,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'dry_run' .* must be a boolean"):
@@ -600,7 +612,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         with pytest.raises(ConfigError, match="'events' .* must be a list"):
@@ -617,7 +629,7 @@ class TestNotificationsConfigValidation:
             },
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)

@@ -50,7 +50,8 @@ class TestAgentLoader:
     def test_load_single_agent(self, agents_dir: Path, loader: AgentLoader):
         """Load a single agent definition."""
         agent_file = agents_dir / "test.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: test
 description: A test agent
 tools: []
@@ -59,7 +60,9 @@ tools: []
 # Test Agent
 
 This is a test agent prompt.
-""")
+""",
+            encoding="utf-8",
+        )
 
         agents = loader.load_all()
 
@@ -72,14 +75,17 @@ This is a test agent prompt.
     def test_load_agent_with_all_tools(self, agents_dir: Path, loader: AgentLoader):
         """Agent with tools: ["*"] gets None (all tools)."""
         agent_file = agents_dir / "builder.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: builder
 description: A builder agent
 tools: ["*"]
 ---
 
 Builder prompt.
-""")
+""",
+            encoding="utf-8",
+        )
 
         agents = loader.load_all()
 
@@ -89,13 +95,16 @@ Builder prompt.
     def test_get_agent_exact_match(self, agents_dir: Path, loader: AgentLoader):
         """get_agent returns exact match."""
         agent_file = agents_dir / "pm.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: pm
 description: Project Manager
 ---
 
 PM prompt.
-""")
+""",
+            encoding="utf-8",
+        )
 
         agent = loader.get_agent("pm")
 
@@ -105,13 +114,16 @@ PM prompt.
     def test_get_agent_base_name_fallback(self, agents_dir: Path, loader: AgentLoader):
         """get_agent falls back to base name for numbered agents."""
         agent_file = agents_dir / "builder.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: builder
 description: Builder
 ---
 
 Builder prompt.
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Request builder-1 but only builder.agent.md exists
         agent = loader.get_agent("builder-1")
@@ -127,24 +139,30 @@ Builder prompt.
     def test_cached_results(self, agents_dir: Path, loader: AgentLoader):
         """Results are cached after first load."""
         agent_file = agents_dir / "test.agent.md"
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: test
 ---
 
 Prompt.
-""")
+""",
+            encoding="utf-8",
+        )
 
         # First load
         agents1 = loader.load_all()
         assert "test" in agents1
 
         # Modify file
-        agent_file.write_text("""---
+        agent_file.write_text(
+            """---
 name: modified
 ---
 
 Modified.
-""")
+""",
+            encoding="utf-8",
+        )
 
         # Second load returns cached
         agents2 = loader.load_all()

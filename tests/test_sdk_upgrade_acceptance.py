@@ -22,7 +22,7 @@ class TestSDKUpgradeAcceptance:
         from pathlib import Path
 
         lock_path = Path(__file__).resolve().parents[1] / "uv.lock"
-        lock_text = lock_path.read_text()
+        lock_text = lock_path.read_text(encoding="utf-8")
         assert 'name = "github-copilot-sdk"' in lock_text
         assert "0.1.23" in lock_text
         # Ensure old version is NOT present
@@ -33,7 +33,7 @@ class TestSDKUpgradeAcceptance:
         from pathlib import Path
 
         pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
-        pyproject_text = pyproject_path.read_text()
+        pyproject_text = pyproject_path.read_text(encoding="utf-8")
         assert "github-copilot-sdk==0.1.23" in pyproject_text
 
     def test_at_001_installed_version_is_0_1_23(self):

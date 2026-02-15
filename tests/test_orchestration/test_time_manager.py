@@ -21,10 +21,10 @@ class TestTimeManager:
         """elapsed_seconds increases over time."""
         manager = TimeManager()
         manager.start()
-        time.sleep(0.05)
+        time.sleep(0.1)  # Increased for Windows timing reliability
         elapsed = manager.elapsed_seconds
-        assert elapsed >= 0.05
-        time.sleep(0.05)
+        assert elapsed >= 0.05  # Use lower bound for tolerance
+        time.sleep(0.1)
         assert manager.elapsed_seconds > elapsed
 
     def test_elapsed_seconds_before_start(self) -> None:

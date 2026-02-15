@@ -264,7 +264,7 @@ class TestAcceptanceScenarios:
             "show_startup_animation": False,
         }
         config_file = tmp_path / "teambot.json"
-        config_file.write_text(json.dumps(config_data))
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
         loader = ConfigLoader()
         config = loader.load(config_file)
@@ -1289,7 +1289,8 @@ class TestParallelStageGroupsAcceptance:
 ## Context
 **Target Codebase**: Test
 **Primary Language/Framework**: Python
-"""
+""",
+            encoding="utf-8",
         )
         return obj_file
 
@@ -1330,7 +1331,9 @@ class TestParallelStageGroupsAcceptance:
         feature_dir.mkdir(parents=True, exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir()
-        (artifacts_dir / "feature_spec.md").write_text("# Test Spec\n\n## Acceptance")
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Test Spec\n\n## Acceptance", encoding="utf-8"
+        )
 
         # Load REAL stages config with parallel groups
         stages_config = load_stages_config()
@@ -1386,7 +1389,9 @@ class TestParallelStageGroupsAcceptance:
         feature_dir.mkdir(parents=True, exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir()
-        (artifacts_dir / "feature_spec.md").write_text("# Test Spec\n\n## Acceptance")
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Test Spec\n\n## Acceptance", encoding="utf-8"
+        )
 
         # Create REAL state file simulating mid-parallel-group interrupt
         state_file = feature_dir / "orchestration_state.json"
@@ -1408,7 +1413,8 @@ class TestParallelStageGroupsAcceptance:
                         }
                     },
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         # Use REAL resume() classmethod
@@ -1449,7 +1455,9 @@ class TestParallelStageGroupsAcceptance:
         feature_dir.mkdir(parents=True, exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir()
-        (artifacts_dir / "feature_spec.md").write_text("# Test Spec\n\n## Acceptance")
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Test Spec\n\n## Acceptance", encoding="utf-8"
+        )
 
         # Create mock that fails on first call (RESEARCH), succeeds on second
         call_count = 0
@@ -1529,7 +1537,8 @@ class TestParallelStageGroupsAcceptance:
                     "stage_outputs": {"SETUP": "Setup complete"},
                     # NOTE: No parallel_group_status field - legacy format
                 }
-            )
+            ),
+            encoding="utf-8",
         )
 
         # Use REAL resume() classmethod - should not crash
@@ -1591,7 +1600,8 @@ parallel_groups:
       - RESEARCH
       - NONEXISTENT_STAGE
     before: PLAN
-"""
+""",
+            encoding="utf-8",
         )
 
         # Attempt to load REAL config - should raise error
@@ -1640,7 +1650,7 @@ class TestNotificationUXAcceptance:
 - [ ] Test criteria
 """
         objective_path = tmp_path / "objective.md"
-        objective_path.write_text(objective_content)
+        objective_path.write_text(objective_content, encoding="utf-8")
 
         # Create teambot dir with feature spec
         teambot_dir = tmp_path / ".teambot"
@@ -1649,7 +1659,9 @@ class TestNotificationUXAcceptance:
         feature_dir.mkdir()
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir()
-        (artifacts_dir / "feature_spec.md").write_text("# Feature Spec\n\n## Overview\nTest.")
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Feature Spec\n\n## Overview\nTest.", encoding="utf-8"
+        )
 
         # Create ExecutionLoop with real objective file
         loop = ExecutionLoop(
@@ -1724,7 +1736,7 @@ class TestNotificationUXAcceptance:
 - [ ] Test criteria
 """
         objective_path = tmp_path / "objective.md"
-        objective_path.write_text(objective_content)
+        objective_path.write_text(objective_content, encoding="utf-8")
 
         # Create teambot dir with feature spec
         teambot_dir = tmp_path / ".teambot"
@@ -1733,7 +1745,9 @@ class TestNotificationUXAcceptance:
         feature_dir.mkdir()
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir()
-        (artifacts_dir / "feature_spec.md").write_text("# Feature Spec\n\n## Overview\nTest.")
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Feature Spec\n\n## Overview\nTest.", encoding="utf-8"
+        )
 
         loop = ExecutionLoop(
             objective_path=objective_path,
@@ -2007,7 +2021,7 @@ class TestNotificationUXAcceptance:
 - [ ] Thing is done
 """
         objective_path = tmp_path / "objective.md"
-        objective_path.write_text(objective_content)
+        objective_path.write_text(objective_content, encoding="utf-8")
 
         # Create teambot dir with feature spec
         teambot_dir = tmp_path / ".teambot"
@@ -2016,7 +2030,9 @@ class TestNotificationUXAcceptance:
         feature_dir.mkdir()
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir()
-        (artifacts_dir / "feature_spec.md").write_text("# Feature Spec\n\n## Overview\nTest.")
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Feature Spec\n\n## Overview\nTest.", encoding="utf-8"
+        )
 
         loop = ExecutionLoop(
             objective_path=objective_path,

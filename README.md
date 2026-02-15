@@ -4,9 +4,42 @@
 
 TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://img.shields.io/badge/tests-1050%20passing-green.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)]()
+
+## Installation
+
+### Prerequisites
+
+- **Python 3.10 or later** - [Download Python](https://www.python.org/downloads/)
+- **uv** - [Install uv](https://astral.sh/uv)
+- **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/) and authenticate with `copilot auth`
+
+### Installation Methods
+
+| Method | Command | Best For |
+|--------|---------|----------|
+| **uvx (git)** | `uvx --from git+https://github.com/teambot-ai/teambot teambot` | Quick evaluation |
+| **Devcontainer** | See [installation guide](docs/guides/installation.md) | VS Code / Codespaces |
+| **Docker** | `docker run ghcr.io/teambot-ai/teambot` | No Python environment |
+| **From source** | See below | Development |
+
+### Install from Source
+
+```bash
+git clone https://github.com/teambot-ai/teambot.git
+cd teambot
+uv sync
+uv run teambot --version
+```
+
+### Verify Installation
+
+```bash
+teambot --version
+teambot --help
+```
 
 ## Key Features
 
@@ -24,27 +57,20 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 ![Screenshot](./docs/guides/teambot-shot2.png)
 ![Screenshot](./docs/guides/teambot-shot3.png)
 
-## Prerequisites
-
-- Python 3.12+
-- [uv](https://github.com/astral-sh/uv) package manager
-- GitHub Copilot access
-
 ## Quick Start
 
 ```bash
-# Install dependencies
-uv sync
-
-# Initialize TeamBot
-uv run teambot init
+# Initialize TeamBot in your project
+teambot init
 
 # Run with an objective file
-uv run teambot run objectives/my-feature.md
+teambot run objectives/my-feature.md
 
 # Or start interactive mode
-uv run teambot run
+teambot run
 ```
+
+For development from source, see [Development Guide](docs/guides/development.md).
 
 ## Documentation
 

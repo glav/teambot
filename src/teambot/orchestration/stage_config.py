@@ -108,7 +108,7 @@ def load_stages_config(config_path: Path | None = None) -> StagesConfiguration:
             return _get_default_configuration()
 
     # Load and parse YAML
-    content = yaml_path.read_text()
+    content = yaml_path.read_text(encoding="utf-8")
     data = yaml.safe_load(content)
 
     config = _parse_configuration(data)
