@@ -51,15 +51,9 @@ class TestCopilotCLIDetection:
             import importlib
             import sys
 
-            # Import first to ensure module is loaded, then reload it
             from teambot.cli import check_copilot_cli
 
-            # Access module via sys.modules to avoid duplicate import style
-            cli_module = sys.modules["teambot.cli"]
-            importlib.reload(cli_module)
-
-            # Re-import after reload to get the patched version
-            from teambot.cli import check_copilot_cli
+            importlib.reload(sys.modules["teambot.cli"])
 
             result = check_copilot_cli()
             assert result is False
