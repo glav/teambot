@@ -49,6 +49,7 @@ class TestCopilotCLIDetection:
         with patch("shutil.which", return_value=None):
             # Need to reimport to get the patched version
             import importlib
+            import sys
 
             from teambot.cli import check_copilot_cli
 
