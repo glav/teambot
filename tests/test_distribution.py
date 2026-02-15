@@ -49,11 +49,13 @@ class TestCopilotCLIDetection:
         with patch("shutil.which", return_value=None):
             # Need to reimport to get the patched version
             import importlib
+            import sys
 
-            import teambot.cli
-
-            importlib.reload(teambot.cli)
             from teambot.cli import check_copilot_cli
+
+            # Access module via sys.modules to avoid duplicate import style
+            cli_module = sys.modules["teambot.cli"]
+            importlib.reload(cli_module)
 
             result = check_copilot_cli()
             assert result is False
