@@ -379,6 +379,7 @@ class TestEventBusDrain:
             try:
                 await asyncio.wait_for(cancel_event.wait(), timeout=10)
             except TimeoutError:
+                # Expected fallback: timeout ensures function doesn't block indefinitely
                 pass
 
         mock_channel.send = very_slow_send
@@ -442,6 +443,7 @@ class TestEventBusClose:
             try:
                 await asyncio.wait_for(cancel_event.wait(), timeout=10)
             except TimeoutError:
+                # Expected fallback: timeout ensures function doesn't block indefinitely
                 pass
 
         mock_channel.send = very_slow_send
