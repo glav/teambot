@@ -7,7 +7,8 @@ This guide covers all installation methods for TeamBot, organized by user person
 Before installing TeamBot, ensure you have:
 
 1. **Python 3.10 or later** - [Download Python](https://www.python.org/downloads/)
-2. **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/)
+2. **uv** - [Install uv](https://astral.sh/uv)
+3. **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/)
 
 ### Verify Copilot CLI
 
@@ -25,63 +26,36 @@ copilot auth  # Authenticate if needed
 **Goal**: Try TeamBot without installing anything permanently.
 
 ```bash
-# Using uvx (requires uv installed)
-uvx copilot-teambot --help
-uvx copilot-teambot init
+# Using uvx with git (requires uv installed)
+uvx --from git+https://github.com/teambot-ai/teambot teambot --help
+uvx --from git+https://github.com/teambot-ai/teambot teambot init
 
 # Install uv first if needed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Pros**: No permanent installation, always uses latest version  
-**Cons**: Slightly slower startup (downloads on each run)
+**Cons**: Slightly slower startup (clones on each run)
 
 ---
 
-### 🐍 Python Developer (pip)
+### 🐍 Python Developer (From Source)
 
-**Goal**: Install TeamBot as a global or virtual environment package.
+**Goal**: Install TeamBot for development.
 
 ```bash
-# Global installation
-pip install copilot-teambot
+# Clone and install
+git clone https://github.com/teambot-ai/teambot.git
+cd teambot
+uv sync
 
-# Or in a virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install copilot-teambot
+# Run TeamBot
+uv run teambot --version
 ```
 
 **Verify**:
 ```bash
-teambot --version
-```
-
----
-
-### 📦 Existing Codebase Adopter
-
-**Goal**: Add TeamBot to an existing project's dependencies.
-
-#### Using requirements.txt
-
-```bash
-echo "copilot-teambot>=0.2.0" >> requirements.txt
-pip install -r requirements.txt
-```
-
-#### Using pyproject.toml
-
-```toml
-[project.optional-dependencies]
-dev = [
-    "copilot-teambot>=0.2.0",
-]
-```
-
-Then install:
-```bash
-pip install -e ".[dev]"
+uv run teambot --version
 ```
 
 ---
@@ -106,7 +80,7 @@ Add to your `devcontainer.json`:
 {
     "features": {
         "ghcr.io/teambot-ai/features/teambot:1": {
-            "version": "0.2.0"
+            "version": "0.1.0"
         }
     }
 }
@@ -135,25 +109,22 @@ Add to your `devcontainer.json`:
 # Install Python if needed (using winget)
 winget install Python.Python.3.12
 
-# Install TeamBot
-pip install copilot-teambot
+# Install uv
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Clone and install TeamBot
+git clone https://github.com/teambot-ai/teambot.git
+cd teambot
+uv sync
 
 # Verify
-teambot --version
-```
-
-#### CMD
-
-```cmd
-pip install copilot-teambot
-teambot --version
+uv run teambot --version
 ```
 
 #### Windows Notes
 
 - Ensure Python is added to PATH during installation
-- Use `python -m pip` if `pip` is not recognized
-- The `teambot` command works in both PowerShell and CMD
+- The `uv run teambot` command works in both PowerShell and CMD
 
 ---
 
@@ -206,23 +177,19 @@ teambot status
 
 ## Upgrading
 
-### pip
+### From Source
 
 ```bash
-pip install --upgrade copilot-teambot
+cd teambot
+git pull
+uv sync
 ```
 
-### uvx
+### uvx (git)
 
 ```bash
-# uvx always uses latest by default
-uvx copilot-teambot@latest --version
-```
-
-### pipx
-
-```bash
-pipx upgrade copilot-teambot
+# uvx with git always fetches latest
+uvx --from git+https://github.com/teambot-ai/teambot teambot --version
 ```
 
 ---
@@ -231,18 +198,7 @@ pipx upgrade copilot-teambot
 
 ### "teambot: command not found"
 
-Python scripts directory may not be in PATH:
-
-```bash
-# Check where pip installed it
-pip show copilot-teambot
-
-# Add to PATH (Linux/macOS)
-export PATH="$HOME/.local/bin:$PATH"
-
-# Add to PATH (Windows PowerShell)
-$env:Path += ";$env:APPDATA\Python\Python312\Scripts"
-```
+When installing from source, use `uv run teambot` instead of `teambot` directly.
 
 ### "Copilot CLI not found"
 
@@ -256,22 +212,12 @@ TeamBot requires the GitHub Copilot CLI:
 copilot auth
 ```
 
-### Dependency conflicts
+### "uv: command not found"
 
-Use pipx or uvx for isolated installation:
-
-```bash
-pipx install copilot-teambot
-# or
-uvx copilot-teambot
-```
-
-### SSL certificate errors
-
-Update certificates or use trusted hosts:
+Install uv:
 
 ```bash
-pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org copilot-teambot
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ---

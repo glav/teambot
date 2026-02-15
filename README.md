@@ -4,44 +4,34 @@
 
 TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/github/copilot-sdk) to enable collaborative, multi-agent AI workflows. Instead of single-threaded AI interactions, TeamBot orchestrates a team of specialized AI agents that work together autonomously to achieve development objectives.
 
-[![PyPI](https://img.shields.io/pypi/v/copilot-teambot.svg)](https://pypi.org/project/copilot-teambot/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://img.shields.io/badge/tests-1050%20passing-green.svg)]()
 [![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)]()
 
 ## Installation
 
-### Quick Start (Recommended)
-
-```bash
-# Try without installing (requires uv)
-uvx copilot-teambot --help
-
-# Or install with pip
-pip install copilot-teambot
-```
-
 ### Prerequisites
 
 - **Python 3.10 or later** - [Download Python](https://www.python.org/downloads/)
+- **uv** - [Install uv](https://astral.sh/uv)
 - **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/) and authenticate with `copilot auth`
 
 ### Installation Methods
 
 | Method | Command | Best For |
 |--------|---------|----------|
-| **pip** | `pip install copilot-teambot` | Most users |
-| **uvx** | `uvx copilot-teambot` | Quick evaluation (no install) |
-| **pipx** | `pipx install copilot-teambot` | Isolated global install |
+| **uvx (git)** | `uvx --from git+https://github.com/teambot-ai/teambot teambot` | Quick evaluation |
 | **Devcontainer** | See [installation guide](docs/guides/installation.md) | VS Code / Codespaces |
 | **Docker** | `docker run ghcr.io/teambot-ai/teambot` | No Python environment |
+| **From source** | See below | Development |
 
-### Windows
+### Install from Source
 
-```powershell
-# PowerShell
-pip install copilot-teambot
-teambot --version
+```bash
+git clone https://github.com/teambot-ai/teambot.git
+cd teambot
+uv sync
+uv run teambot --version
 ```
 
 ### Verify Installation
