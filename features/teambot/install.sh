@@ -14,9 +14,9 @@ fi
 
 # Install TeamBot
 if [ "$VERSION" = "latest" ]; then
-    uv tool install copilot-teambot
+    uv tool install git+https://github.com/teambot-ai/teambot
 else
-    uv tool install "copilot-teambot==$VERSION"
+    uv tool install "git+https://github.com/teambot-ai/teambot@${VERSION}"
 fi
 
 # Ensure tool bin is in PATH for all shells
