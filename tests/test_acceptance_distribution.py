@@ -28,7 +28,7 @@ class TestAcceptanceScenarios:
         # Also verify version is importable and correct format
         assert __version__ is not None
         assert isinstance(__version__, str)
-        assert __version__ == "0.2.0"
+        assert __version__ == "0.2.1"
 
     def test_at_001_help_command(self):
         """AT-001: teambot --help shows all commands."""
