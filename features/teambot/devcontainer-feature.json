@@ -8,7 +8,7 @@
         "version": {
             "type": "string",
             "default": "latest",
-            "description": "TeamBot version to install (e.g., '0.2.0' or 'latest')"
+            "description": "TeamBot version to install. Use 'latest' for main branch, or a version number (e.g., '0.2.0' or 'v0.2.0') for specific releases."
         }
     },
     "installsAfter": [

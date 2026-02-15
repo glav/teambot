@@ -272,10 +272,10 @@ class TestAcceptanceScenarios:
         install_script = Path("features/teambot/install.sh")
         content = install_script.read_text(encoding="utf-8")
 
-        # Script should install uv and copilot-teambot
+        # Script should install uv and teambot from git
         assert "#!/" in content  # Has shebang
         assert "uv" in content  # Uses uv
-        assert "copilot-teambot" in content  # Installs our package
+        assert "git+https://github.com/teambot-ai/teambot" in content  # Installs from git
 
     # =========================================================================
     # AT-006: Docker Image Execution
@@ -294,7 +294,7 @@ class TestAcceptanceScenarios:
         # Required Dockerfile elements
         assert "FROM" in content
         assert "python" in content.lower()
-        assert "copilot-teambot" in content
+        assert "git+https://github.com/teambot-ai/teambot" in content
         assert "ENTRYPOINT" in content
         assert "teambot" in content
 

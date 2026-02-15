@@ -40,7 +40,7 @@ Add to your `devcontainer.json`:
 ## What's Installed
 
 - `uv` package manager (if not present)
-- `copilot-teambot` Python package via `uv tool install`
+- TeamBot from git repository via `uv tool install`
 - `teambot` command available in PATH
 
 ## Post-Installation

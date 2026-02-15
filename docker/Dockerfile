@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv
 RUN pip install --no-cache-dir uv
 
-# Install TeamBot
-RUN uv tool install copilot-teambot
+# Install TeamBot from git
+RUN uv tool install git+https://github.com/teambot-ai/teambot
 
 # Add tool bin to PATH
 ENV PATH="/root/.local/bin:$PATH"
