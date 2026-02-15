@@ -8,7 +8,7 @@
         "version": {
             "type": "string",
             "default": "latest",
-            "description": "TeamBot version to install. Use 'latest' for main branch, or provide a version number (e.g., '0.2.0') which will be automatically prefixed with 'v' to match git tags (e.g., 'v0.2.0'). You can also provide a full git ref like 'v0.2.0' directly."
+            "description": "TeamBot version to install. Use 'latest' for main branch, or a version number (e.g., '0.2.0' or 'v0.2.0') for specific releases."
         }
     },
     "installsAfter": [
