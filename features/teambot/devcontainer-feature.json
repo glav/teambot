@@ -8,7 +8,7 @@
         "version": {
             "type": "string",
             "default": "latest",
-            "description": "TeamBot version to install (e.g., '0.2.0' or 'latest')"
+            "description": "TeamBot version to install (e.g., '0.2.0', 'v0.2.0', or 'latest'). Version numbers are automatically prefixed with 'v' to match git tags."
         }
     },
     "installsAfter": [
