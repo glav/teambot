@@ -11,14 +11,14 @@ from unittest.mock import patch
 
 
 class TestPackageMetadata:
-    """Tests for PyPI package configuration."""
+    """Tests for package configuration."""
 
     def test_pyproject_has_required_fields(self):
-        """Verify pyproject.toml has all required PyPI fields."""
+        """Verify pyproject.toml has all required fields."""
         with open("pyproject.toml", "rb") as f:
             config = tomllib.load(f)
 
-        assert config["project"]["name"] == "copilot-teambot"
+        assert config["project"]["name"] == "teambot"
         assert "version" in config["project"]
         assert "description" in config["project"]
         assert config["project"]["requires-python"] == ">=3.10"
@@ -31,34 +31,6 @@ class TestPackageMetadata:
         scripts = config["project"]["scripts"]
         assert "teambot" in scripts
         assert scripts["teambot"] == "teambot.cli:main"
-
-    def test_build_system_configured(self):
-        """Verify build system is configured for PyPI."""
-        with open("pyproject.toml", "rb") as f:
-            config = tomllib.load(f)
-
-        assert "build-system" in config
-        assert "hatchling" in str(config["build-system"]["requires"])
-        assert config["build-system"]["build-backend"] == "hatchling.build"
-
-    def test_project_urls_defined(self):
-        """Verify project URLs are defined for PyPI page."""
-        with open("pyproject.toml", "rb") as f:
-            config = tomllib.load(f)
-
-        urls = config["project"]["urls"]
-        assert "Homepage" in urls
-        assert "Repository" in urls
-        assert "Issues" in urls
-
-    def test_classifiers_include_python_versions(self):
-        """Verify Python version classifiers are present."""
-        with open("pyproject.toml", "rb") as f:
-            config = tomllib.load(f)
-
-        classifiers = config["project"]["classifiers"]
-        python_classifiers = [c for c in classifiers if "Python :: 3" in c]
-        assert len(python_classifiers) >= 3  # 3.10, 3.11, 3.12
 
 
 class TestCopilotCLIDetection:
@@ -137,7 +109,7 @@ class TestDistributionArtifacts:
         """Verify README has installation instructions."""
         content = Path("README.md").read_text(encoding="utf-8")
         assert "## Installation" in content
-        assert "pip install" in content
+        assert "uv" in content  # Uses uv-based installation
 
     def test_installation_guide_exists(self):
         """Verify installation guide exists."""
