@@ -39,14 +39,28 @@ def _ensure_models_loaded() -> None:
     cache = load_cache()
     if is_cache_valid(cache):
         # Use cached models (valid cache)
-        _cached_models = {m.id: {"display": m.name, "category": m.category} for m in cache.models}
+        _cached_models = {
+            m.id: {
+                "display": m.name,
+                "category": m.category,
+                "multiplier": getattr(m, "multiplier", None),
+            }
+            for m in cache.models
+        }
         _models_loaded = True
         logger.debug(f"Loaded {len(_cached_models)} models from cache")
         return
 
     # Cache expired - still use it but warn user
     if cache and cache.models:
-        _cached_models = {m.id: {"display": m.name, "category": m.category} for m in cache.models}
+        _cached_models = {
+            m.id: {
+                "display": m.name,
+                "category": m.category,
+                "multiplier": getattr(m, "multiplier", None),
+            }
+            for m in cache.models
+        }
         _models_loaded = True
         logger.warning("Using expired model cache - run '/models --refresh' to update")
         return
@@ -163,7 +177,14 @@ async def refresh_models() -> bool:
             # Save to cache
             if save_cache(models, sdk_version):
                 # Update in-memory state
-                _cached_models = {m.id: {"display": m.name, "category": m.category} for m in models}
+                _cached_models = {
+                    m.id: {
+                        "display": m.name,
+                        "category": m.category,
+                        "multiplier": getattr(m, "multiplier", None),
+                    }
+                    for m in models
+                }
                 _models_loaded = True
                 logger.info(f"Refreshed {len(models)} models from SDK")
                 return True

@@ -39,11 +39,20 @@ class TestDynamicModelDiscoveryAcceptance:
         from teambot.copilot.sdk_client import TeamBotModelInfo
 
         return [
-            TeamBotModelInfo(id="gpt-5", name="GPT-5", category="standard"),
-            TeamBotModelInfo(id="gpt-5-mini", name="GPT-5 Mini", category="fast"),
-            TeamBotModelInfo(id="claude-opus-4.6", name="Claude Opus 4.6", category="premium"),
-            TeamBotModelInfo(id="claude-sonnet-4.5", name="Claude Sonnet 4.5", category="standard"),
-            TeamBotModelInfo(id="claude-haiku-4.5", name="Claude Haiku 4.5", category="fast"),
+            TeamBotModelInfo(id="gpt-5", name="GPT-5", category="standard", multiplier=1.0),
+            TeamBotModelInfo(id="gpt-5-mini", name="GPT-5 Mini", category="fast", multiplier=0.25),
+            TeamBotModelInfo(
+                id="claude-opus-4.6", name="Claude Opus 4.6", category="premium", multiplier=5.0
+            ),
+            TeamBotModelInfo(
+                id="claude-sonnet-4.5",
+                name="Claude Sonnet 4.5",
+                category="standard",
+                multiplier=1.0,
+            ),
+            TeamBotModelInfo(
+                id="claude-haiku-4.5", name="Claude Haiku 4.5", category="fast", multiplier=0.3
+            ),
         ]
 
     # =========================================================================
@@ -361,12 +370,46 @@ class TestDynamicModelDiscoveryAcceptance:
             "claude-opus-4.6 should be in PREMIUM"
         )
 
+    # =========================================================================
+    # AT-007: Multiplier Display in /models Command
+    # =========================================================================
+    @pytest.mark.asyncio
+    async def test_at_007_multiplier_display(
+        self, temp_teambot_dir, reset_schema_state, mock_sdk_models
+    ):
+        """AT-007: /models command displays billing multiplier for each model.
 
-class TestTierWarningLogging:
-    """Additional tests for tier warning logging in SDK adapter."""
+        Validates that the /models output includes [Nx] multiplier suffix
+        for models with billing multiplier data.
+        """
+        from teambot.config.model_cache import save_cache
+        from teambot.config.schema import reset_model_cache
+        from teambot.repl.commands import handle_models
 
-    def test_at_006_tier_warning_for_missing_tier(self, caplog):
-        """Verify warning is logged when SDK model has no tier."""
+        # Pre-populate cache with models that have multipliers
+        with patch("teambot.config.model_cache.Path.cwd", return_value=temp_teambot_dir):
+            save_cache(mock_sdk_models, "1.0.0")
+
+        reset_model_cache()
+
+        with patch("teambot.config.model_cache.Path.cwd", return_value=temp_teambot_dir):
+            result = await handle_models([])
+
+        # Verify multiplier display in output
+        assert "[1.0x]" in result.output or "[1x]" in result.output, (
+            "Standard model should show [1.0x] multiplier"
+        )
+        assert "[5.0x]" in result.output or "[5x]" in result.output, (
+            "Premium model should show [5.0x] multiplier"
+        )
+        assert "[0.25x]" in result.output, "Fast model should show [0.25x] multiplier"
+
+
+class TestTierMultiplierClassification:
+    """Tests for tier classification based on billing.multiplier."""
+
+    def test_silent_fallback_no_billing(self, caplog):
+        """Verify no warning is logged when SDK model has no billing data."""
         import logging
 
         from teambot.copilot.sdk_client import CopilotSDKClient
@@ -374,27 +417,30 @@ class TestTierWarningLogging:
         class MockModel:
             id = "test-model"
             name = "Test Model"
-            capabilities = {}  # No tier
+            # No billing attribute
 
         with caplog.at_level(logging.WARNING):
             result = CopilotSDKClient._adapt_model_info(MockModel())
 
         assert result.category == "standard"
-        assert "missing tier" in caplog.text.lower()
+        assert result.multiplier is None
+        # Verify NO warning was logged
+        assert "missing" not in caplog.text.lower()
+        assert "tier" not in caplog.text.lower()
 
-    def test_at_006_tier_warning_for_invalid_tier(self, caplog):
-        """Verify warning is logged when SDK model has invalid tier."""
-        import logging
-
+    def test_multiplier_based_tier_classification(self):
+        """Verify tier is derived from billing.multiplier."""
         from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockBilling:
+            multiplier = 5.0
 
         class MockModel:
             id = "test-model"
             name = "Test Model"
-            capabilities = {"tier": "unknown-tier"}
+            billing = MockBilling()
 
-        with caplog.at_level(logging.WARNING):
-            result = CopilotSDKClient._adapt_model_info(MockModel())
+        result = CopilotSDKClient._adapt_model_info(MockModel())
 
-        assert result.category == "standard"
-        assert "invalid tier" in caplog.text.lower()
+        assert result.category == "premium"
+        assert result.multiplier == 5.0

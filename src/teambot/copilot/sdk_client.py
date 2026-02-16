@@ -18,11 +18,13 @@ class TeamBotModelInfo:
         id: Model identifier (e.g., "claude-opus-4.6").
         name: Human-readable display name.
         category: Model tier - "standard", "fast", or "premium".
+        multiplier: Billing multiplier (None if unavailable).
     """
 
     id: str
     name: str
     category: str
+    multiplier: float | None = None
 
 
 try:
@@ -84,6 +86,41 @@ def resolve_model(
 
     # Priority 5: SDK default
     return None
+
+
+def _extract_multiplier(sdk_model: Any) -> float | None:
+    """Extract billing multiplier from SDK model.
+
+    Args:
+        sdk_model: SDK ModelInfo object.
+
+    Returns:
+        Multiplier value if available, None otherwise.
+    """
+    billing = getattr(sdk_model, "billing", None)
+    if billing is None:
+        return None
+    if isinstance(billing, dict):
+        return billing.get("multiplier")
+    return getattr(billing, "multiplier", None)
+
+
+def _get_tier_from_multiplier(multiplier: float | None) -> str:
+    """Convert billing multiplier to tier category.
+
+    Args:
+        multiplier: Billing multiplier value (may be None).
+
+    Returns:
+        Tier string: "fast", "standard", or "premium".
+    """
+    if multiplier is None or multiplier < 0:
+        return "standard"  # Default for missing/invalid data
+    if multiplier <= 0.5:
+        return "fast"
+    if multiplier <= 1.5:
+        return "standard"
+    return "premium"
 
 
 class SDKClientError(Exception):
@@ -561,21 +598,15 @@ User request: {user_prompt}"""
         model_id = getattr(sdk_model, "id", str(sdk_model))
         name = getattr(sdk_model, "name", model_id)
 
-        # Extract category from capabilities.tier
-        capabilities = getattr(sdk_model, "capabilities", None)
-        category = None
+        # Extract billing multiplier (None if unavailable)
+        multiplier = _extract_multiplier(sdk_model)
 
-        if isinstance(capabilities, dict):
-            category = capabilities.get("tier")
-        elif capabilities is not None:
-            category = getattr(capabilities, "tier", None)
+        # Derive tier from multiplier (silent fallback to "standard")
+        category = _get_tier_from_multiplier(multiplier)
 
-        # Log warning if tier missing, use "standard" for display only
-        if not category:
-            logger.warning(f"Model '{model_id}' missing tier in capabilities, using 'standard'")
-            category = "standard"
-        elif category not in ("fast", "standard", "premium"):
-            logger.warning(f"Model '{model_id}' has invalid tier '{category}', using 'standard'")
-            category = "standard"
-
-        return TeamBotModelInfo(id=model_id, name=name, category=category)
+        return TeamBotModelInfo(
+            id=model_id,
+            name=name,
+            category=category,
+            multiplier=multiplier,
+        )

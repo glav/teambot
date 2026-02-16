@@ -30,11 +30,13 @@ class CachedModel:
         id: Model identifier.
         name: Display name.
         category: Model tier (standard/fast/premium).
+        multiplier: Billing multiplier (None if unavailable).
     """
 
     id: str
     name: str
     category: str
+    multiplier: float | None = None
 
 
 @dataclass
@@ -117,6 +119,7 @@ def load_cache() -> ModelCache | None:
                 id=m["id"],
                 name=m["name"],
                 category=m["category"],
+                multiplier=m.get("multiplier"),
             )
             for m in data.get("models", [])
         ]
@@ -159,6 +162,7 @@ def save_cache(models: list[Any], sdk_version: str = "unknown") -> bool:
                         "id": m.id,
                         "name": getattr(m, "name", m.id),
                         "category": getattr(m, "category", "standard"),
+                        "multiplier": getattr(m, "multiplier", None),
                     }
                 )
             elif isinstance(m, dict):
@@ -167,6 +171,7 @@ def save_cache(models: list[Any], sdk_version: str = "unknown") -> bool:
                         "id": m.get("id", ""),
                         "name": m.get("name", m.get("id", "")),
                         "category": m.get("category", "standard"),
+                        "multiplier": m.get("multiplier"),
                     }
                 )
 

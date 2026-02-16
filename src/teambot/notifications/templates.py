@@ -68,11 +68,13 @@ class MessageTemplates:
         # Escape event-provided string fields
         context["event_type"] = html.escape(event.event_type)
         context["feature_name"] = html.escape(event.feature_name or "Unknown")
-        # Use event.stage first, fallback to already-escaped event.data stage, or "Unknown"
-        if event.stage is not None:
-            context["stage"] = html.escape(event.stage)
-        elif "stage" not in context:
-            context["stage"] = "Unknown"
+        # Use event.data stage if present (e.g. parallel_stage_complete carries its own
+        # stage), otherwise fall back to event.stage (the bus-tracked current stage).
+        if "stage" not in context:
+            if event.stage is not None:
+                context["stage"] = html.escape(event.stage)
+            else:
+                context["stage"] = "Unknown"
 
         # Add computed emoji fields (emojis and hardcoded strings are safe)
         if event.event_type == "parallel_group_complete":

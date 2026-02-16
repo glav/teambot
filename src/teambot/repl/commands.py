@@ -235,7 +235,7 @@ async def handle_models(args: list[str]) -> CommandResult:
     lines = ["Available Models:", ""]
 
     # Group by category
-    categories: dict[str, list[tuple[str, str]]] = {
+    categories: dict[str, list[tuple[str, str, float | None]]] = {
         "standard": [],
         "fast": [],
         "premium": [],
@@ -246,16 +246,21 @@ async def handle_models(args: list[str]) -> CommandResult:
         if info:
             display_name = info.get("display", model_id)
             category = info.get("category", "standard")
+            multiplier = info.get("multiplier")
         else:
             display_name = model_id
             category = "standard"
-        categories.setdefault(category, []).append((model_id, display_name))
+            multiplier = None
+        categories.setdefault(category, []).append((model_id, display_name, multiplier))
 
     for category in ["standard", "fast", "premium"]:
         if categories.get(category):
             lines.append(f"  {category.upper()}:")
-            for model_id, display_name in categories[category]:
-                lines.append(f"    {model_id:25} ({display_name})")
+            for model_id, display_name, multiplier in categories[category]:
+                if multiplier is not None:
+                    lines.append(f"    {model_id:25} ({display_name}) [dim]\\[{multiplier}x][/dim]")
+                else:
+                    lines.append(f"    {model_id:25} ({display_name})")
             lines.append("")
 
     # Add cache status
