@@ -561,13 +561,21 @@ User request: {user_prompt}"""
         model_id = getattr(sdk_model, "id", str(sdk_model))
         name = getattr(sdk_model, "name", model_id)
 
-        # Extract category from capabilities.tier, defaulting to "standard"
+        # Extract category from capabilities.tier
         capabilities = getattr(sdk_model, "capabilities", None)
+        category = None
+
         if isinstance(capabilities, dict):
-            category = capabilities.get("tier") or "standard"
+            category = capabilities.get("tier")
         elif capabilities is not None:
-            category = getattr(capabilities, "tier", None) or "standard"
-        else:
+            category = getattr(capabilities, "tier", None)
+
+        # Log warning if tier missing, use "standard" for display only
+        if not category:
+            logger.warning(f"Model '{model_id}' missing tier in capabilities, using 'standard'")
+            category = "standard"
+        elif category not in ("fast", "standard", "premium"):
+            logger.warning(f"Model '{model_id}' has invalid tier '{category}', using 'standard'")
             category = "standard"
 
         return TeamBotModelInfo(id=model_id, name=name, category=category)

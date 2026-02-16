@@ -219,6 +219,19 @@ async def handle_models(args: list[str]) -> CommandResult:
     if args and args[0] == "--refresh":
         return await _handle_models_refresh()
 
+    models = get_available_models()
+
+    # Handle no models available
+    if not models:
+        return CommandResult(
+            output=(
+                "[red]✗ No models available[/red]\n"
+                "[yellow]Model cache is empty or expired.[/yellow]\n"
+                "[dim]Run '/models --refresh' to fetch from SDK.[/dim]"
+            ),
+            success=False,
+        )
+
     lines = ["Available Models:", ""]
 
     # Group by category
@@ -228,7 +241,7 @@ async def handle_models(args: list[str]) -> CommandResult:
         "premium": [],
     }
 
-    for model_id in get_available_models():
+    for model_id in models:
         info = get_model_info(model_id)
         if info:
             display_name = info.get("display", model_id)
@@ -259,8 +272,6 @@ async def handle_models(args: list[str]) -> CommandResult:
             else:
                 age_str = f"{age_hours:.1f} hours ago"
             lines.append(f"  (Cached: {age_str})")
-    else:
-        lines.append("  (Using fallback list - run /models --refresh to update)")
     lines.append("")
 
     lines.append("Usage: @pm --model <model> <task>")
@@ -283,15 +294,22 @@ async def _handle_models_refresh() -> CommandResult:
 
         if success:
             count = len(get_available_models())
-            return CommandResult(output=f"Model cache refreshed: {count} models available.")
+            return CommandResult(output=f"✓ Model cache refreshed: {count} models available.")
         else:
             return CommandResult(
-                output="Failed to refresh models. Using cached/fallback list.",
+                output=(
+                    "[red]✗ Failed to refresh models[/red]\n"
+                    "[dim]Check network connectivity and SDK installation.[/dim]\n"
+                    "[dim]Run 'copilot --version' to verify SDK.[/dim]"
+                ),
                 success=False,
             )
     except Exception as e:
         return CommandResult(
-            output=f"Error refreshing models: {type(e).__name__}",
+            output=(
+                f"[red]✗ Error refreshing models: {type(e).__name__}[/red]\n"
+                "[dim]Run 'copilot --version' to verify SDK installation.[/dim]"
+            ),
             success=False,
         )
 

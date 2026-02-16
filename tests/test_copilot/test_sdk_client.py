@@ -1141,3 +1141,39 @@ class TestListModels:
         assert result.id == "test-model"
         assert result.name == "test-model"  # Falls back to id
         assert result.category == "standard"  # Default
+
+    def test_adapt_model_info_logs_warning_for_missing_tier(self, caplog):
+        """Test _adapt_model_info logs warning when tier is missing."""
+        import logging
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockModel:
+            id = "test-model"
+            name = "Test Model"
+            capabilities = {}  # Empty capabilities, no tier
+
+        with caplog.at_level(logging.WARNING):
+            result = CopilotSDKClient._adapt_model_info(MockModel())
+
+        assert result.category == "standard"  # Falls back to standard
+        assert "missing tier" in caplog.text.lower()
+        assert "test-model" in caplog.text
+
+    def test_adapt_model_info_logs_warning_for_invalid_tier(self, caplog):
+        """Test _adapt_model_info logs warning when tier is invalid."""
+        import logging
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockModel:
+            id = "test-model"
+            name = "Test Model"
+            capabilities = {"tier": "invalid-tier"}
+
+        with caplog.at_level(logging.WARNING):
+            result = CopilotSDKClient._adapt_model_info(MockModel())
+
+        assert result.category == "standard"  # Falls back to standard
+        assert "invalid tier" in caplog.text.lower()
+        assert "test-model" in caplog.text

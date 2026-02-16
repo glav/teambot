@@ -14,52 +14,8 @@ CONFIG_SCHEMA = {
     "required": ["agents"],
 }
 
-# Static fallback models (used when SDK and cache unavailable)
-# Source: copilot --help output, verified 2026-02-04
-_FALLBACK_MODELS: set[str] = {
-    # Claude models
-    "claude-sonnet-4.5",
-    "claude-haiku-4.5",
-    "claude-opus-4.5",
-    "claude-sonnet-4",
-    # Gemini models
-    "gemini-3-pro-preview",
-    # GPT models
-    "gpt-5.2-codex",
-    "gpt-5.2",
-    "gpt-5.1-codex-max",
-    "gpt-5.1-codex",
-    "gpt-5.1",
-    "gpt-5",
-    "gpt-5.1-codex-mini",
-    "gpt-5-mini",
-    "gpt-4.1",
-}
-
-# Static fallback model info
-_FALLBACK_MODEL_INFO: dict[str, dict[str, str]] = {
-    "claude-sonnet-4.5": {"display": "Claude Sonnet 4.5", "category": "standard"},
-    "claude-haiku-4.5": {"display": "Claude Haiku 4.5", "category": "fast"},
-    "claude-opus-4.5": {"display": "Claude Opus 4.5", "category": "premium"},
-    "claude-sonnet-4": {"display": "Claude Sonnet 4", "category": "standard"},
-    "gemini-3-pro-preview": {"display": "Gemini 3 Pro (Preview)", "category": "standard"},
-    "gpt-5.2-codex": {"display": "GPT-5.2-Codex", "category": "standard"},
-    "gpt-5.2": {"display": "GPT-5.2", "category": "standard"},
-    "gpt-5.1-codex-max": {"display": "GPT-5.1-Codex-Max", "category": "standard"},
-    "gpt-5.1-codex": {"display": "GPT-5.1-Codex", "category": "standard"},
-    "gpt-5.1": {"display": "GPT-5.1", "category": "standard"},
-    "gpt-5": {"display": "GPT-5", "category": "standard"},
-    "gpt-5.1-codex-mini": {"display": "GPT-5.1-Codex-Mini", "category": "fast"},
-    "gpt-5-mini": {"display": "GPT-5 mini", "category": "fast"},
-    "gpt-4.1": {"display": "GPT-4.1", "category": "fast"},
-}
-
-# Backward compatibility: expose static sets for imports
-# NOTE: Use get_available_models() instead for dynamic discovery
-VALID_MODELS = _FALLBACK_MODELS
-MODEL_INFO = _FALLBACK_MODEL_INFO
-
 # Module-level state for lazy loading
+# Models come exclusively from SDK via cache - no static fallback
 _models_loaded = False
 _cached_models: dict[str, dict[str, str]] = {}
 
@@ -67,9 +23,11 @@ _cached_models: dict[str, dict[str, str]] = {}
 def _ensure_models_loaded() -> None:
     """Lazy load models from cache on first access.
 
-    Checks cache validity and loads models. If cache is expired
-    or missing, attempts async refresh via SDK (if available).
-    Falls back to static list if SDK unavailable.
+    Checks cache validity and loads models. If cache is expired,
+    uses expired cache data with warning. If no cache exists,
+    models will be empty until refresh_models() is called.
+
+    No static fallback - all model data comes from SDK via cache.
     """
     global _models_loaded, _cached_models
 
@@ -80,23 +38,29 @@ def _ensure_models_loaded() -> None:
 
     cache = load_cache()
     if is_cache_valid(cache):
-        # Use cached models
+        # Use cached models (valid cache)
         _cached_models = {m.id: {"display": m.name, "category": m.category} for m in cache.models}
         _models_loaded = True
         logger.debug(f"Loaded {len(_cached_models)} models from cache")
         return
 
-    # Cache expired or missing - try to refresh from SDK
-    # Note: This is synchronous; async refresh happens via refresh_models()
-    logger.debug("Cache expired or missing, using fallback models")
-    _models_loaded = True  # Mark loaded to prevent infinite recursion
+    # Cache expired - still use it but warn user
+    if cache and cache.models:
+        _cached_models = {m.id: {"display": m.name, "category": m.category} for m in cache.models}
+        _models_loaded = True
+        logger.warning("Using expired model cache - run '/models --refresh' to update")
+        return
+
+    # No cache at all - models will need refresh
+    _models_loaded = True  # Mark loaded to prevent repeated attempts
+    logger.warning("No model cache available - run '/models --refresh' to fetch models")
 
 
 def validate_model(model: str | None) -> bool:
     """Validate that a model name is supported by Copilot CLI.
 
-    Uses dynamically discovered models when available, falls back
-    to static list otherwise.
+    Uses dynamically discovered models from SDK cache.
+    Returns False if no models are loaded (cache empty).
 
     Args:
         model: Model name to validate.
@@ -112,28 +76,28 @@ def validate_model(model: str | None) -> bool:
     if not model:
         return False
 
-    # Try dynamic models first
     _ensure_models_loaded()
     if _cached_models:
         return model in _cached_models
 
-    # Fallback to static list
-    return model in _FALLBACK_MODELS
+    # No models available - cannot validate
+    logger.warning(f"Cannot validate model '{model}' - no models loaded from SDK")
+    return False
 
 
 def get_available_models() -> list[str]:
     """Get list of all available model names.
 
-    Returns dynamically discovered models when available,
-    falls back to static list otherwise.
+    Returns models from SDK cache. Returns empty list if
+    no cache is available (user should run '/models --refresh').
 
     Returns:
-        Sorted list of valid model names.
+        Sorted list of valid model names, or empty list.
     """
     _ensure_models_loaded()
     if _cached_models:
         return sorted(_cached_models.keys())
-    return sorted(_FALLBACK_MODELS)
+    return []  # No fallback - SDK cache is the only source
 
 
 def get_model_info(model: str) -> dict[str, str] | None:
@@ -143,12 +107,12 @@ def get_model_info(model: str) -> dict[str, str] | None:
         model: Model name.
 
     Returns:
-        Dict with 'display' and 'category' keys, or None if invalid.
+        Dict with 'display' and 'category' keys, or None if model not found.
     """
     _ensure_models_loaded()
     if _cached_models and model in _cached_models:
         return _cached_models[model]
-    return _FALLBACK_MODEL_INFO.get(model)
+    return None  # No fallback - SDK cache is the only source
 
 
 def is_using_cached_models() -> bool:
