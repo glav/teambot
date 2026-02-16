@@ -258,7 +258,7 @@ async def handle_models(args: list[str]) -> CommandResult:
             lines.append(f"  {category.upper()}:")
             for model_id, display_name, multiplier in categories[category]:
                 if multiplier is not None:
-                    lines.append(f"    {model_id:25} ({display_name}) [{multiplier}x]")
+                    lines.append(f"    {model_id:25} ({display_name}) [dim]\\[{multiplier}x][/dim]")
                 else:
                     lines.append(f"    {model_id:25} ({display_name})")
             lines.append("")
