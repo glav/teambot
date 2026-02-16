@@ -1005,17 +1005,21 @@ class TestListModels:
         """Test list_models adapts SDK models to TeamBot format."""
         from teambot.copilot.sdk_client import CopilotSDKClient, TeamBotModelInfo
 
-        # Create mock SDK model responses
+        # Create mock SDK model responses with billing.multiplier
+        class MockBilling:
+            def __init__(self, multiplier):
+                self.multiplier = multiplier
+
         class MockSDKModel:
-            def __init__(self, id, name, capabilities):
+            def __init__(self, id, name, multiplier):
                 self.id = id
                 self.name = name
-                self.capabilities = capabilities
+                self.billing = MockBilling(multiplier)
 
         mock_sdk_models = [
-            MockSDKModel("gpt-5", "GPT-5", {"tier": "standard"}),
-            MockSDKModel("claude-opus-4.6", "Claude Opus 4.6", {"tier": "premium"}),
-            MockSDKModel("gpt-5-mini", "GPT-5 Mini", {"tier": "fast"}),
+            MockSDKModel("gpt-5", "GPT-5", 1.0),  # standard
+            MockSDKModel("claude-opus-4.6", "Claude Opus 4.6", 5.0),  # premium
+            MockSDKModel("gpt-5-mini", "GPT-5 Mini", 0.25),  # fast
         ]
 
         with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
@@ -1038,8 +1042,11 @@ class TestListModels:
             model_dict = {m.id: m for m in models}
             assert model_dict["gpt-5"].name == "GPT-5"
             assert model_dict["gpt-5"].category == "standard"
+            assert model_dict["gpt-5"].multiplier == 1.0
             assert model_dict["claude-opus-4.6"].category == "premium"
+            assert model_dict["claude-opus-4.6"].multiplier == 5.0
             assert model_dict["gpt-5-mini"].category == "fast"
+            assert model_dict["gpt-5-mini"].multiplier == 0.25
 
     @pytest.mark.asyncio
     async def test_list_models_returns_empty_when_not_started(self):
@@ -1101,34 +1108,36 @@ class TestListModels:
             assert len(models) == 2
             assert all(m.category == "standard" for m in models)
 
-    def test_adapt_model_info_with_dict_capabilities(self):
-        """Test _adapt_model_info handles dict capabilities."""
+    def test_adapt_model_info_with_dict_billing(self):
+        """Test _adapt_model_info handles dict billing."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
         class MockModel:
             id = "test-model"
             name = "Test Model"
-            capabilities = {"tier": "premium", "other": "value"}
+            billing = {"multiplier": 5.0}  # Premium tier
 
         result = CopilotSDKClient._adapt_model_info(MockModel())
         assert result.id == "test-model"
         assert result.name == "Test Model"
         assert result.category == "premium"
+        assert result.multiplier == 5.0
 
-    def test_adapt_model_info_with_object_capabilities(self):
-        """Test _adapt_model_info handles object capabilities."""
+    def test_adapt_model_info_with_object_billing(self):
+        """Test _adapt_model_info handles object billing."""
         from teambot.copilot.sdk_client import CopilotSDKClient
 
-        class MockCapabilities:
-            tier = "fast"
+        class MockBilling:
+            multiplier = 0.25  # Fast tier
 
         class MockModel:
             id = "test-model"
             name = "Test Model"
-            capabilities = MockCapabilities()
+            billing = MockBilling()
 
         result = CopilotSDKClient._adapt_model_info(MockModel())
         assert result.category == "fast"
+        assert result.multiplier == 0.25
 
     def test_adapt_model_info_minimal(self):
         """Test _adapt_model_info handles minimal model info."""
@@ -1141,9 +1150,10 @@ class TestListModels:
         assert result.id == "test-model"
         assert result.name == "test-model"  # Falls back to id
         assert result.category == "standard"  # Default
+        assert result.multiplier is None  # No billing data
 
-    def test_adapt_model_info_logs_warning_for_missing_tier(self, caplog):
-        """Test _adapt_model_info logs warning when tier is missing."""
+    def test_adapt_model_info_silent_fallback_no_warning(self, caplog):
+        """Test that missing billing data defaults silently without warning."""
         import logging
 
         from teambot.copilot.sdk_client import CopilotSDKClient
@@ -1151,29 +1161,47 @@ class TestListModels:
         class MockModel:
             id = "test-model"
             name = "Test Model"
-            capabilities = {}  # Empty capabilities, no tier
+            # No billing attribute
 
         with caplog.at_level(logging.WARNING):
             result = CopilotSDKClient._adapt_model_info(MockModel())
 
-        assert result.category == "standard"  # Falls back to standard
-        assert "missing tier" in caplog.text.lower()
-        assert "test-model" in caplog.text
+        assert result.category == "standard"
+        assert result.multiplier is None
+        # Verify NO warning was logged
+        assert "warning" not in caplog.text.lower()
+        assert "missing" not in caplog.text.lower()
+        assert "tier" not in caplog.text.lower()
 
-    def test_adapt_model_info_logs_warning_for_invalid_tier(self, caplog):
-        """Test _adapt_model_info logs warning when tier is invalid."""
-        import logging
-
+    @pytest.mark.parametrize(
+        "multiplier,expected_tier",
+        [
+            (0.0, "fast"),
+            (0.25, "fast"),
+            (0.5, "fast"),  # Upper boundary of fast
+            (0.51, "standard"),  # Lower boundary of standard
+            (1.0, "standard"),
+            (1.5, "standard"),  # Upper boundary of standard
+            (1.51, "premium"),  # Lower boundary of premium
+            (5.0, "premium"),
+            (100.0, "premium"),
+            (-1.0, "standard"),  # Negative - defensive fallback
+        ],
+    )
+    def test_adapt_model_info_tier_boundaries(self, multiplier, expected_tier):
+        """Test tier mapping boundary values from billing.multiplier."""
         from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockBilling:
+            pass
 
         class MockModel:
             id = "test-model"
             name = "Test Model"
-            capabilities = {"tier": "invalid-tier"}
+            billing = MockBilling()
 
-        with caplog.at_level(logging.WARNING):
-            result = CopilotSDKClient._adapt_model_info(MockModel())
+        MockModel.billing.multiplier = multiplier
 
-        assert result.category == "standard"  # Falls back to standard
-        assert "invalid tier" in caplog.text.lower()
-        assert "test-model" in caplog.text
+        result = CopilotSDKClient._adapt_model_info(MockModel())
+        assert result.category == expected_tier
+        assert result.multiplier == multiplier

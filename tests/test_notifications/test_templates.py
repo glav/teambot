@@ -194,6 +194,43 @@ class TestMessageTemplates:
         assert "TEST&lt;&gt;STAGE" in result
         assert "TEST<>STAGE" not in result
 
+    def test_render_parallel_stage_complete_uses_data_stage(
+        self, templates: MessageTemplates
+    ) -> None:
+        """parallel_stage_complete uses stage from event.data, not event.stage.
+
+        Regression test: when running parallel stages (e.g. RESEARCH + TEST_STRATEGY),
+        event.stage is the bus-tracked 'current stage' (first parallel stage), but
+        event.data['stage'] carries the actual completed stage. The data stage must
+        take precedence so notifications show the correct stage name.
+        """
+        event = NotificationEvent(
+            event_type="parallel_stage_complete",
+            data={"stage": "TEST_STRATEGY", "agent": "builder-2"},
+            stage="RESEARCH",  # Bus-tracked current stage (wrong for this event)
+        )
+
+        result = templates.render(event)
+
+        assert "TEST_STRATEGY" in result
+        assert "builder-2" in result
+        assert "RESEARCH" not in result
+
+    def test_render_parallel_stage_failed_uses_data_stage(
+        self, templates: MessageTemplates
+    ) -> None:
+        """parallel_stage_failed uses stage from event.data, not event.stage."""
+        event = NotificationEvent(
+            event_type="parallel_stage_failed",
+            data={"stage": "TEST_STRATEGY", "agent": "builder-2"},
+            stage="RESEARCH",
+        )
+
+        result = templates.render(event)
+
+        assert "TEST_STRATEGY" in result
+        assert "RESEARCH" not in result
+
     def test_render_escapes_html_in_stages_list(self, templates: MessageTemplates) -> None:
         """HTML characters in stages list are escaped."""
         event = NotificationEvent(
