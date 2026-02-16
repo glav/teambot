@@ -19,13 +19,13 @@ export UV_TOOL_BIN_DIR=/usr/local/bin
 export UV_TOOL_DIR=/usr/local/share/uv
 
 if [ "$VERSION" = "latest" ]; then
-    uv tool install git+https://github.com/teambot-ai/teambot@main
+    uv tool install git+https://github.com/glav/teambot@main
 else
     # Git tags use 'v' prefix (e.g., v0.2.0)
     if [[ ! "$VERSION" =~ ^v ]]; then
         VERSION="v${VERSION}"
     fi
-    uv tool install git+https://github.com/teambot-ai/teambot@"${VERSION}"
+    uv tool install git+https://github.com/glav/teambot@"${VERSION}"
 fi
 
 echo "TeamBot installed successfully!"

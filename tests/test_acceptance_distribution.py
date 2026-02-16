@@ -275,7 +275,7 @@ class TestAcceptanceScenarios:
         # Script should install uv and teambot from git
         assert "#!/" in content  # Has shebang
         assert "uv" in content  # Uses uv
-        assert "git+https://github.com/teambot-ai/teambot" in content  # Installs from git
+        assert "git+https://github.com/glav/teambot" in content  # Installs from git
 
     # =========================================================================
     # AT-006: Docker Image Execution
@@ -294,7 +294,7 @@ class TestAcceptanceScenarios:
         # Required Dockerfile elements
         assert "FROM" in content
         assert "python" in content.lower()
-        assert "git+https://github.com/teambot-ai/teambot" in content
+        assert "git+https://github.com/glav/teambot" in content
         assert "ENTRYPOINT" in content
         assert "teambot" in content
 

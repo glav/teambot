@@ -1,6 +1,6 @@
 # TeamBot Devcontainer Feature
 
-Installs [TeamBot](https://github.com/teambot-ai/teambot) CLI for autonomous AI agent workflows with GitHub Copilot.
+Installs [TeamBot](https://github.com/glav/teambot) CLI for autonomous AI agent workflows with GitHub Copilot.
 
 ## Usage
 
@@ -60,5 +60,5 @@ teambot run objectives/my-task.md
 
 ## More Information
 
-- [TeamBot Documentation](https://github.com/teambot-ai/teambot/tree/main/docs)
-- [Getting Started Guide](https://github.com/teambot-ai/teambot/blob/main/docs/guides/getting-started.md)
+- [TeamBot Documentation](https://github.com/glav/teambot/tree/main/docs)
+- [Getting Started Guide](https://github.com/glav/teambot/blob/main/docs/guides/getting-started.md)

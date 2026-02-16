@@ -12,7 +12,7 @@ This guide covers installation, prerequisites, and running your first TeamBot ob
 
 ```bash
 # Clone the repository
-git clone https://github.com/teambot-ai/teambot.git
+git clone https://github.com/glav/teambot.git
 cd teambot
 
 # Install dependencies

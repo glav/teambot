@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir uv
 
 # Install TeamBot from git
-RUN uv tool install git+https://github.com/teambot-ai/teambot
+RUN uv tool install git+https://github.com/glav/teambot
 
 # Add tool bin to PATH
 ENV PATH="/root/.local/bin:$PATH"
@@ -35,6 +35,6 @@ CMD ["--help"]
 # Labels
 LABEL org.opencontainers.image.title="TeamBot"
 LABEL org.opencontainers.image.description="Autonomous AI agent teams for software development"
-LABEL org.opencontainers.image.url="https://github.com/teambot-ai/teambot"
-LABEL org.opencontainers.image.source="https://github.com/teambot-ai/teambot"
+LABEL org.opencontainers.image.url="https://github.com/glav/teambot"
+LABEL org.opencontainers.image.source="https://github.com/glav/teambot"
 LABEL org.opencontainers.image.licenses="MIT"

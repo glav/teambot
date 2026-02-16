@@ -27,8 +27,8 @@ copilot auth  # Authenticate if needed
 
 ```bash
 # Using uvx with git (requires uv installed)
-uvx --from git+https://github.com/teambot-ai/teambot teambot --help
-uvx --from git+https://github.com/teambot-ai/teambot teambot init
+uvx --from git+https://github.com/glav/teambot teambot --help
+uvx --from git+https://github.com/glav/teambot teambot init
 
 # Install uv first if needed
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -45,7 +45,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ```bash
 # Clone and install
-git clone https://github.com/teambot-ai/teambot.git
+git clone https://github.com/glav/teambot.git
 cd teambot
 uv sync
 
@@ -113,7 +113,7 @@ winget install Python.Python.3.12
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 # Clone and install TeamBot
-git clone https://github.com/teambot-ai/teambot.git
+git clone https://github.com/glav/teambot.git
 cd teambot
 uv sync
 
@@ -134,16 +134,16 @@ uv run teambot --version
 
 ```bash
 # Run help
-docker run --rm ghcr.io/teambot-ai/teambot --help
+docker run --rm ghcr.io/glav/teambot --help
 
 # Initialize in current directory
-docker run -it -v $(pwd):/workspace ghcr.io/teambot-ai/teambot init
+docker run -it -v $(pwd):/workspace ghcr.io/glav/teambot init
 
 # Run interactive mode
-docker run -it -v $(pwd):/workspace ghcr.io/teambot-ai/teambot run
+docker run -it -v $(pwd):/workspace ghcr.io/glav/teambot run
 
 # Run with objective
-docker run -it -v $(pwd):/workspace ghcr.io/teambot-ai/teambot run objectives/task.md
+docker run -it -v $(pwd):/workspace ghcr.io/glav/teambot run objectives/task.md
 ```
 
 #### Docker Notes
@@ -189,7 +189,7 @@ uv sync
 
 ```bash
 # uvx with git always fetches latest
-uvx --from git+https://github.com/teambot-ai/teambot teambot --version
+uvx --from git+https://github.com/glav/teambot teambot --version
 ```
 
 ---
