@@ -1,0 +1,76 @@
+{
+  "models": [
+    {
+      "id": "claude-sonnet-4.5",
+      "name": "Claude Sonnet 4.5",
+      "category": "standard"
+    },
+    {
+      "id": "claude-haiku-4.5",
+      "name": "Claude Haiku 4.5",
+      "category": "standard"
+    },
+    {
+      "id": "claude-opus-4.5",
+      "name": "Claude Opus 4.5",
+      "category": "standard"
+    },
+    {
+      "id": "claude-sonnet-4",
+      "name": "Claude Sonnet 4",
+      "category": "standard"
+    },
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro (Preview)",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5.2-codex",
+      "name": "GPT-5.2-Codex",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5.2",
+      "name": "GPT-5.2",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5.1-codex-max",
+      "name": "GPT-5.1-Codex-Max",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5.1-codex",
+      "name": "GPT-5.1-Codex",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5.1",
+      "name": "GPT-5.1",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5",
+      "name": "GPT-5",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5.1-codex-mini",
+      "name": "GPT-5.1-Codex-Mini",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-5-mini",
+      "name": "GPT-5 mini",
+      "category": "standard"
+    },
+    {
+      "id": "gpt-4.1",
+      "name": "GPT-4.1",
+      "category": "standard"
+    }
+  ],
+  "timestamp": 1771221295.4719572,
+  "sdk_version": "0.1.23"
+}

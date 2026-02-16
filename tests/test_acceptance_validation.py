@@ -566,7 +566,7 @@ class TestDefaultAgentSwitchingAcceptance:
 
     # ── AT-006: /status Shows Default Agent ──
 
-    def test_at_006_status_shows_default_agent(self):
+    async def test_at_006_status_shows_default_agent(self):
         """/status output includes default agent with session override info."""
         router = AgentRouter(default_agent="pm")
         router.set_default_agent("builder-1")
@@ -581,7 +581,7 @@ class TestDefaultAgentSwitchingAcceptance:
 
         # Test via SystemCommands dispatch
         commands = SystemCommands(router=router)
-        dispatch_result = commands.dispatch("status", [])
+        dispatch_result = await commands.dispatch("status", [])
         assert dispatch_result.success is True
         assert "Default Agent" in dispatch_result.output
         assert "builder-1" in dispatch_result.output
@@ -632,7 +632,7 @@ class TestDefaultAgentSwitchingAcceptance:
 
     # ── AT-009: /help Documents New Commands ──
 
-    def test_at_009_help_documents_new_commands(self):
+    async def test_at_009_help_documents_new_commands(self):
         """/help includes /use-agent and /reset-agent."""
         result = handle_help([])
         assert result.success is True
@@ -641,7 +641,7 @@ class TestDefaultAgentSwitchingAcceptance:
 
         # Also via dispatch
         commands = SystemCommands()
-        dispatch_result = commands.dispatch("help", [])
+        dispatch_result = await commands.dispatch("help", [])
         assert dispatch_result.success is True
         assert "/use-agent" in dispatch_result.output
         assert "/reset-agent" in dispatch_result.output
@@ -1865,7 +1865,7 @@ class TestNotificationUXAcceptance:
     # -------------------------------------------------------------------------
     # AT-004: Legacy /notify Removed
     # -------------------------------------------------------------------------
-    def test_at_004_legacy_notify_command_removed(self) -> None:
+    async def test_at_004_legacy_notify_command_removed(self) -> None:
         """Validate /notify returns unknown command (superseded by @notify).
 
         Steps:
@@ -1877,7 +1877,7 @@ class TestNotificationUXAcceptance:
 
         commands = SystemCommands(router=None, config=None)
 
-        result = commands.dispatch("notify", ["test"])
+        result = await commands.dispatch("notify", ["test"])
 
         assert result.success is False
         assert "Unknown command" in result.output

@@ -71,8 +71,10 @@ class TestAgentRouterRouting:
     @pytest.mark.asyncio
     async def test_route_system_command(self):
         """Test routing a system command."""
+        from unittest.mock import AsyncMock
+
         router = AgentRouter()
-        mock_handler = MagicMock(return_value="Help text")
+        mock_handler = AsyncMock(return_value="Help text")
 
         router.register_system_handler(mock_handler)
 

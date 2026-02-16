@@ -363,10 +363,10 @@ class TestAcceptanceNotifyPseudoAgent:
     # -------------------------------------------------------------------------
     # AT-010: Legacy /notify Removed
     # -------------------------------------------------------------------------
-    def test_at_010_slash_notify_returns_unknown(self):
+    async def test_at_010_slash_notify_returns_unknown(self):
         """ "/notify" returns unknown command error."""
         commands = SystemCommands()
-        result = commands.dispatch("notify", ["test", "message"])
+        result = await commands.dispatch("notify", ["test", "message"])
 
         assert result.success is False
         assert "Unknown command" in result.output
@@ -378,11 +378,11 @@ class TestAcceptanceNotifyPseudoAgent:
         assert "@notify" in result.output
         assert "/notify" not in result.output
 
-    def test_at_010_notify_not_in_handlers(self):
+    async def test_at_010_notify_not_in_handlers(self):
         """notify is not in SystemCommands handlers."""
         commands = SystemCommands()
         # Dispatch returns unknown for notify
-        result = commands.dispatch("notify", [])
+        result = await commands.dispatch("notify", [])
         assert "Unknown command" in result.output
 
 

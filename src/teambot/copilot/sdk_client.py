@@ -4,9 +4,26 @@ import asyncio
 import logging
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from teambot.copilot.agent_loader import get_agent_loader
+
+
+@dataclass
+class TeamBotModelInfo:
+    """Model information adapted from SDK for TeamBot use.
+
+    Attributes:
+        id: Model identifier (e.g., "claude-opus-4.6").
+        name: Human-readable display name.
+        category: Model tier - "standard", "fast", or "premium".
+    """
+
+    id: str
+    name: str
+    category: str
+
 
 try:
     from copilot import CopilotClient  # type: ignore
@@ -510,3 +527,47 @@ User request: {user_prompt}"""
             return []
 
         return self._client.list_sessions()
+
+    async def list_models(self) -> list[TeamBotModelInfo]:
+        """List available models from the Copilot SDK.
+
+        Fetches model information from the SDK and adapts it to
+        TeamBot's format. Returns empty list if SDK unavailable.
+
+        Returns:
+            List of TeamBotModelInfo objects, or empty list on error.
+        """
+        if not self._started or not self._client:
+            logger.debug("SDK not started, returning empty model list")
+            return []
+
+        try:
+            sdk_models = await self._client.list_models()
+            return [self._adapt_model_info(m) for m in sdk_models]
+        except Exception as e:
+            logger.warning(f"Failed to fetch models from SDK: {type(e).__name__}")
+            return []
+
+    @staticmethod
+    def _adapt_model_info(sdk_model: Any) -> TeamBotModelInfo:
+        """Adapt SDK ModelInfo to TeamBot format.
+
+        Args:
+            sdk_model: SDK ModelInfo object.
+
+        Returns:
+            TeamBotModelInfo with adapted fields.
+        """
+        model_id = getattr(sdk_model, "id", str(sdk_model))
+        name = getattr(sdk_model, "name", model_id)
+
+        # Extract category from capabilities.tier, defaulting to "standard"
+        capabilities = getattr(sdk_model, "capabilities", None)
+        if isinstance(capabilities, dict):
+            category = capabilities.get("tier") or "standard"
+        elif capabilities is not None:
+            category = getattr(capabilities, "tier", None) or "standard"
+        else:
+            category = "standard"
+
+        return TeamBotModelInfo(id=model_id, name=name, category=category)

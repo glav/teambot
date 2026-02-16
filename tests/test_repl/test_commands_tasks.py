@@ -193,35 +193,35 @@ class TestSystemCommandsTaskIntegration:
         cmds.set_executor(executor)
         assert cmds._executor == executor
 
-    def test_dispatch_tasks(self):
+    async def test_dispatch_tasks(self):
         """Test dispatching /tasks."""
         executor = MagicMock()
         executor.list_tasks.return_value = []
 
         cmds = SystemCommands(executor=executor)
-        result = cmds.dispatch("tasks", [])
+        result = await cmds.dispatch("tasks", [])
 
         assert result.success
         assert "No tasks" in result.output
 
-    def test_dispatch_task(self):
+    async def test_dispatch_task(self):
         """Test dispatching /task."""
         task = Task(id="1", agent_id="pm", prompt="Plan", status=TaskStatus.RUNNING)
         executor = MagicMock()
         executor.get_task.return_value = task
 
         cmds = SystemCommands(executor=executor)
-        result = cmds.dispatch("task", ["1"])
+        result = await cmds.dispatch("task", ["1"])
 
         assert result.success
 
-    def test_dispatch_cancel(self):
+    async def test_dispatch_cancel(self):
         """Test dispatching /cancel."""
         executor = MagicMock()
         executor.cancel_task.return_value = True
 
         cmds = SystemCommands(executor=executor)
-        result = cmds.dispatch("cancel", ["1"])
+        result = await cmds.dispatch("cancel", ["1"])
 
         assert result.success
         assert "Cancelled" in result.output

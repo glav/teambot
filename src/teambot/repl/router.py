@@ -45,7 +45,7 @@ class AgentRouter:
                           raw input is handled by the raw handler.
         """
         self._agent_handler: Callable[[str, str], Awaitable[str]] | None = None
-        self._system_handler: Callable[[str, list[str]], str] | None = None
+        self._system_handler: Callable[[str, list[str]], Awaitable[Any]] | None = None
         self._raw_handler: Callable[[str], str] | None = None
         self._history: list[dict[str, Any]] = []
         self._history_limit = history_limit
@@ -122,11 +122,11 @@ class AgentRouter:
         """
         self._agent_handler = handler
 
-    def register_system_handler(self, handler: Callable[[str, list[str]], str]) -> None:
+    def register_system_handler(self, handler: Callable[[str, list[str]], Awaitable[Any]]) -> None:
         """Register handler for system commands.
 
         Args:
-            handler: Function(command, args) -> response.
+            handler: Async function(command, args) -> response.
         """
         self._system_handler = handler
 
@@ -153,7 +153,7 @@ class AgentRouter:
         if command.type == CommandType.AGENT:
             return await self._route_agent(command)
         elif command.type == CommandType.SYSTEM:
-            return self._route_system(command)
+            return await self._route_system(command)
         else:
             return await self._route_raw(command)
 
@@ -174,12 +174,12 @@ class AgentRouter:
 
         return await self._agent_handler(agent_id, command.content)
 
-    def _route_system(self, command: Command) -> str:
+    async def _route_system(self, command: Command) -> str:
         """Route system command."""
         if self._system_handler is None:
             raise RouterError("No handler registered for system commands")
 
-        return self._system_handler(command.command, command.args or [])
+        return await self._system_handler(command.command, command.args or [])
 
     async def _route_raw(self, command: Command) -> str:
         """Route raw input.

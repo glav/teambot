@@ -160,13 +160,13 @@ class TestAcceptanceScenarios:
         assert "session override" in result.output
         assert "pm" in result.output  # config default also shown
 
-    def test_at_006_status_via_system_commands_dispatch(self):
+    async def test_at_006_status_via_system_commands_dispatch(self):
         """/status dispatched through SystemCommands includes default agent."""
         router = AgentRouter(default_agent="pm")
         router.set_default_agent("builder-1")
         commands = SystemCommands(router=router)
 
-        result = commands.dispatch("status", [])
+        result = await commands.dispatch("status", [])
 
         assert result.success is True
         assert "Default Agent" in result.output
@@ -229,10 +229,10 @@ class TestAcceptanceScenarios:
         assert "/use-agent" in result.output
         assert "/reset-agent" in result.output
 
-    def test_at_009_help_via_system_commands_dispatch(self):
+    async def test_at_009_help_via_system_commands_dispatch(self):
         """/help dispatched through SystemCommands includes new commands."""
         commands = SystemCommands()
-        result = commands.dispatch("help", [])
+        result = await commands.dispatch("help", [])
 
         assert result.success is True
         assert "/use-agent" in result.output

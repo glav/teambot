@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
 from teambot import __version__
-from teambot.config.schema import MODEL_INFO, VALID_MODELS, validate_model
+from teambot.config.schema import (
+    get_available_models,
+    get_model_info,
+    is_using_cached_models,
+    validate_model,
+)
 from teambot.repl.router import VALID_AGENTS
 
 if TYPE_CHECKING:
@@ -201,15 +206,19 @@ def handle_quit(args: list[str]) -> CommandResult:
     return CommandResult(output="Goodbye!", should_exit=True)
 
 
-def handle_models(args: list[str]) -> CommandResult:
+async def handle_models(args: list[str]) -> CommandResult:
     """Handle /models command - list all available models.
 
     Args:
-        args: Command arguments (unused).
+        args: Command arguments. Supports --refresh to force cache update.
 
     Returns:
         CommandResult with list of available models.
     """
+    # Check for --refresh flag
+    if args and args[0] == "--refresh":
+        return await _handle_models_refresh()
+
     lines = ["Available Models:", ""]
 
     # Group by category
@@ -219,10 +228,14 @@ def handle_models(args: list[str]) -> CommandResult:
         "premium": [],
     }
 
-    for model_id in sorted(VALID_MODELS):
-        info = MODEL_INFO.get(model_id, {})
-        display_name = info.get("display", model_id)
-        category = info.get("category", "standard")
+    for model_id in get_available_models():
+        info = get_model_info(model_id)
+        if info:
+            display_name = info.get("display", model_id)
+            category = info.get("category", "standard")
+        else:
+            display_name = model_id
+            category = "standard"
         categories.setdefault(category, []).append((model_id, display_name))
 
     for category in ["standard", "fast", "premium"]:
@@ -232,10 +245,55 @@ def handle_models(args: list[str]) -> CommandResult:
                 lines.append(f"    {model_id:25} ({display_name})")
             lines.append("")
 
+    # Add cache status
+    if is_using_cached_models():
+        import time
+
+        from teambot.config.model_cache import get_cache_timestamp
+
+        ts = get_cache_timestamp()
+        if ts:
+            age_hours = (time.time() - ts) / 3600
+            if age_hours < 1:
+                age_str = f"{int(age_hours * 60)} minutes ago"
+            else:
+                age_str = f"{age_hours:.1f} hours ago"
+            lines.append(f"  (Cached: {age_str})")
+    else:
+        lines.append("  (Using fallback list - run /models --refresh to update)")
+    lines.append("")
+
     lines.append("Usage: @pm --model <model> <task>")
     lines.append("       /model <agent> <model>  - Set session model for agent")
+    lines.append("       /models --refresh       - Refresh from SDK")
 
     return CommandResult(output="\n".join(lines))
+
+
+async def _handle_models_refresh() -> CommandResult:
+    """Handle /models --refresh to force cache update.
+
+    Returns:
+        CommandResult with refresh status.
+    """
+    from teambot.config.schema import refresh_models
+
+    try:
+        success = await refresh_models()
+
+        if success:
+            count = len(get_available_models())
+            return CommandResult(output=f"Model cache refreshed: {count} models available.")
+        else:
+            return CommandResult(
+                output="Failed to refresh models. Using cached/fallback list.",
+                success=False,
+            )
+    except Exception as e:
+        return CommandResult(
+            output=f"Error refreshing models: {type(e).__name__}",
+            success=False,
+        )
 
 
 def handle_model(args: list[str], session_overrides: dict[str, str]) -> CommandResult:
@@ -583,7 +641,7 @@ class SystemCommands:
         """
         self._router = router
 
-    def dispatch(self, command: str, args: list[str]) -> CommandResult:
+    async def dispatch(self, command: str, args: list[str]) -> CommandResult:
         """Dispatch a system command.
 
         Args:
@@ -593,6 +651,8 @@ class SystemCommands:
         Returns:
             CommandResult from handler.
         """
+        import asyncio
+
         handlers = {
             "help": self.help,
             "status": self.status,
@@ -615,7 +675,11 @@ class SystemCommands:
                 success=False,
             )
 
-        return handler(args)
+        result = handler(args)
+        # Handle both sync and async handlers
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
 
     def help(self, args: list[str]) -> CommandResult:
         """Handle /help command."""
@@ -656,9 +720,9 @@ class SystemCommands:
         """Handle /cancel <id> command."""
         return handle_cancel(args, self._executor)
 
-    def models(self, args: list[str]) -> CommandResult:
+    async def models(self, args: list[str]) -> CommandResult:
         """Handle /models command."""
-        return handle_models(args)
+        return await handle_models(args)
 
     def model(self, args: list[str]) -> CommandResult:
         """Handle /model command."""
