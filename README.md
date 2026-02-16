@@ -20,15 +20,15 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 
 | Method | Command | Best For |
 |--------|---------|----------|
-| **uvx (git)** | `uvx --from git+https://github.com/teambot-ai/teambot teambot` | Quick evaluation |
+| **uvx (git)** | `uvx --from git+https://github.com/glav/teambot teambot` | Quick evaluation |
 | **Devcontainer** | See [installation guide](docs/guides/installation.md) | VS Code / Codespaces |
-| **Docker** | `docker run ghcr.io/teambot-ai/teambot` | No Python environment |
+| **Docker** | `docker run ghcr.io/glav/teambot` | No Python environment |
 | **From source** | See below | Development |
 
 ### Install from Source
 
 ```bash
-git clone https://github.com/teambot-ai/teambot.git
+git clone https://github.com/glav/teambot.git
 cd teambot
 uv sync
 uv run teambot --version

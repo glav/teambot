@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "name": "TeamBot - AI Agent Teams",
     "description": "Installs TeamBot CLI for autonomous AI agent workflows with GitHub Copilot",
-    "documentationURL": "https://github.com/teambot-ai/teambot",
+    "documentationURL": "https://github.com/glav/teambot",
     "options": {
         "version": {
             "type": "string",
