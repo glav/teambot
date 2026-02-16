@@ -995,3 +995,185 @@ class TestCopilotSDKClientSessionRetry:
         client = CopilotSDKClient()
         # Should not raise
         client._invalidate_session("nonexistent")
+
+
+class TestListModels:
+    """Tests for list_models() method."""
+
+    @pytest.mark.asyncio
+    async def test_list_models_returns_adapted_models(self):
+        """Test list_models adapts SDK models to TeamBot format."""
+        from teambot.copilot.sdk_client import CopilotSDKClient, TeamBotModelInfo
+
+        # Create mock SDK model responses
+        class MockSDKModel:
+            def __init__(self, id, name, capabilities):
+                self.id = id
+                self.name = name
+                self.capabilities = capabilities
+
+        mock_sdk_models = [
+            MockSDKModel("gpt-5", "GPT-5", {"tier": "standard"}),
+            MockSDKModel("claude-opus-4.6", "Claude Opus 4.6", {"tier": "premium"}),
+            MockSDKModel("gpt-5-mini", "GPT-5 Mini", {"tier": "fast"}),
+        ]
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+            mock_client.list_models = AsyncMock(return_value=mock_sdk_models)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            models = await client.list_models()
+
+            assert len(models) == 3
+            assert all(isinstance(m, TeamBotModelInfo) for m in models)
+
+            # Check model data
+            model_dict = {m.id: m for m in models}
+            assert model_dict["gpt-5"].name == "GPT-5"
+            assert model_dict["gpt-5"].category == "standard"
+            assert model_dict["claude-opus-4.6"].category == "premium"
+            assert model_dict["gpt-5-mini"].category == "fast"
+
+    @pytest.mark.asyncio
+    async def test_list_models_returns_empty_when_not_started(self):
+        """Test list_models returns empty list when client not started."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        client = CopilotSDKClient()
+        models = await client.list_models()
+        assert models == []
+
+    @pytest.mark.asyncio
+    async def test_list_models_returns_empty_on_sdk_error(self):
+        """Test list_models returns empty list on SDK error."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+            mock_client.list_models = AsyncMock(side_effect=Exception("Network error"))
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            models = await client.list_models()
+            assert models == []
+
+    @pytest.mark.asyncio
+    async def test_list_models_category_fallback_to_standard(self):
+        """Test list_models uses 'standard' when no tier in capabilities."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockSDKModel:
+            def __init__(self, id, name, capabilities):
+                self.id = id
+                self.name = name
+                self.capabilities = capabilities
+
+        mock_sdk_models = [
+            MockSDKModel("gpt-5", "GPT-5", {}),  # Empty capabilities
+            MockSDKModel("claude-4", "Claude 4", None),  # No capabilities
+        ]
+
+        with patch("teambot.copilot.sdk_client.CopilotClient") as MockClient:
+            mock_client = MagicMock()
+            mock_client.start = AsyncMock()
+            mock_client.stop = AsyncMock()
+            mock_client.get_auth_status = AsyncMock(return_value={"isAuthenticated": True})
+            mock_client.list_models = AsyncMock(return_value=mock_sdk_models)
+            MockClient.return_value = mock_client
+
+            client = CopilotSDKClient()
+            await client.start()
+
+            models = await client.list_models()
+
+            assert len(models) == 2
+            assert all(m.category == "standard" for m in models)
+
+    def test_adapt_model_info_with_dict_capabilities(self):
+        """Test _adapt_model_info handles dict capabilities."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockModel:
+            id = "test-model"
+            name = "Test Model"
+            capabilities = {"tier": "premium", "other": "value"}
+
+        result = CopilotSDKClient._adapt_model_info(MockModel())
+        assert result.id == "test-model"
+        assert result.name == "Test Model"
+        assert result.category == "premium"
+
+    def test_adapt_model_info_with_object_capabilities(self):
+        """Test _adapt_model_info handles object capabilities."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockCapabilities:
+            tier = "fast"
+
+        class MockModel:
+            id = "test-model"
+            name = "Test Model"
+            capabilities = MockCapabilities()
+
+        result = CopilotSDKClient._adapt_model_info(MockModel())
+        assert result.category == "fast"
+
+    def test_adapt_model_info_minimal(self):
+        """Test _adapt_model_info handles minimal model info."""
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockModel:
+            id = "test-model"
+
+        result = CopilotSDKClient._adapt_model_info(MockModel())
+        assert result.id == "test-model"
+        assert result.name == "test-model"  # Falls back to id
+        assert result.category == "standard"  # Default
+
+    def test_adapt_model_info_logs_warning_for_missing_tier(self, caplog):
+        """Test _adapt_model_info logs warning when tier is missing."""
+        import logging
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockModel:
+            id = "test-model"
+            name = "Test Model"
+            capabilities = {}  # Empty capabilities, no tier
+
+        with caplog.at_level(logging.WARNING):
+            result = CopilotSDKClient._adapt_model_info(MockModel())
+
+        assert result.category == "standard"  # Falls back to standard
+        assert "missing tier" in caplog.text.lower()
+        assert "test-model" in caplog.text
+
+    def test_adapt_model_info_logs_warning_for_invalid_tier(self, caplog):
+        """Test _adapt_model_info logs warning when tier is invalid."""
+        import logging
+
+        from teambot.copilot.sdk_client import CopilotSDKClient
+
+        class MockModel:
+            id = "test-model"
+            name = "Test Model"
+            capabilities = {"tier": "invalid-tier"}
+
+        with caplog.at_level(logging.WARNING):
+            result = CopilotSDKClient._adapt_model_info(MockModel())
+
+        assert result.category == "standard"  # Falls back to standard
+        assert "invalid tier" in caplog.text.lower()
+        assert "test-model" in caplog.text

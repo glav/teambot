@@ -101,9 +101,43 @@ In this example:
 
 **Interactive commands:**
 - `/models` - List all available models
+- `/models --refresh` - Refresh model list from SDK
 - `/model` - Show current session overrides
 - `/model @agent <model>` - Set model for agent in current session
 - `/model @agent clear` - Clear session override
+
+### Dynamic Model Discovery
+
+TeamBot automatically discovers available models from the Copilot SDK. This ensures you always have access to the latest models without needing to update TeamBot.
+
+**How it works:**
+1. On first model access, TeamBot checks for cached model data
+2. If cache is valid, cached models are used
+3. If cache is expired or missing, it falls back to a static list
+4. Use `/models --refresh` to manually update the cache from SDK
+
+**Cache location:** `.teambot/model_cache.json`
+
+**Cache TTL:** 24 hours (default)
+
+**Environment variables:**
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TEAMBOT_MODEL_CACHE_TTL` | Cache time-to-live in seconds | `86400` (24 hours) |
+
+**Example: Setting custom cache TTL:**
+```bash
+# Refresh cache every 6 hours
+export TEAMBOT_MODEL_CACHE_TTL=21600
+```
+
+**Fallback behavior:**
+- **SDK available + cache valid**: Uses cached models
+- **SDK available + cache expired**: Uses fallback list (refresh with `/models --refresh`)
+- **SDK unavailable**: Uses fallback list (built-in 14 models)
+
+The `/models` command shows cache status at the bottom of the output.
 
 ## Stage Configuration (stages.yaml)
 

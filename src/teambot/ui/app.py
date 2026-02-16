@@ -341,7 +341,7 @@ class TeamBotApp(App):
             return
 
         # Use SystemCommands.dispatch for other commands
-        result = self._commands.dispatch(command.command, command.args or [])
+        result = await self._commands.dispatch(command.command, command.args or [])
         output.write_system(result.output)
 
         # Update status panel if /model command succeeded

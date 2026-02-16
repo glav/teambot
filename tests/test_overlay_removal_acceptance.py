@@ -62,26 +62,26 @@ class TestOverlayRemovalAcceptanceScenarios:
 
     # -- AT-002: Unknown Command Response for /overlay --
 
-    def test_at_002_overlay_command_returns_unknown(self):
+    async def test_at_002_overlay_command_returns_unknown(self):
         """Verify /overlay command returns unknown command error."""
         router = AgentRouter()
         commands = SystemCommands(router=router)
 
         # Dispatch /overlay command
-        result = commands.dispatch("overlay", [])
+        result = await commands.dispatch("overlay", [])
 
         # Should return unknown command error
         assert result.success is False
         assert "Unknown command" in result.output or "unknown" in result.output.lower()
 
-    def test_at_002_overlay_not_in_dispatch_handlers(self):
+    async def test_at_002_overlay_not_in_dispatch_handlers(self):
         """Verify overlay is not in the command dispatch handlers."""
         router = AgentRouter()
         commands = SystemCommands(router=router)
 
         # Get the handlers from dispatch method by calling it
         # The dispatch method should not have 'overlay' as a valid command
-        result = commands.dispatch("overlay", [])
+        result = await commands.dispatch("overlay", [])
 
         # Should fail because overlay is not a recognized command
         assert result.success is False

@@ -190,71 +190,71 @@ class TestCommandResult:
 class TestSystemCommandsDispatch:
     """Tests for command dispatch."""
 
-    def test_dispatch_help(self):
+    async def test_dispatch_help(self):
         """Test dispatching /help."""
         commands = SystemCommands()
-        result = commands.dispatch("help", [])
+        result = await commands.dispatch("help", [])
 
         assert result.success is True
         assert "help" in result.output.lower() or "@" in result.output
 
-    def test_dispatch_status(self):
+    async def test_dispatch_status(self):
         """Test dispatching /status."""
         commands = SystemCommands()
-        result = commands.dispatch("status", [])
+        result = await commands.dispatch("status", [])
 
         assert result.success is True
 
-    def test_dispatch_history(self):
+    async def test_dispatch_history(self):
         """Test dispatching /history."""
         commands = SystemCommands()
-        result = commands.dispatch("history", [])
+        result = await commands.dispatch("history", [])
 
         assert result.success is True
 
-    def test_dispatch_quit(self):
+    async def test_dispatch_quit(self):
         """Test dispatching /quit."""
         commands = SystemCommands()
-        result = commands.dispatch("quit", [])
+        result = await commands.dispatch("quit", [])
 
         assert result.should_exit is True
 
-    def test_dispatch_exit_alias(self):
+    async def test_dispatch_exit_alias(self):
         """Test dispatching /exit as alias."""
         commands = SystemCommands()
-        result = commands.dispatch("exit", [])
+        result = await commands.dispatch("exit", [])
 
         assert result.should_exit is True
 
-    def test_dispatch_use_agent(self):
+    async def test_dispatch_use_agent(self):
         """Test dispatching /use-agent routes to handler."""
         router = AgentRouter(default_agent="pm")
         commands = SystemCommands(router=router)
-        result = commands.dispatch("use-agent", ["builder-1"])
+        result = await commands.dispatch("use-agent", ["builder-1"])
         assert result.success is True
         assert router.get_default_agent() == "builder-1"
 
-    def test_dispatch_reset_agent(self):
+    async def test_dispatch_reset_agent(self):
         """Test dispatching /reset-agent routes to handler."""
         router = AgentRouter(default_agent="pm")
         commands = SystemCommands(router=router)
-        commands.dispatch("use-agent", ["builder-1"])
-        result = commands.dispatch("reset-agent", [])
+        await commands.dispatch("use-agent", ["builder-1"])
+        result = await commands.dispatch("reset-agent", [])
         assert result.success is True
         assert router.get_default_agent() == "pm"
 
-    def test_dispatch_unknown_command(self):
+    async def test_dispatch_unknown_command(self):
         """Test dispatching unknown command."""
         commands = SystemCommands()
-        result = commands.dispatch("unknown", [])
+        result = await commands.dispatch("unknown", [])
 
         assert result.success is False
         assert "unknown" in result.output.lower() or "not found" in result.output.lower()
 
-    def test_dispatch_with_args(self):
+    async def test_dispatch_with_args(self):
         """Test dispatching with arguments."""
         commands = SystemCommands()
-        result = commands.dispatch("help", ["agent"])
+        result = await commands.dispatch("help", ["agent"])
 
         assert result.success is True
 
@@ -262,84 +262,104 @@ class TestSystemCommandsDispatch:
 class TestModelsCommand:
     """Tests for /models command."""
 
-    def test_models_lists_all_valid_models(self):
+    async def test_models_lists_all_valid_models(self):
         """'/models' returns all 14 valid models."""
-        result = handle_models([])
+        result = await handle_models([])
 
         assert result.success is True
         assert "claude-sonnet-4.5" in result.output
         assert "gpt-5" in result.output
         assert "gemini-3-pro-preview" in result.output
 
-    def test_models_shows_categories(self):
+    async def test_models_shows_categories(self):
         """'/models' shows model categories or model info."""
-        result = handle_models([])
+        result = await handle_models([])
 
         # Should show some kind of categorization or info
         assert "standard" in result.output.lower() or "model" in result.output.lower()
 
-    def test_models_count(self):
-        """'/models' lists exactly 14 models."""
-        from teambot.config.schema import VALID_MODELS
+    async def test_models_count(self):
+        """'/models' lists all available models."""
+        from teambot.config.schema import get_available_models
 
-        result = handle_models([])
+        result = await handle_models([])
 
         # Count how many valid models appear in output
-        count = sum(1 for model in VALID_MODELS if model in result.output)
-        assert count == 14
+        models = get_available_models()
+        count = sum(1 for model in models if model in result.output)
+        assert count == len(models)
 
-    def test_models_dispatch(self):
+    async def test_models_dispatch(self):
         """Test dispatching /models command."""
         commands = SystemCommands()
-        result = commands.dispatch("models", [])
+        result = await commands.dispatch("models", [])
 
         assert result.success is True
         assert "gpt" in result.output.lower() or "claude" in result.output.lower()
+
+    async def test_models_shows_refresh_hint(self):
+        """'/models' shows hint about --refresh flag."""
+        result = await handle_models([])
+
+        assert "/models --refresh" in result.output
+
+    async def test_models_refresh_flag_triggers_refresh(self):
+        """'/models --refresh' triggers cache refresh."""
+        from unittest.mock import AsyncMock, patch
+
+        # Mock refresh_models in the schema module where it's imported from
+        with patch("teambot.config.schema.refresh_models", new_callable=AsyncMock) as mock_refresh:
+            mock_refresh.return_value = False  # Simulate failure
+
+            result = await handle_models(["--refresh"])
+
+            # Should show failure message
+            assert "Failed to refresh" in result.output or result.success is False
 
 
 class TestModelCommand:
     """Tests for /model command."""
 
-    def test_model_shows_current_models(self):
+    async def test_model_shows_current_models(self):
         """'/model' without args shows current session models."""
         commands = SystemCommands()
-        result = commands.dispatch("model", [])
+        result = await commands.dispatch("model", [])
 
         assert result.success is True
         # Should show some info about models
 
-    def test_model_sets_agent_model(self):
+    async def test_model_sets_agent_model(self):
         """'/model pm gpt-5' sets model for agent."""
         commands = SystemCommands()
-        result = commands.dispatch("model", ["pm", "gpt-5"])
+        result = await commands.dispatch("model", ["pm", "gpt-5"])
 
         assert result.success is True
         assert commands._session_model_overrides.get("pm") == "gpt-5"
 
-    def test_model_invalid_agent(self):
+    async def test_model_invalid_agent(self):
         """'/model invalid gpt-5' shows error for invalid agent."""
         commands = SystemCommands()
-        result = commands.dispatch("model", ["invalid-agent-xyz", "gpt-5"])
+        result = await commands.dispatch("model", ["invalid-agent-xyz", "gpt-5"])
 
         # Should fail - we validate agent IDs exist
         assert result.success is False
         assert "Invalid agent" in result.output
         assert "invalid-agent-xyz" in result.output
 
-    def test_model_invalid_model(self):
+    async def test_model_invalid_model(self):
         """'/model pm invalid' shows error for invalid model."""
         commands = SystemCommands()
-        result = commands.dispatch("model", ["pm", "invalid-model-xyz"])
+        result = await commands.dispatch("model", ["pm", "invalid-model-xyz"])
 
         assert result.success is False
         assert "invalid" in result.output.lower()
 
-    def test_model_clears_with_clear(self):
+    async def test_model_clears_with_clear(self):
         """'/model pm clear' clears model for agent."""
         commands = SystemCommands()
         commands._session_model_overrides["pm"] = "gpt-5"
 
-        result = commands.dispatch("model", ["pm", "clear"])
+        result = await commands.dispatch("model", ["pm", "clear"])
 
         assert result.success is True
         assert "pm" not in commands._session_model_overrides
@@ -421,10 +441,10 @@ class TestResetAgentCommand:
 class TestLegacyNotifyCommandRemoved:
     """Tests that /notify is removed (superseded by @notify pseudo-agent)."""
 
-    def test_notify_command_returns_unknown(self):
+    async def test_notify_command_returns_unknown(self):
         """Test /notify returns unknown command error."""
         commands = SystemCommands()
-        result = commands.dispatch("notify", ["test"])
+        result = await commands.dispatch("notify", ["test"])
 
         assert result.success is False
         assert "Unknown command" in result.output
