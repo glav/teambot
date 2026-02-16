@@ -182,20 +182,24 @@ class TestModelTierAcceptanceScenarios:
         # Reset in-memory cache to force reload
         reset_model_cache()
 
-        # Call REAL handle_models implementation
-        with patch("teambot.config.model_cache.Path.cwd", return_value=tmp_path):
-            result = await handle_models([])
+        try:
+            # Call REAL handle_models implementation
+            with patch("teambot.config.model_cache.Path.cwd", return_value=tmp_path):
+                result = await handle_models([])
 
-        # Verify output contains multiplier suffixes
-        assert "[1.0x]" in result.output or "[1x]" in result.output, (
-            f"Expected '[1.0x]' in output, got: {result.output[:500]}"
-        )
-        assert "[0.25x]" in result.output, (
-            f"Expected '[0.25x]' in output, got: {result.output[:500]}"
-        )
-        assert "[5.0x]" in result.output or "[5x]" in result.output, (
-            f"Expected '[5.0x]' in output, got: {result.output[:500]}"
-        )
+            # Verify output contains multiplier suffixes
+            assert "[1.0x]" in result.output or "[1x]" in result.output, (
+                f"Expected '[1.0x]' in output, got: {result.output[:500]}"
+            )
+            assert "[0.25x]" in result.output, (
+                f"Expected '[0.25x]' in output, got: {result.output[:500]}"
+            )
+            assert "[5.0x]" in result.output or "[5x]" in result.output, (
+                f"Expected '[5.0x]' in output, got: {result.output[:500]}"
+            )
+        finally:
+            # Reset cache to avoid polluting subsequent tests
+            reset_model_cache()
 
     # =========================================================================
     # AT-006: Tier Boundary Values
