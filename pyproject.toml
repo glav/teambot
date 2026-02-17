@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 packages = ["src/teambot"]
 
 [tool.hatch.build]
-include = ["src/teambot/**/*.css"]
+include = ["src/teambot/**/*.css", "src/teambot/scaffolds/**"]
 
 [project]
 name = "teambot"

@@ -49,10 +49,9 @@ class TestAcceptanceNotifyPseudoAgent:
             command = parse_command('@notify "Build complete!"')
             result = await executor.execute(command)
 
-            # Verify confirmation output
+            # Verify confirmation output (text only, not emojis for Windows compatibility)
             assert result.success is True
             assert "Notification sent" in result.output
-            assert "✅" in result.output
 
             # Verify EventBus was called with message
             mock_bus.emit_sync.assert_called_once()

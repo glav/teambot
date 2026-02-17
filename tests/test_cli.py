@@ -132,6 +132,64 @@ class TestCLIInit:
         config = json.loads((tmp_path / "teambot.json").read_text(encoding="utf-8"))
         assert "agents" in config
 
+    def test_init_copies_scaffolds(self, tmp_path, monkeypatch):
+        """Init copies scaffold files to new repository."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        args = argparse.Namespace(force=False)
+        display = ConsoleDisplay()
+
+        result = cmd_init(args, display)
+
+        assert result == 0
+        assert (tmp_path / "stages.yaml").exists()
+        assert (tmp_path / "AGENTS.md").exists()
+        assert (tmp_path / ".github" / "agents").exists()
+        assert (tmp_path / ".agent").exists()
+
+    def test_init_skips_existing_scaffolds(self, tmp_path, monkeypatch):
+        """Init doesn't overwrite existing scaffold files."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create existing file
+        (tmp_path / "AGENTS.md").write_text("My custom AGENTS")
+
+        args = argparse.Namespace(force=False)
+        display = ConsoleDisplay()
+
+        cmd_init(args, display)
+
+        # Should preserve existing content
+        assert (tmp_path / "AGENTS.md").read_text() == "My custom AGENTS"
+
+    def test_init_force_overwrites_scaffolds(self, tmp_path, monkeypatch):
+        """Init with --force overwrites scaffold files."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # First init
+        cmd_init(argparse.Namespace(force=False), ConsoleDisplay())
+
+        # Modify a file
+        (tmp_path / "AGENTS.md").write_text("Modified")
+
+        # Force re-init
+        cmd_init(argparse.Namespace(force=True), ConsoleDisplay())
+
+        # Should be overwritten with package version
+        assert (tmp_path / "AGENTS.md").read_text() != "Modified"
+
 
 class TestCLIRun:
     """Tests for run command."""

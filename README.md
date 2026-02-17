@@ -70,6 +70,20 @@ teambot run objectives/my-feature.md
 teambot run
 ```
 
+### What `teambot init` Creates
+
+The init command sets up your project with:
+
+- `teambot.json` - Configuration file for agents and workflows
+- `.teambot/` - Directory for workflow state and history
+- `stages.yaml` - Workflow stage definitions (if not exists)
+- `AGENTS.md` - Agent documentation (if not exists)
+- `.github/agents/` - Agent persona definitions (if not exists)
+- `.agent/` - SDD commands, instructions, and standards (if not exists)
+- `docs/sdd-objective-template.md` - Objective template (if not exists)
+
+**Existing files are never overwritten.** Use `teambot init --force` to reset all scaffold files.
+
 For development from source, see [Development Guide](docs/guides/development.md).
 
 ## Documentation

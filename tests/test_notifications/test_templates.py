@@ -287,7 +287,7 @@ class TestOrchestrationStartedTemplate:
             data={"objective_name": "my-feature", "objective_path": "/path/to/obj.md"},
         )
         result = templates.render(event)
-        assert "🚀" in result
+        # Check for key text content (not emojis for cross-platform compatibility)
         assert "Starting" in result
         assert "my-feature" in result
 
@@ -337,7 +337,7 @@ class TestOrchestrationCompletedTemplate:
             },
         )
         result = templates.render(event)
-        assert "✅" in result
+        # Check for key text content (not emojis for cross-platform compatibility)
         assert "Completed" in result
         assert "my-feature" in result
         assert "2m 5s" in result

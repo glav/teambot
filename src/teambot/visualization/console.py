@@ -294,12 +294,16 @@ class ConsoleDisplay:
 
     def print_success(self, message: str) -> None:
         """Print a success message."""
-        self.console.print(f"[bold green]✓[/] {message}")
+        self.console.print(f"[bold green][OK][/] {message}")
 
     def print_error(self, message: str) -> None:
         """Print an error message."""
-        self.console.print(f"[bold red]✗[/] {message}")
+        self.console.print(f"[bold red][ERROR][/] {message}")
 
     def print_warning(self, message: str) -> None:
         """Print a warning message."""
         self.console.print(f"[bold yellow]![/] {message}")
+
+    def print_info(self, message: str) -> None:
+        """Print an informational message (no special symbols for Windows compatibility)."""
+        self.console.print(message)

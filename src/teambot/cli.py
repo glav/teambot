@@ -104,9 +104,9 @@ def _should_setup_notifications(display: ConsoleDisplay) -> bool:
     if not sys.stdin.isatty():
         return False
 
-    display.print_success("")
-    display.print_success("=== Optional: Real-Time Notifications ===")
-    display.print_success("TeamBot can send notifications via Telegram when stages complete.")
+    display.print_info("")
+    display.print_info("=== Optional: Real-Time Notifications ===")
+    display.print_info("TeamBot can send notifications via Telegram when stages complete.")
     try:
         response = input("Enable real-time notifications? [y/N]: ").strip().lower()
         return response in ("y", "yes")
@@ -116,12 +116,12 @@ def _should_setup_notifications(display: ConsoleDisplay) -> bool:
 
 def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool:
     """Guide user through Telegram notification setup."""
-    display.print_success("")
-    display.print_success("=== Telegram Bot Setup ===")
-    display.print_success("1. Open Telegram and search for @BotFather")
-    display.print_success("2. Send /newbot and follow the prompts")
-    display.print_success("3. Copy the bot token you receive")
-    display.print_success("")
+    display.print_info("")
+    display.print_info("=== Telegram Bot Setup ===")
+    display.print_info("1. Open Telegram and search for @BotFather")
+    display.print_info("2. Send /newbot and follow the prompts")
+    display.print_info("3. Copy the bot token you receive")
+    display.print_info("")
 
     try:
         proceed = input("Ready to enter credentials? [Y/n]: ").strip().lower()
@@ -135,24 +135,24 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
             token_env = "TEAMBOT_TELEGRAM_TOKEN"
 
         # Get chat ID env var name (with default)
-        display.print_success("")
-        display.print_success("To get your chat ID:")
-        display.print_success("1. Send any message to your new bot")
-        display.print_success("2. Visit: https://api.telegram.org/bot<TOKEN>/getUpdates")
-        display.print_success("3. Look for 'chat':{'id': <YOUR_CHAT_ID>}")
-        display.print_success("")
+        display.print_info("")
+        display.print_info("To get your chat ID:")
+        display.print_info("1. Send any message to your new bot")
+        display.print_info("2. Visit: https://api.telegram.org/bot<TOKEN>/getUpdates")
+        display.print_info("3. Look for 'chat':{'id': <YOUR_CHAT_ID>}")
+        display.print_info("")
         chat_id_env = input("Environment variable for chat ID [TEAMBOT_TELEGRAM_CHAT_ID]: ").strip()
         if not chat_id_env:
             chat_id_env = "TEAMBOT_TELEGRAM_CHAT_ID"
 
         # Get notification mode
-        display.print_success("")
-        display.print_success("=== Notification Frequency ===")
-        display.print_success("Choose how many notifications to receive:")
-        display.print_success("  1. stages_only  - Major milestones only (recommended)")
-        display.print_success("  2. agent_status - Stage + agent lifecycle events")
-        display.print_success("  3. all          - All events (verbose)")
-        display.print_success("")
+        display.print_info("")
+        display.print_info("=== Notification Frequency ===")
+        display.print_info("Choose how many notifications to receive:")
+        display.print_info("  1. stages_only  - Major milestones only (recommended)")
+        display.print_info("  2. agent_status - Stage + agent lifecycle events")
+        display.print_info("  3. all          - All events (verbose)")
+        display.print_info("")
 
         mode_input = input("Notification mode [1/2/3, default: 1]: ").strip()
         mode_map = {"1": "stages_only", "2": "agent_status", "3": "all", "": "stages_only"}
@@ -171,14 +171,14 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
             ],
         }
 
-        display.print_success("")
+        display.print_info("")
         display.print_success("Notification configuration added!")
-        display.print_success(f"  Mode: {notification_mode}")
-        display.print_success("")
+        display.print_info(f"  Mode: {notification_mode}")
+        display.print_info("")
         display.print_warning("IMPORTANT: Set these environment variables:")
         display.print_warning(f"  export {token_env}='your-bot-token'")
         display.print_warning(f"  export {chat_id_env}='your-chat-id'")
-        display.print_success("")
+        display.print_info("")
 
         return True
 
@@ -190,8 +190,9 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
 def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Initialize TeamBot configuration."""
     config_path = Path("teambot.json")
+    force = getattr(args, "force", False)
 
-    if config_path.exists() and not args.force:
+    if config_path.exists() and not force:
         display.print_error(f"Configuration already exists: {config_path}")
         display.print_warning("Use --force to overwrite")
         return 1
@@ -214,6 +215,26 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     display.print_success(f"Created configuration: {config_path}")
     display.print_success(f"Created directory: {teambot_dir}")
+
+    # Copy scaffold files
+    from teambot.scaffolds import copy_all_scaffolds
+
+    display.print_success("")
+    display.print_success("=== Copying Scaffold Files ===")
+
+    results = copy_all_scaffolds(Path.cwd(), force=force)
+
+    for result in results:
+        if result.copied:
+            display.print_success(f"  Copied: {result.target}")
+        elif result.reason == "skipped_exists":
+            display.print_warning(f"  Skipped (exists): {result.target}")
+        elif result.reason == "skipped_not_empty":
+            display.print_warning(f"  Skipped (not empty): {result.target}")
+        elif result.reason == "source_missing":
+            display.print_error(f"  Missing from package: {result.source}")
+
+    display.print_success("")
 
     # Show agents
     play_startup_animation(
@@ -385,14 +406,14 @@ def _run_orchestration(
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
         elif event_type == "orchestration_started":
             objective = data.get("objective_name", "orchestration run")
-            display.print_success(f"🚀 Starting: {objective}")
+            display.print_success(f"Starting: {objective}")
         elif event_type == "orchestration_completed":
             objective = data.get("objective_name", "orchestration run")
             status = data.get("status", "complete")
             duration = data.get("duration_seconds", 0)
             duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
-            emoji = "✅" if status == "complete" else "⚠️"
-            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
+            status_str = "[DONE]" if status == "complete" else "[WARN]"
+            display.print_success(f"{status_str} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
@@ -519,14 +540,14 @@ def _run_orchestration_resume(
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
         elif event_type == "orchestration_started":
             objective = data.get("objective_name", "orchestration run")
-            display.print_success(f"🚀 Starting: {objective}")
+            display.print_success(f"Starting: {objective}")
         elif event_type == "orchestration_completed":
             objective = data.get("objective_name", "orchestration run")
             status = data.get("status", "complete")
             duration = data.get("duration_seconds", 0)
             duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
-            emoji = "✅" if status == "complete" else "⚠️"
-            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
+            status_str = "[DONE]" if status == "complete" else "[WARN]"
+            display.print_success(f"{status_str} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
