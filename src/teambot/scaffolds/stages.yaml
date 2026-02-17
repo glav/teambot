@@ -1,0 +1,447 @@
+# =============================================================================
+# TeamBot Stage Configuration
+# =============================================================================
+#
+# This file defines the workflow stages for TeamBot orchestration.
+# Each stage specifies which agents run, what artifacts are produced, and exit criteria.
+#
+# To customize the workflow, copy this file and point to it in teambot.json:
+#   "stages_config": "path/to/custom-stages.yaml"
+#
+# =============================================================================
+# SCHEMA REFERENCE
+# =============================================================================
+#
+# Stage Fields:
+#   name              - Display name for the stage (default: stage key)
+#   description       - What this stage does (default: "")
+#   work_agent        - Agent that executes work (see AGENT SEMANTICS below) (default: null)
+#   review_agent      - Agent that performs review (review stages only) (default: null)
+#   allowed_personas  - Personas allowed at this stage; enforced via is_persona_allowed()
+#                       in state_machine.py (default: [])
+#   artifacts         - Files produced (see ARTIFACT STORAGE below) (default: [])
+#   exit_criteria     - Completion conditions (informational) (default: [])
+#   optional          - Whether stage can be skipped (default: false)
+#   is_review_stage   - Triggers review iteration loop (default: false)
+#   is_acceptance_test_stage - Triggers acceptance test handling (default: false)
+#   requires_acceptance_tests_passed - Blocks if acceptance tests failed (default: false)
+#   parallel_agents   - Agents that can run in parallel (default: null)
+#   prompt_template   - Path to SDD prompt file (relative to repo root) (default: null)
+#   include_objective - Include objective content in agent context (default: true)
+#
+# Global Sections (at file level):
+#   stages            - Map of stage definitions (required)
+#   stage_order       - List defining sequential execution order (required)
+#   parallel_groups   - Map of parallel stage groups (optional, see PARALLEL STAGE GROUPS)
+#   work_to_review_mapping - Map of work stages to their review stages (required)
+#
+# =============================================================================
+# AGENT FIELD SEMANTICS
+# =============================================================================
+#
+# The meaning of work_agent and review_agent depends on stage type:
+#
+# WORK STAGES (is_review_stage: false):
+#   work_agent   = Agent that executes the stage work
+#   review_agent = Not used (should be null)
+#
+# REVIEW STAGES (is_review_stage: true):
+#   work_agent   = Agent that addresses feedback and makes revisions
+#   review_agent = Agent that reviews work and approves/rejects
+#
+# Review stages iterate up to 4 times:
+#   1. work_agent executes or revises based on feedback
+#   2. review_agent reviews and provides feedback
+#   3. If not approved, work_agent addresses feedback
+#   4. Repeat until approved or max iterations reached
+#
+# Example: In SPEC_REVIEW stage:
+#   work_agent: ba        → Business Analyst revises the spec
+#   review_agent: reviewer → Reviewer approves or requests changes
+#
+# =============================================================================
+# ARTIFACT STORAGE
+# =============================================================================
+#
+# Artifacts listed in the 'artifacts' field are stored at:
+#
+#   {teambot_dir}/{feature_name}/artifacts/{artifact_filename}
+#
+# Where:
+#   teambot_dir  = .teambot (or custom path from teambot.json "teambot_dir")
+#   feature_name = Derived from objective file (## Feature Name or filename)
+#
+# Example:
+#   Objective: objectives/add-user-login.md
+#   Feature name: add-user-login
+#   Artifact: feature_spec.md
+#   Full path: .teambot/add-user-login/artifacts/feature_spec.md
+#
+# =============================================================================
+# REVIEW STAGE MAPPING
+# =============================================================================
+#
+# Two related but distinct concepts control review behavior:
+#
+# 1. is_review_stage (per-stage field):
+#    - Enables the review iteration loop for that stage
+#    - When true, ReviewIterator handles the stage execution
+#
+# 2. work_to_review_mapping (global mapping at end of file):
+#    - Defines which review stage follows each work stage
+#    - Used for navigation and workflow sequencing
+#
+# These are NOT redundant - a stage can be in work_to_review_mapping
+# without being a review stage itself (e.g., ACCEPTANCE_TEST → POST_REVIEW).
+#
+# =============================================================================
+# PARALLEL STAGE GROUPS
+# =============================================================================
+#
+# The parallel_groups section defines stages that can execute concurrently
+# instead of sequentially. This enables workflow optimization by running
+# independent stages in parallel.
+#
+# Each parallel group has the following fields:
+#
+#   after  - Trigger stage that must complete before parallel execution starts
+#   stages - List of stage names to run concurrently
+#   before - Gate stage that waits for all parallel stages to complete
+#
+# Example:
+#   parallel_groups:
+#     post_spec_review:
+#       after: SPEC_REVIEW      # Parallel stages start after SPEC_REVIEW completes
+#       stages:
+#         - RESEARCH            # These two stages run concurrently
+#         - TEST_STRATEGY
+#       before: PLAN            # PLAN waits for both RESEARCH and TEST_STRATEGY
+#
+# Constraints:
+#   - Parallel stages must be independent (no dependencies between them)
+#   - All stages in a group must be defined in the 'stages' section
+#   - The 'after' stage must precede all parallel stages in stage_order
+#   - The 'before' stage must follow all parallel stages in stage_order
+#   - Stages in a parallel group must use different work_agents. Using the
+#     same agent in multiple parallel stages causes session conflicts and
+#     will be rejected at startup with a validation error.
+#
+# =============================================================================
+# VALIDATION RULES
+# =============================================================================
+#
+# WORK STAGES (is_review_stage: false):
+#   - Must have work_agent set (non-null)
+#   - review_agent should be null
+#   - allowed_personas must include work_agent's persona
+#
+# REVIEW STAGES (is_review_stage: true):
+#   - Must have both work_agent and review_agent set
+#   - work_agent handles revisions based on feedback
+#   - review_agent performs approval/rejection
+#   - allowed_personas must include review_agent's persona
+#
+# TERMINAL STAGE (COMPLETE):
+#   - work_agent and review_agent should be null
+#   - allowed_personas should be empty
+#   - No artifacts produced
+#
+# =============================================================================
+
+stages:
+  SETUP:
+    name: Setup
+    description: Initialize project, configure agents, and establish working directory
+    work_agent: pm
+    review_agent: null
+    allowed_personas:
+      - project_manager
+      - pm
+    artifacts: []
+    exit_criteria:
+      - Environment ready
+      - Configuration validated
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.0-initialize.prompt.md
+    include_objective: false  # Generic initialization, no objective needed
+
+  BUSINESS_PROBLEM:
+    name: Business Problem
+    description: Define the business problem, goals, and success criteria
+    work_agent: ba
+    review_agent: null
+    allowed_personas:
+      - business_analyst
+      - ba
+      - project_manager
+      - pm
+    artifacts:
+      - problem_statement.md  # → .teambot/{feature}/artifacts/problem_statement.md
+    exit_criteria:
+      - Clear problem definition with measurable goals
+    optional: true  # May be skipped for small changes
+    prompt_template: null  # No SDD prompt for this stage
+    include_objective: true
+
+  SPEC:
+    name: Specification
+    description: Create detailed feature specification
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas:
+      - business_analyst
+      - ba
+      - technical_writer
+      - writer
+    artifacts:
+      - feature_spec.md  # → .teambot/{feature}/artifacts/feature_spec.md
+    exit_criteria:
+      - Complete specification with all required sections
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
+    include_objective: true
+
+  SPEC_REVIEW:
+    name: Spec Review
+    description: Review and approve the feature specification
+    work_agent: ba
+    review_agent: reviewer
+    allowed_personas:
+      - reviewer
+      - project_manager
+      - pm
+    artifacts:
+      - spec_review.md  # → .teambot/{feature}/artifacts/spec_review.md
+    exit_criteria:
+      - Specification approved or revision feedback provided
+    optional: false
+    is_review_stage: true
+    prompt_template: .agent/commands/sdd/sdd.2-review-spec.prompt.md
+    include_objective: true
+
+  RESEARCH:
+    name: Research
+    description: Research technical approaches, analyze project structure, and identify dependencies
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+      - technical_writer
+      - writer
+    artifacts:
+      - research.md  # → .teambot/{feature}/artifacts/research.md
+    exit_criteria:
+      - Research document with implementation recommendations
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.3-research-feature.prompt.md
+    include_objective: true
+
+  TEST_STRATEGY:
+    name: Test Strategy
+    description: Define testing approach (TDD vs Code-First), coverage targets, and test patterns
+    work_agent: builder-2
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+      - reviewer
+    artifacts:
+      - test_strategy.md  # → .teambot/{feature}/artifacts/test_strategy.md
+    exit_criteria:
+      - Test strategy document with approach per component
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.4-determine-test-strategy.prompt.md
+    include_objective: true
+
+  PLAN:
+    name: Plan
+    description: Create implementation plan with task breakdown and dependencies
+    work_agent: pm
+    review_agent: reviewer
+    allowed_personas:
+      - project_manager
+      - pm
+      - builder
+      - developer
+    artifacts:
+      - implementation_plan.md  # → .teambot/{feature}/artifacts/implementation_plan.md
+    exit_criteria:
+      - Actionable plan with atomic tasks and clear dependencies
+    optional: false
+    prompt_template: .agent/commands/sdd/sdd.5-task-planner-for-feature.prompt.md
+    include_objective: true
+
+  PLAN_REVIEW:
+    name: Plan Review
+    description: Review and approve the implementation plan
+    work_agent: pm
+    review_agent: reviewer
+    allowed_personas:
+      - reviewer
+      - project_manager
+      - pm
+    artifacts:
+      - plan_review.md  # → .teambot/{feature}/artifacts/plan_review.md
+    exit_criteria:
+      - Plan approved or revision feedback provided
+    optional: false
+    is_review_stage: true
+    prompt_template: .agent/commands/sdd/sdd.6-review-plan.prompt.md
+    include_objective: true
+
+  IMPLEMENTATION:
+    name: Implementation
+    description: Execute the implementation plan, write code, and implement tests
+    work_agent: builder-1
+    review_agent: reviewer
+    allowed_personas:
+      - builder
+      - developer
+    artifacts: []  # Dynamic based on plan
+    exit_criteria:
+      - All tasks complete
+      - Code implemented per plan
+    optional: false
+    parallel_agents:
+      - builder-1
+      - builder-2
+    prompt_template: .agent/commands/sdd/sdd.7-task-implementer-for-feature.prompt.md
+    include_objective: true
+
+  IMPLEMENTATION_REVIEW:
+    name: Implementation Review
+    description: Review implemented changes for quality, correctness, and adherence to spec
+    work_agent: builder-1
+    review_agent: reviewer
+    allowed_personas:
+      - reviewer
+    artifacts:
+      - impl_review.md  # → .teambot/{feature}/artifacts/impl_review.md
+    exit_criteria:
+      - Implementation approved or revision feedback provided
+    optional: false
+    is_review_stage: true
+    prompt_template: null  # Uses general review approach
+    include_objective: true
+
+  TEST:
+    name: Test
+    description: >
+      Execute tests and validate implementation meets requirements.
+      New tests should be introduced to ensure new functionality is covered
+      and tests pass before continuing.
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+      - reviewer
+    artifacts:
+      - test_results.md  # → .teambot/{feature}/artifacts/test_results.md
+    exit_criteria:
+      - All tests passing
+      - Coverage targets met
+    optional: false
+    prompt_template: null  # Uses general test execution
+    include_objective: true
+
+  ACCEPTANCE_TEST:
+    name: Acceptance Test
+    description: >
+      Execute acceptance test scenarios from the feature specification.
+      These tests validate the implementation works end-to-end from a user's perspective.
+      Unlike unit tests, acceptance tests exercise the complete user flow.
+      The orchestration will NOT proceed to completion if any acceptance tests fail.
+    work_agent: builder-1
+    review_agent: null
+    allowed_personas:
+      - builder
+      - developer
+    artifacts:
+      - acceptance_test_results.md  # → .teambot/{feature}/artifacts/acceptance_test_results.md
+    exit_criteria:
+      - All acceptance test scenarios executed
+      - All acceptance tests passing
+      - No failures blocking completion
+    optional: false
+    is_acceptance_test_stage: true  # Special flag for acceptance test handling
+    prompt_template: null
+    include_objective: true
+
+  POST_REVIEW:
+    name: Post Implementation Review
+    description: >
+      Final review, retrospective, and validation of all success criteria.
+      MUST verify that acceptance tests have passed before approving.
+      Cannot mark workflow as complete if acceptance tests failed.
+    work_agent: pm
+    review_agent: reviewer
+    allowed_personas:
+      - project_manager
+      - pm
+      - reviewer
+    artifacts:
+      - post_review.md  # → .teambot/{feature}/artifacts/post_review.md
+    exit_criteria:
+      - All success criteria validated
+      - Acceptance tests verified as passing
+      - Final approval granted
+    optional: false
+    is_review_stage: true
+    requires_acceptance_tests_passed: true  # Blocks completion if acceptance tests failed
+    prompt_template: .agent/commands/sdd/sdd.8-post-implementation-review.prompt.md
+    include_objective: true
+
+  COMPLETE:
+    name: Complete
+    description: Workflow complete, all artifacts finalized
+    work_agent: null
+    review_agent: null
+    allowed_personas: []
+    artifacts: []
+    exit_criteria:
+      - All success criteria met
+      - Documentation complete
+    optional: false
+    prompt_template: null
+    include_objective: false
+
+# Stage execution order
+stage_order:
+  - SETUP
+  - BUSINESS_PROBLEM
+  - SPEC
+  - SPEC_REVIEW
+  - RESEARCH
+  - TEST_STRATEGY
+  - PLAN
+  - PLAN_REVIEW
+  - IMPLEMENTATION
+  - IMPLEMENTATION_REVIEW
+  - TEST
+  - ACCEPTANCE_TEST
+  - POST_REVIEW
+  - COMPLETE
+
+# Parallel stage groups - stages that execute concurrently
+# after: trigger stage that must complete first
+# stages: list of stages to run in parallel
+# before: gate stage - all parallel stages must complete before this
+parallel_groups:
+  post_spec_review:
+    after: SPEC_REVIEW
+    stages:
+      - RESEARCH
+      - TEST_STRATEGY
+    before: PLAN
+
+# Mapping of work stages to their review stages
+# Note: This defines NAVIGATION (which review follows which work stage).
+# The is_review_stage flag on each stage controls EXECUTION BEHAVIOR.
+# See header documentation for full explanation of the distinction.
+work_to_review_mapping:
+  SPEC: SPEC_REVIEW
+  PLAN: PLAN_REVIEW
+  IMPLEMENTATION: IMPLEMENTATION_REVIEW
+  ACCEPTANCE_TEST: POST_REVIEW

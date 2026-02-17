@@ -190,8 +190,9 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
 def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Initialize TeamBot configuration."""
     config_path = Path("teambot.json")
+    force = getattr(args, "force", False)
 
-    if config_path.exists() and not args.force:
+    if config_path.exists() and not force:
         display.print_error(f"Configuration already exists: {config_path}")
         display.print_warning("Use --force to overwrite")
         return 1
@@ -214,6 +215,26 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     display.print_success(f"Created configuration: {config_path}")
     display.print_success(f"Created directory: {teambot_dir}")
+
+    # Copy scaffold files
+    from teambot.scaffolds import copy_all_scaffolds
+
+    display.print_success("")
+    display.print_success("=== Copying Scaffold Files ===")
+
+    results = copy_all_scaffolds(Path.cwd(), force=force)
+
+    for result in results:
+        if result.copied:
+            display.print_success(f"  ✅ Copied: {result.target}")
+        elif result.reason == "skipped_exists":
+            display.print_warning(f"  ⏭️  Skipped (exists): {result.target}")
+        elif result.reason == "skipped_not_empty":
+            display.print_warning(f"  ⏭️  Skipped (not empty): {result.target}")
+        elif result.reason == "source_missing":
+            display.print_error(f"  ❌ Missing from package: {result.source}")
+
+    display.print_success("")
 
     # Show agents
     play_startup_animation(
