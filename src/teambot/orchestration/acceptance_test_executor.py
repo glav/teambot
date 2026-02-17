@@ -65,7 +65,7 @@ class AcceptanceTestResult:
     @property
     def summary(self) -> str:
         """Generate a summary of the test results."""
-        status = "✅ ALL PASSED" if self.all_passed else "❌ FAILURES"
+        status = "[OK] ALL PASSED" if self.all_passed else "[FAIL] FAILURES"
         return f"{status}: {self.passed}/{self.total} passed, {self.failed} failed"
 
 
@@ -546,7 +546,7 @@ class AcceptanceTestExecutor:
         # Append runtime validation output to main validation output
         runtime_report = "\n\n## Runtime Validation Results\n\n"
         for scenario in runtime_result.scenarios:
-            status_emoji = "✅" if scenario.status == AcceptanceTestStatus.PASSED else "❌"
+            status_emoji = "[OK]" if scenario.status == AcceptanceTestStatus.PASSED else "[FAIL]"
             runtime_report += f"- {status_emoji} {scenario.id}: {scenario.status.value}"
             if scenario.failure_reason:
                 runtime_report += f" - {scenario.failure_reason}"
@@ -916,12 +916,12 @@ def generate_acceptance_test_report(
 
     for scenario in result.scenarios:
         status_emoji = {
-            AcceptanceTestStatus.PASSED: "✅",
-            AcceptanceTestStatus.FAILED: "❌",
-            AcceptanceTestStatus.SKIPPED: "⏭️",
+            AcceptanceTestStatus.PASSED: "[OK]",
+            AcceptanceTestStatus.FAILED: "[FAIL]",
+            AcceptanceTestStatus.SKIPPED: "[SKIP]",
             AcceptanceTestStatus.ERROR: "💥",
             AcceptanceTestStatus.PENDING: "⏳",
-            AcceptanceTestStatus.RUNNING: "🔄",
+            AcceptanceTestStatus.RUNNING: "[...]",
         }.get(scenario.status, "❓")
 
         details = scenario.failure_reason or "-"

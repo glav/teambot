@@ -194,7 +194,7 @@ class TaskExecutor:
                 # Check if notifications are explicitly disabled
                 # Default to False if 'enabled' key is missing for safety
                 if not notifications.get("enabled", False):
-                    output = "⚠️ Notifications are disabled"
+                    output = "[WARN] Notifications are disabled"
                     logger.warning("@notify: Notifications are disabled in config")
                 else:
                     # Notifications are enabled, try to create event bus
@@ -203,17 +203,17 @@ class TaskExecutor:
                         channel_names = [type(ch).__name__ for ch in event_bus._channels]
                         logger.debug(f"@notify: Emitting to channels: {channel_names}")
                         event_bus.emit_sync("custom_message", {"message": message})
-                        output = "Notification sent ✅"
+                        output = "Notification sent [OK]"
                         logger.debug("@notify: emit_sync completed")
                     else:
-                        output = "⚠️ No notification channels configured"
+                        output = "[WARN] No notification channels configured"
                         logger.warning("@notify: Notifications enabled but no channels configured")
             else:
-                output = "⚠️ No notification configuration available"
+                output = "[WARN] No notification configuration available"
                 logger.warning("@notify: No config available")
         except Exception as e:
             # Generic output without exception details to avoid leaking secrets
-            output = "⚠️ Notification failed (see logs)"
+            output = "[WARN] Notification failed (see logs)"
             # Log only exception type to avoid exposing sensitive data (e.g., URLs with tokens)
             logger.warning(f"@notify failed: {type(e).__name__}")
 

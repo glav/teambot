@@ -226,13 +226,13 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     for result in results:
         if result.copied:
-            display.print_success(f"  ✅ Copied: {result.target}")
+            display.print_success(f"  Copied: {result.target}")
         elif result.reason == "skipped_exists":
-            display.print_warning(f"  ⏭️  Skipped (exists): {result.target}")
+            display.print_warning(f"  Skipped (exists): {result.target}")
         elif result.reason == "skipped_not_empty":
-            display.print_warning(f"  ⏭️  Skipped (not empty): {result.target}")
+            display.print_warning(f"  Skipped (not empty): {result.target}")
         elif result.reason == "source_missing":
-            display.print_error(f"  ❌ Missing from package: {result.source}")
+            display.print_error(f"  Missing from package: {result.source}")
 
     display.print_success("")
 
@@ -406,14 +406,14 @@ def _run_orchestration(
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
         elif event_type == "orchestration_started":
             objective = data.get("objective_name", "orchestration run")
-            display.print_success(f"🚀 Starting: {objective}")
+            display.print_success(f"Starting: {objective}")
         elif event_type == "orchestration_completed":
             objective = data.get("objective_name", "orchestration run")
             status = data.get("status", "complete")
             duration = data.get("duration_seconds", 0)
             duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
-            emoji = "✅" if status == "complete" else "⚠️"
-            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
+            status_str = "[DONE]" if status == "complete" else "[WARN]"
+            display.print_success(f"{status_str} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":
@@ -540,14 +540,14 @@ def _run_orchestration_resume(
             display.print_success(f"Stage: {data.get('stage', 'unknown')}")
         elif event_type == "orchestration_started":
             objective = data.get("objective_name", "orchestration run")
-            display.print_success(f"🚀 Starting: {objective}")
+            display.print_success(f"Starting: {objective}")
         elif event_type == "orchestration_completed":
             objective = data.get("objective_name", "orchestration run")
             status = data.get("status", "complete")
             duration = data.get("duration_seconds", 0)
             duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
-            emoji = "✅" if status == "complete" else "⚠️"
-            display.print_success(f"{emoji} Completed: {objective} ({duration_str})")
+            status_str = "[DONE]" if status == "complete" else "[WARN]"
+            display.print_success(f"{status_str} Completed: {objective} ({duration_str})")
         elif event_type == "agent_running":
             display.print_success(f"Agent {data.get('agent_id')} running")
         elif event_type == "agent_complete":

@@ -225,7 +225,7 @@ async def handle_models(args: list[str]) -> CommandResult:
     if not models:
         return CommandResult(
             output=(
-                "[red]✗ No models available[/red]\n"
+                "[red][X] No models available[/red]\n"
                 "[yellow]Model cache is empty or expired.[/yellow]\n"
                 "[dim]Run '/models --refresh' to fetch from SDK.[/dim]"
             ),
@@ -299,11 +299,11 @@ async def _handle_models_refresh() -> CommandResult:
 
         if success:
             count = len(get_available_models())
-            return CommandResult(output=f"✓ Model cache refreshed: {count} models available.")
+            return CommandResult(output=f"[OK] Model cache refreshed: {count} models available.")
         else:
             return CommandResult(
                 output=(
-                    "[red]✗ Failed to refresh models[/red]\n"
+                    "[red][X] Failed to refresh models[/red]\n"
                     "[dim]Check network connectivity and SDK installation.[/dim]\n"
                     "[dim]Run 'copilot --version' to verify SDK.[/dim]"
                 ),
@@ -312,7 +312,7 @@ async def _handle_models_refresh() -> CommandResult:
     except Exception as e:
         return CommandResult(
             output=(
-                f"[red]✗ Error refreshing models: {type(e).__name__}[/red]\n"
+                f"[red][X] Error refreshing models: {type(e).__name__}[/red]\n"
                 "[dim]Run 'copilot --version' to verify SDK installation.[/dim]"
             ),
             success=False,
@@ -488,10 +488,10 @@ def handle_tasks(args: list[str], executor: Optional["TaskExecutor"]) -> Command
     for task in tasks:
         status_icon = {
             TaskStatus.PENDING: "⏳",
-            TaskStatus.RUNNING: "🔄",
-            TaskStatus.COMPLETED: "✅",
-            TaskStatus.FAILED: "❌",
-            TaskStatus.SKIPPED: "⏭️",
+            TaskStatus.RUNNING: "[...]",
+            TaskStatus.COMPLETED: "[OK]",
+            TaskStatus.FAILED: "[FAIL]",
+            TaskStatus.SKIPPED: "[SKIP]",
             TaskStatus.CANCELLED: "🚫",
         }.get(task.status, "?")
 
