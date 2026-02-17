@@ -154,9 +154,9 @@ When configuring notifications, add a step:
 
 ```
 ? Notification frequency:
-  ○ stages_only - Only stage start/completion (quietest)
+  ● stages_only - Only stage start/completion (quietest, default)
   ○ agent_status - Stage and agent lifecycle events
-  ● all - All notification events (default)
+  ○ all - All notification events
 ```
 
 ### Files Likely to Change
