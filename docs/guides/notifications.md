@@ -189,7 +189,8 @@ The `${VAR_NAME}` syntax references environment variables at runtime.
 | `type` | string | Yes | Must be `"telegram"` |
 | `token` | string | Yes | Bot token (use `${ENV_VAR}` syntax) |
 | `chat_id` | string | Yes | Chat ID (use `${ENV_VAR}` syntax) |
-| `events` | array | No | Event types to receive (default: all) |
+| `notification_mode` | string | No | Preset filter: `stages_only`, `agent_status`, or `all` |
+| `events` | array | No | Event types to receive (overrides `notification_mode`) |
 | `dry_run` | boolean | No | Log messages without sending (default: `false`) |
 
 ### Custom Environment Variable Names
@@ -210,6 +211,70 @@ You can use custom environment variable names:
   }
 }
 ```
+
+---
+
+## Notification Modes
+
+Instead of listing individual event types, you can use **notification mode presets** to control how many notifications you receive:
+
+| Mode | Events Included | Use Case |
+|------|-----------------|----------|
+| `stages_only` | `stage_changed`, `orchestration_started`, `orchestration_completed` | Low noise, major milestones only |
+| `agent_status` | All `stages_only` events + `agent_running`, `agent_complete`, `agent_failed` | Monitor agent health |
+| `all` | All notification events | Full visibility, debugging |
+
+### Mode Configuration Example
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "channels": [
+      {
+        "type": "telegram",
+        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+        "notification_mode": "stages_only"
+      }
+    ]
+  }
+}
+```
+
+### Multiple Channels with Different Modes
+
+You can configure different channels with different verbosity levels:
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "channels": [
+      {
+        "type": "telegram",
+        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+        "chat_id": "${TELEGRAM_PM_CHAT}",
+        "notification_mode": "stages_only"
+      },
+      {
+        "type": "telegram",
+        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+        "chat_id": "${TELEGRAM_OPS_CHAT}",
+        "notification_mode": "agent_status"
+      }
+    ]
+  }
+}
+```
+
+### Precedence Rules
+
+1. **`events` array** (if specified) takes precedence over `notification_mode`
+2. **`notification_mode`** expands to its preset event set
+3. **Default** (neither specified) accepts all events
+
+This ensures backwards compatibility — existing configurations with `events` arrays continue to work unchanged.
 
 ---
 

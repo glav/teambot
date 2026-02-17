@@ -280,3 +280,227 @@ class TestCreateEventBusFromConfig:
 
         assert result is not None
         assert len(result._channels) == 0
+
+
+class TestNotificationModeConfig:
+    """Tests for notification_mode in channel config."""
+
+    def test_stages_only_mode_expands_to_stage_events(self, monkeypatch) -> None:
+        """notification_mode: 'stages_only' expands to stage event set."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "stages_only",
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        assert channel.supports_event("stage_changed") is True
+        assert channel.supports_event("orchestration_started") is True
+        assert channel.supports_event("orchestration_completed") is True
+        assert channel.supports_event("agent_running") is False
+        assert channel.supports_event("agent_failed") is False
+
+    def test_agent_status_mode_expands_to_agent_events(self, monkeypatch) -> None:
+        """notification_mode: 'agent_status' expands to agent event set."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "agent_status",
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        assert channel.supports_event("stage_changed") is True
+        assert channel.supports_event("agent_running") is True
+        assert channel.supports_event("agent_complete") is True
+        assert channel.supports_event("agent_failed") is True
+        assert channel.supports_event("parallel_group_start") is False
+
+    def test_all_mode_accepts_all_events(self, monkeypatch) -> None:
+        """notification_mode: 'all' accepts all events."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "all",
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # All mode = no filtering, accepts any event
+        assert channel.supports_event("stage_changed") is True
+        assert channel.supports_event("agent_running") is True
+        assert channel.supports_event("custom_event") is True
+
+    def test_events_array_takes_precedence_over_mode(self, monkeypatch) -> None:
+        """Explicit events array overrides notification_mode."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "all",
+                        "events": ["agent_failed"],  # Explicit filter overrides mode
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        assert channel.supports_event("agent_failed") is True
+        assert channel.supports_event("stage_changed") is False  # Not in events array
+
+    def test_default_accepts_all_when_no_mode_or_events(self, monkeypatch) -> None:
+        """Default behavior (no mode, no events) accepts all events."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        # No events, no notification_mode
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # Default = all events (backwards compatible)
+        assert channel.supports_event("stage_changed") is True
+        assert channel.supports_event("agent_running") is True
+        assert channel.supports_event("any_future_event") is True
+
+    def test_invalid_notification_mode_raises_value_error(self, monkeypatch) -> None:
+        """Invalid notification_mode raises ValueError with valid modes listed."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "invalid_mode",
+                    }
+                ],
+            }
+        }
+
+        import pytest
+
+        with pytest.raises(ValueError) as exc_info:
+            create_event_bus_from_config(config)
+
+        error_message = str(exc_info.value)
+        assert "invalid_mode" in error_message
+        assert "stages_only" in error_message
+        assert "agent_status" in error_message
+        assert "all" in error_message
+
+    def test_empty_events_array_disables_all_notifications(self, monkeypatch) -> None:
+        """Empty events array disables all notifications."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "events": [],  # Empty list should disable all events
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # Empty events list should disable all events
+        assert channel.supports_event("stage_changed") is False
+        assert channel.supports_event("agent_running") is False
+        assert channel.supports_event("any_event") is False
+
+    def test_empty_events_array_overrides_notification_mode(self, monkeypatch) -> None:
+        """Empty events array takes precedence over notification_mode."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "all",  # Mode says accept all
+                        "events": [],  # Empty array should override mode
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # Empty events array should override notification_mode
+        assert channel.supports_event("stage_changed") is False
+        assert channel.supports_event("agent_running") is False
