@@ -189,7 +189,9 @@ class TestAcceptanceScenarios:
         assert command.content == "Incorporate $reviewer feedback"
 
         # Verify reference was extracted by parse_command
-        assert command.references == ["reviewer"], f"Expected ['reviewer'], got {command.references}"
+        assert command.references == ["reviewer"], (
+            f"Expected ['reviewer'], got {command.references}"
+        )
 
     # ── Additional Edge Case Tests ──
 
