@@ -201,3 +201,48 @@ class TestSharedContextIntegration:
         # The last call to execute should have been for PM
         # and should contain BA output #2
         assert run_count == 3  # 2 BA + 1 PM
+
+    @pytest.mark.asyncio
+    async def test_default_agent_routing_extracts_references(self, mock_sdk):
+        """Default agent routing correctly extracts $agent references.
+
+        This tests the bug fix where references were not extracted when
+        using default agent routing (without explicit @agent prefix).
+        """
+        from teambot.repl.parser import Command, CommandType, extract_references
+
+        # Simulate what loop.py does when routing raw input to default agent
+        raw_content = "Summarize $ba feedback and $pm notes"
+
+        # Create command as fixed loop.py would
+        command = Command(
+            type=CommandType.AGENT,
+            agent_id="reviewer",
+            agent_ids=["reviewer"],
+            content=raw_content,
+            references=extract_references(raw_content),
+        )
+
+        # Verify references were extracted
+        assert command.references == ["ba", "pm"]
+
+        # TaskExecutor checks command.references to decide on injection
+        assert len(command.references) == 2
+
+    @pytest.mark.asyncio
+    async def test_default_agent_with_escaped_reference(self, mock_sdk):
+        """Default agent routing ignores escaped references."""
+        from teambot.repl.parser import Command, CommandType, extract_references
+
+        raw_content = r"Explain \$ba syntax but use $pm output"
+
+        command = Command(
+            type=CommandType.AGENT,
+            agent_id="reviewer",
+            agent_ids=["reviewer"],
+            content=raw_content,
+            references=extract_references(raw_content),
+        )
+
+        # Only $pm is extracted, not escaped \$ba
+        assert command.references == ["pm"]

@@ -96,6 +96,29 @@ REFERENCE_PATTERN = re.compile(r"(?<!\\)\$([a-zA-Z][a-zA-Z0-9_-]*)")
 MODEL_FLAG_PATTERN = re.compile(r"(?:--model|-m)\s+([^\s]+)")
 
 
+def extract_references(content: str | None) -> list[str]:
+    """Extract $agent references from content.
+
+    Args:
+        content: Text potentially containing $agent references.
+
+    Returns:
+        List of agent IDs referenced (deduplicated, order preserved).
+
+    Examples:
+        >>> extract_references("Summarize $ba output")
+        ['ba']
+        >>> extract_references("Check $ba and $pm")
+        ['ba', 'pm']
+    """
+    if not content:
+        return []
+    matches = REFERENCE_PATTERN.findall(content)
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    return [r for r in matches if not (r in seen or seen.add(r))]
+
+
 def parse_command(input_text: str) -> Command:
     """Parse user input into a Command object.
 

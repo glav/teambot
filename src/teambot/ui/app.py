@@ -15,6 +15,7 @@ from teambot.repl.commands import SystemCommands
 from teambot.repl.parser import (
     Command,
     CommandType,
+    extract_references,
     needs_default_agent_for_pipeline,
     parse_command,
     prepend_default_agent,
@@ -143,6 +144,7 @@ class TeamBotApp(App):
                         agent_id=default_agent,
                         agent_ids=[default_agent],
                         content=command.content,
+                        references=extract_references(command.content),
                     )
                 task = asyncio.create_task(self._handle_agent_command(agent_command, output))
                 self._pending_tasks.add(task)
