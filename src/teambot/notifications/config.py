@@ -127,9 +127,10 @@ def _create_channel(channel_config: dict[str, Any]):
         # 3. Default to None (all events) for backwards compatibility
         subscribed: set[str] | None = None
 
-        if "events" in resolved and resolved["events"]:
+        if "events" in resolved:
             # Explicit events array takes precedence
-            subscribed = set(resolved["events"])
+            # Empty list means disable all events
+            subscribed = set(resolved["events"]) if resolved["events"] else set()
         elif "notification_mode" in resolved:
             # Mode-based filtering
             mode_events = resolve_notification_mode(resolved["notification_mode"])

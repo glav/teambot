@@ -450,3 +450,57 @@ class TestNotificationModeConfig:
         assert "stages_only" in error_message
         assert "agent_status" in error_message
         assert "all" in error_message
+
+    def test_empty_events_array_disables_all_notifications(self, monkeypatch) -> None:
+        """Empty events array disables all notifications."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "events": [],  # Empty list should disable all events
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # Empty events list should disable all events
+        assert channel.supports_event("stage_changed") is False
+        assert channel.supports_event("agent_running") is False
+        assert channel.supports_event("any_event") is False
+
+    def test_empty_events_array_overrides_notification_mode(self, monkeypatch) -> None:
+        """Empty events array takes precedence over notification_mode."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "123")
+
+        config = {
+            "notifications": {
+                "enabled": True,
+                "channels": [
+                    {
+                        "type": "telegram",
+                        "token": "${TEAMBOT_TELEGRAM_TOKEN}",
+                        "chat_id": "${TEAMBOT_TELEGRAM_CHAT_ID}",
+                        "notification_mode": "all",  # Mode says accept all
+                        "events": [],  # Empty array should override mode
+                    }
+                ],
+            }
+        }
+
+        result = create_event_bus_from_config(config)
+
+        channel = result._channels[0]
+        # Empty events array should override notification_mode
+        assert channel.supports_event("stage_changed") is False
+        assert channel.supports_event("agent_running") is False
