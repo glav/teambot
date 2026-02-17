@@ -42,13 +42,12 @@ def resolve_notification_mode(mode: str) -> frozenset[str] | None:
     Raises:
         ValueError: If mode is not recognized or not a string
     """
+    valid_modes = ", ".join(sorted(NOTIFICATION_MODES.keys()))
     if not isinstance(mode, str):
-        valid = ", ".join(sorted(NOTIFICATION_MODES.keys()))
         raise ValueError(
             f"notification_mode must be a string, got {type(mode).__name__}. "
-            f"Valid modes: {valid}"
+            f"Valid modes: {valid_modes}"
         )
     if mode not in NOTIFICATION_MODES:
-        valid = ", ".join(sorted(NOTIFICATION_MODES.keys()))
-        raise ValueError(f"Invalid notification_mode '{mode}'. Valid modes: {valid}")
+        raise ValueError(f"Invalid notification_mode '{mode}'. Valid modes: {valid_modes}")
     return NOTIFICATION_MODES[mode]
