@@ -86,10 +86,10 @@ class TestResolveNotificationMode:
         error_msg = str(exc_info.value)
         assert "must be a string" in error_msg
         assert "int" in error_msg
-        assert "stages_only" in error_msg
+        assert "Valid modes:" in error_msg
 
-    def test_list_mode_raises_value_error_not_type_error(self) -> None:
-        """List mode raises ValueError, not TypeError (non-hashable)."""
+    def test_list_mode_raises_value_error(self) -> None:
+        """List mode raises ValueError with type information."""
         with pytest.raises(ValueError) as exc_info:
             resolve_notification_mode(["stages_only"])  # type: ignore[arg-type]
 
@@ -97,8 +97,8 @@ class TestResolveNotificationMode:
         assert "must be a string" in error_msg
         assert "list" in error_msg
 
-    def test_dict_mode_raises_value_error_not_type_error(self) -> None:
-        """Dict mode raises ValueError, not TypeError (non-hashable)."""
+    def test_dict_mode_raises_value_error(self) -> None:
+        """Dict mode raises ValueError with type information."""
         with pytest.raises(ValueError) as exc_info:
             resolve_notification_mode({"mode": "all"})  # type: ignore[arg-type]
 
