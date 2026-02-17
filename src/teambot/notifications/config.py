@@ -109,6 +109,7 @@ def create_event_bus_from_config(
 def _create_channel(channel_config: dict[str, Any]):
     """Create channel instance from config."""
     from teambot.notifications.channels.telegram import TelegramChannel
+    from teambot.notifications.modes import resolve_notification_mode
 
     channel_type = channel_config.get("type")
 
@@ -119,11 +120,25 @@ def _create_channel(channel_config: dict[str, Any]):
 
         # Resolve other config values
         resolved = resolve_config_secrets(channel_config)
-        subscribed = set(resolved.get("events", []))
+
+        # Determine subscribed events with precedence:
+        # 1. Explicit "events" array (highest priority)
+        # 2. "notification_mode" preset expansion
+        # 3. Default to None (all events) for backwards compatibility
+        subscribed: set[str] | None = None
+
+        if "events" in resolved and resolved["events"]:
+            # Explicit events array takes precedence
+            subscribed = set(resolved["events"])
+        elif "notification_mode" in resolved:
+            # Mode-based filtering
+            mode_events = resolve_notification_mode(resolved["notification_mode"])
+            subscribed = set(mode_events) if mode_events else None
+        # else: subscribed=None → accept all events (default, backwards compatible)
 
         # Build kwargs for TelegramChannel
         kwargs = {
-            "subscribed_events": subscribed if subscribed else None,
+            "subscribed_events": subscribed,
             "dry_run": resolved.get("dry_run", False),
         }
 

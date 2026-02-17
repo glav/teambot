@@ -1,0 +1,68 @@
+{
+  "specFile": ".teambot/notification-frequency-control/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-17T00:31:00Z",
+  "currentPhase": "specification-complete",
+  "questionsAsked": [
+    "product-name",
+    "core-problem",
+    "solution-approach",
+    "target-users",
+    "technical-stack",
+    "testing-approach",
+    "backwards-compatibility"
+  ],
+  "answeredQuestions": {
+    "product-name": "Notification Frequency Control",
+    "core-problem": "Users receive excessive notifications and must manually list event types to filter",
+    "solution-approach": "Named mode presets (stages_only, agent_status, all) that expand to event sets",
+    "target-users": "Project managers, ops teams, developers, mobile users",
+    "technical-stack": "Python, existing notification infrastructure",
+    "testing-approach": "pytest with pytest-mock (existing pattern)",
+    "backwards-compatibility": "Events array takes precedence; missing mode defaults to all"
+  },
+  "referencesProcessed": [
+    {
+      "file": "docs/feature-specs/realtime-notifications.md",
+      "status": "analyzed",
+      "keyFindings": "Existing notification architecture with EventBus, TelegramChannel, subscribed_events"
+    },
+    {
+      "file": "src/teambot/notifications/config.py",
+      "status": "analyzed",
+      "keyFindings": "Config loading with env var resolution, _create_channel() function"
+    },
+    {
+      "file": "src/teambot/notifications/templates.py",
+      "status": "analyzed",
+      "keyFindings": "14 event types defined in TEMPLATES dict"
+    },
+    {
+      "file": ".teambot/notification-frequency-control/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Business problem definition, goals, success criteria"
+    }
+  ],
+  "nextActions": [
+    "Proceed to SPEC_REVIEW stage",
+    "Technical review of mode-to-events mapping",
+    "Validate acceptance test scenarios"
+  ],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-testable",
+    "acceptance-tests-defined",
+    "backwards-compatibility-addressed"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  },
+  "validationStatus": {
+    "placeholders": 0,
+    "sectionsComplete": "17/17",
+    "technicalStack": "DEFINED",
+    "testingApproach": "DEFINED",
+    "acceptanceTests": "7 scenarios defined"
+  }
+}

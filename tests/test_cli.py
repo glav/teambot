@@ -243,3 +243,60 @@ class TestCLIMain:
         result = main()
 
         assert isinstance(result, int)
+
+
+class TestInitNotificationMode:
+    """Tests for notification mode selection in init wizard."""
+
+    def test_setup_telegram_includes_notification_mode(self, tmp_path, monkeypatch):
+        """_setup_telegram_notifications adds notification_mode to config."""
+        from teambot.cli import ConsoleDisplay, _setup_telegram_notifications
+
+        # Mock stdin for interactive input
+        # Simulate: Y (proceed), Enter (default token), Enter (default chat_id), 2 (agent_status)
+        inputs = iter(["y", "", "", "2"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+        config = {}
+        display = ConsoleDisplay()
+
+        result = _setup_telegram_notifications(config, display)
+
+        assert result is True
+        assert "notifications" in config
+        channel = config["notifications"]["channels"][0]
+        assert "notification_mode" in channel
+        assert channel["notification_mode"] == "agent_status"
+
+    def test_setup_telegram_default_mode_is_stages_only(self, tmp_path, monkeypatch):
+        """Default notification mode is stages_only when user presses Enter."""
+        from teambot.cli import ConsoleDisplay, _setup_telegram_notifications
+
+        # Simulate: Y (proceed), Enter x3 (all defaults including mode)
+        inputs = iter(["y", "", "", ""])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+        config = {}
+        display = ConsoleDisplay()
+
+        result = _setup_telegram_notifications(config, display)
+
+        assert result is True
+        channel = config["notifications"]["channels"][0]
+        assert channel["notification_mode"] == "stages_only"
+
+    def test_setup_telegram_all_mode(self, tmp_path, monkeypatch):
+        """Mode '3' selects 'all' notification mode."""
+        from teambot.cli import ConsoleDisplay, _setup_telegram_notifications
+
+        inputs = iter(["y", "", "", "3"])
+        monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+        config = {}
+        display = ConsoleDisplay()
+
+        result = _setup_telegram_notifications(config, display)
+
+        assert result is True
+        channel = config["notifications"]["channels"][0]
+        assert channel["notification_mode"] == "all"

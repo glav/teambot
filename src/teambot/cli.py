@@ -145,6 +145,19 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
         if not chat_id_env:
             chat_id_env = "TEAMBOT_TELEGRAM_CHAT_ID"
 
+        # Get notification mode
+        display.print_success("")
+        display.print_success("=== Notification Frequency ===")
+        display.print_success("Choose how many notifications to receive:")
+        display.print_success("  1. stages_only  - Major milestones only (recommended)")
+        display.print_success("  2. agent_status - Stage + agent lifecycle events")
+        display.print_success("  3. all          - All events (verbose)")
+        display.print_success("")
+
+        mode_input = input("Notification mode [1/2/3, default: 1]: ").strip()
+        mode_map = {"1": "stages_only", "2": "agent_status", "3": "all", "": "stages_only"}
+        notification_mode = mode_map.get(mode_input, "stages_only")
+
         # Add notifications config
         config["notifications"] = {
             "enabled": True,
@@ -153,12 +166,14 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
                     "type": "telegram",
                     "token": f"${{{token_env}}}",
                     "chat_id": f"${{{chat_id_env}}}",
+                    "notification_mode": notification_mode,
                 }
             ],
         }
 
         display.print_success("")
         display.print_success("Notification configuration added!")
+        display.print_success(f"  Mode: {notification_mode}")
         display.print_success("")
         display.print_warning("IMPORTANT: Set these environment variables:")
         display.print_warning(f"  export {token_env}='your-bot-token'")
