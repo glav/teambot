@@ -77,3 +77,49 @@ class TestResolveNotificationMode:
         assert "stages_only" in error_msg
         assert "agent_status" in error_msg
         assert "all" in error_msg
+
+    def test_non_string_mode_raises_value_error(self) -> None:
+        """Non-string mode raises ValueError with helpful message."""
+        with pytest.raises(ValueError) as exc_info:
+            resolve_notification_mode(123)  # type: ignore[arg-type]
+
+        error_msg = str(exc_info.value)
+        assert "must be a string" in error_msg
+        assert "int" in error_msg
+        assert "Valid modes:" in error_msg
+
+    def test_list_mode_raises_value_error(self) -> None:
+        """List mode raises ValueError with type information."""
+        with pytest.raises(ValueError) as exc_info:
+            resolve_notification_mode(["stages_only"])  # type: ignore[arg-type]
+
+        error_msg = str(exc_info.value)
+        assert "must be a string" in error_msg
+        assert "list" in error_msg
+
+    def test_dict_mode_raises_value_error(self) -> None:
+        """Dict mode raises ValueError with type information."""
+        with pytest.raises(ValueError) as exc_info:
+            resolve_notification_mode({"mode": "all"})  # type: ignore[arg-type]
+
+        error_msg = str(exc_info.value)
+        assert "must be a string" in error_msg
+        assert "dict" in error_msg
+
+    def test_bool_mode_raises_value_error(self) -> None:
+        """Boolean mode raises ValueError with type information."""
+        with pytest.raises(ValueError) as exc_info:
+            resolve_notification_mode(True)  # type: ignore[arg-type]
+
+        error_msg = str(exc_info.value)
+        assert "must be a string" in error_msg
+        assert "bool" in error_msg
+
+    def test_none_mode_raises_value_error(self) -> None:
+        """None mode raises ValueError with type information."""
+        with pytest.raises(ValueError) as exc_info:
+            resolve_notification_mode(None)  # type: ignore[arg-type]
+
+        error_msg = str(exc_info.value)
+        assert "must be a string" in error_msg
+        assert "NoneType" in error_msg
