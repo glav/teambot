@@ -131,6 +131,36 @@ uv run ruff format .
 
 ---
 
+## Releases and Publishing
+
+### Container Images
+
+The `containers.yml` workflow publishes Docker images and devcontainer features when:
+- A **release** is created (triggered by release events)
+- **Manual dispatch** from the Actions tab
+
+### Devcontainer Feature Publishing
+
+The devcontainer feature (`features/teambot/`) is published as an OCI artifact to GitHub Container Registry.
+
+**Workflow**: `.github/workflows/containers.yml` (job: `devcontainer-feature`)
+
+**What happens**:
+1. The `devcontainers/action@v1` action reads `features/teambot/devcontainer-feature.json`
+2. Packages the feature with `install.sh` as an OCI artifact
+3. Pushes to `ghcr.io/glav/features/teambot:1`
+
+**Version tags**:
+- The `:1` tag is derived from the major version in `devcontainer-feature.json` (`"version": "1.0.0"` → `:1`)
+- Users referencing `:1` automatically get the latest `1.x.x` release
+
+**To publish**:
+1. Update version in `features/teambot/devcontainer-feature.json` if needed
+2. Create a GitHub release
+3. The workflow runs automatically and pushes to GHCR
+
+---
+
 ## Next Steps
 
 - [Getting Started](getting-started.md) - Using TeamBot

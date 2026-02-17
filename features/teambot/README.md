@@ -9,7 +9,7 @@ Add to your `devcontainer.json`:
 ```json
 {
     "features": {
-        "ghcr.io/teambot-ai/features/teambot:1": {}
+        "ghcr.io/glav/features/teambot:1": {}
     }
 }
 ```
@@ -25,7 +25,7 @@ Add to your `devcontainer.json`:
 ```json
 {
     "features": {
-        "ghcr.io/teambot-ai/features/teambot:1": {
+        "ghcr.io/glav/features/teambot:1": {
             "version": "0.2.0"
         }
     }
