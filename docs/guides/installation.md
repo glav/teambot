@@ -69,7 +69,7 @@ Add to your `devcontainer.json`:
 ```json
 {
     "features": {
-        "ghcr.io/teambot-ai/features/teambot:1": {}
+        "ghcr.io/glav/features/teambot:1": {}
     }
 }
 ```
@@ -79,7 +79,7 @@ Add to your `devcontainer.json`:
 ```json
 {
     "features": {
-        "ghcr.io/teambot-ai/features/teambot:1": {
+        "ghcr.io/glav/features/teambot:1": {
             "version": "0.1.0"
         }
     }
@@ -92,10 +92,25 @@ Add to your `devcontainer.json`:
 {
     "features": {
         "ghcr.io/devcontainers/features/copilot-cli:latest": {},
-        "ghcr.io/teambot-ai/features/teambot:1": {}
+        "ghcr.io/glav/features/teambot:1": {}
     }
 }
 ```
+
+#### Understanding the Feature Reference
+
+The devcontainer feature reference follows this format:
+
+| Part | Meaning |
+|------|---------|
+| `ghcr.io` | GitHub Container Registry |
+| `/glav` | GitHub organization (repository owner) |
+| `/features/teambot` | Feature name (from `id` in feature definition) |
+| `:1` | Major version selector (from semver `1.x.x`) |
+
+The feature is published as an OCI artifact to GitHub Container Registry when TeamBot creates a new release. The `:1` selector automatically resolves to the latest `1.x.x` version.
+
+> **Note**: The devcontainer feature is only available after TeamBot publishes a release. If the reference doesn't resolve, check the [TeamBot releases page](https://github.com/glav/teambot/releases) to verify a release exists.
 
 ---
 
