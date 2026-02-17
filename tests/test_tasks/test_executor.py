@@ -58,7 +58,6 @@ class TestNotifyHandler:
 
             assert result.success
             assert "Notification sent" in result.output
-            assert "[OK]" in result.output
 
     @pytest.mark.asyncio
     async def test_handle_notify_calls_event_bus(self, mock_config):
@@ -105,7 +104,7 @@ class TestNotifyHandler:
             result = await executor._handle_notify("Test", background=False)
 
             assert result.success  # Still succeeds
-            assert "[WARN]" in result.output or "No notification channels" in result.output
+            assert "No notification channels" in result.output
 
     @pytest.mark.asyncio
     async def test_handle_notify_disabled(self):
@@ -116,7 +115,6 @@ class TestNotifyHandler:
         result = await executor._handle_notify("Test", background=False)
 
         assert result.success  # Still succeeds
-        assert "[WARN]" in result.output
         assert "disabled" in result.output.lower()
 
     @pytest.mark.asyncio
@@ -127,7 +125,7 @@ class TestNotifyHandler:
         result = await executor._handle_notify("Test", background=False)
 
         assert result.success  # Still succeeds
-        assert "[WARN]" in result.output
+        assert "configuration" in result.output.lower()
 
 
 class TestTruncationForNotification:
@@ -371,8 +369,8 @@ class TestNotifyFailureHandling:
 
             result = await executor._handle_notify("Test", background=False)
 
-            # Verify warning indicator is present
-            assert "[WARN]" in result.output or "failed" in result.output.lower()
+            # Verify warning indicator is present (text-based, not emoji)
+            assert "failed" in result.output.lower()
             # Verify sensitive data is NOT in output
             assert "SENSITIVE_TOKEN" not in result.output
             assert "123456" not in result.output

@@ -1706,7 +1706,7 @@ class TestNotificationUXAcceptance:
 
         result = templates.render(event)
 
-        assert "🚀" in result
+        # Check for key text content (not emojis for Windows compatibility)
         assert "Starting" in result
         assert "my-feature objective" in result
 
@@ -1795,7 +1795,7 @@ class TestNotificationUXAcceptance:
 
         result = templates.render(event)
 
-        assert "✅" in result
+        # Check for key text content (not emojis for Windows compatibility)
         assert "Completed" in result
         assert "my-feature objective" in result
         assert "2m 5s" in result

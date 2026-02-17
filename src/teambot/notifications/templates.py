@@ -9,11 +9,11 @@ from teambot.notifications.events import NotificationEvent
 
 # Status emojis
 STATUS_EMOJI = {
-    "success": "[OK]",
-    "failure": "[FAIL]",
-    "warning": "[WARN]",
-    "running": "[...]",
-    "info": "[i]",
+    "success": "✅",
+    "failure": "❌",
+    "warning": "⚠️",
+    "running": "🔄",
+    "info": "ℹ️",
 }
 
 
@@ -22,28 +22,28 @@ class MessageTemplates:
 
     # Templates use HTML format for Telegram compatibility
     TEMPLATES: dict[str, str] = {
-        "stage_changed": ("📌 <b>Stage: {stage}</b>\n* <code>{feature_name}</code>"),
-        "agent_running": ("[...] <b>{agent_id}</b> started\n* Task: <i>{task}</i>"),
-        "agent_complete": "[OK] <b>{agent_id}</b> completed",
-        "agent_failed": ("[FAIL] <b>{agent_id}</b> FAILED\n* <code>{feature_name}</code>"),
-        "parallel_group_start": ("--> <b>Parallel Group: {group}</b>\n* Stages: {stages}"),
+        "stage_changed": ("📌 <b>Stage: {stage}</b>\n📂 <code>{feature_name}</code>"),
+        "agent_running": ("🔄 <b>{agent_id}</b> started\n📋 Task: <i>{task}</i>"),
+        "agent_complete": "✅ <b>{agent_id}</b> completed",
+        "agent_failed": ("❌ <b>{agent_id}</b> FAILED\n📂 <code>{feature_name}</code>"),
+        "parallel_group_start": ("🚀 <b>Parallel Group: {group}</b>\n📊 Stages: {stages}"),
         "parallel_group_complete": ("{emoji} <b>Parallel Group: {group}</b>\nStatus: {status}"),
-        "parallel_stage_complete": "[OK] <b>{stage}</b> completed (agent: {agent})",
-        "parallel_stage_failed": "[FAIL] <b>{stage}</b> FAILED (agent: {agent})",
+        "parallel_stage_complete": "✅ <b>{stage}</b> completed (agent: {agent})",
+        "parallel_stage_failed": "❌ <b>{stage}</b> FAILED (agent: {agent})",
         "acceptance_test_stage_complete": (
             "{emoji} <b>Acceptance Tests</b>\n"
-            "* Results: {passed}/{total} passed\n"
-            "* <code>{feature_name}</code>"
+            "📊 Results: {passed}/{total} passed\n"
+            "📂 <code>{feature_name}</code>"
         ),
         "acceptance_test_max_iterations_reached": (
-            "[WARN] <b>Max Fix Iterations Reached</b>\n"
+            "⚠️ <b>Max Fix Iterations Reached</b>\n"
             "Acceptance tests still failing after {iterations_used} attempts."
         ),
         "review_progress": ("📝 <b>Review Progress</b>\nStage: {stage}\n{message}"),
         # Orchestration lifecycle events
-        "orchestration_started": "--> <b>Starting</b>: {objective_name}",
+        "orchestration_started": "🚀 <b>Starting</b>: {objective_name}",
         "orchestration_completed": (
-            "[OK] <b>Completed</b>: {objective_name}\nTime: Duration: {duration}"
+            "✅ <b>Completed</b>: {objective_name}\n⏱️ Duration: {duration}"
         ),
         "custom_message": "📢 {message}",
     }
@@ -111,4 +111,4 @@ class MessageTemplates:
 
     def _default_template(self) -> str:
         """Get fallback template for unknown events."""
-        return "📢 <b>{event_type}</b>\n* <code>{feature_name}</code>"
+        return "📢 <b>{event_type}</b>\n📂 <code>{feature_name}</code>"
