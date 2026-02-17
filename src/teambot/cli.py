@@ -104,9 +104,9 @@ def _should_setup_notifications(display: ConsoleDisplay) -> bool:
     if not sys.stdin.isatty():
         return False
 
-    display.print_success("")
-    display.print_success("=== Optional: Real-Time Notifications ===")
-    display.print_success("TeamBot can send notifications via Telegram when stages complete.")
+    display.print_info("")
+    display.print_info("=== Optional: Real-Time Notifications ===")
+    display.print_info("TeamBot can send notifications via Telegram when stages complete.")
     try:
         response = input("Enable real-time notifications? [y/N]: ").strip().lower()
         return response in ("y", "yes")
@@ -116,12 +116,12 @@ def _should_setup_notifications(display: ConsoleDisplay) -> bool:
 
 def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool:
     """Guide user through Telegram notification setup."""
-    display.print_success("")
-    display.print_success("=== Telegram Bot Setup ===")
-    display.print_success("1. Open Telegram and search for @BotFather")
-    display.print_success("2. Send /newbot and follow the prompts")
-    display.print_success("3. Copy the bot token you receive")
-    display.print_success("")
+    display.print_info("")
+    display.print_info("=== Telegram Bot Setup ===")
+    display.print_info("1. Open Telegram and search for @BotFather")
+    display.print_info("2. Send /newbot and follow the prompts")
+    display.print_info("3. Copy the bot token you receive")
+    display.print_info("")
 
     try:
         proceed = input("Ready to enter credentials? [Y/n]: ").strip().lower()
@@ -135,24 +135,24 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
             token_env = "TEAMBOT_TELEGRAM_TOKEN"
 
         # Get chat ID env var name (with default)
-        display.print_success("")
-        display.print_success("To get your chat ID:")
-        display.print_success("1. Send any message to your new bot")
-        display.print_success("2. Visit: https://api.telegram.org/bot<TOKEN>/getUpdates")
-        display.print_success("3. Look for 'chat':{'id': <YOUR_CHAT_ID>}")
-        display.print_success("")
+        display.print_info("")
+        display.print_info("To get your chat ID:")
+        display.print_info("1. Send any message to your new bot")
+        display.print_info("2. Visit: https://api.telegram.org/bot<TOKEN>/getUpdates")
+        display.print_info("3. Look for 'chat':{'id': <YOUR_CHAT_ID>}")
+        display.print_info("")
         chat_id_env = input("Environment variable for chat ID [TEAMBOT_TELEGRAM_CHAT_ID]: ").strip()
         if not chat_id_env:
             chat_id_env = "TEAMBOT_TELEGRAM_CHAT_ID"
 
         # Get notification mode
-        display.print_success("")
-        display.print_success("=== Notification Frequency ===")
-        display.print_success("Choose how many notifications to receive:")
-        display.print_success("  1. stages_only  - Major milestones only (recommended)")
-        display.print_success("  2. agent_status - Stage + agent lifecycle events")
-        display.print_success("  3. all          - All events (verbose)")
-        display.print_success("")
+        display.print_info("")
+        display.print_info("=== Notification Frequency ===")
+        display.print_info("Choose how many notifications to receive:")
+        display.print_info("  1. stages_only  - Major milestones only (recommended)")
+        display.print_info("  2. agent_status - Stage + agent lifecycle events")
+        display.print_info("  3. all          - All events (verbose)")
+        display.print_info("")
 
         mode_input = input("Notification mode [1/2/3, default: 1]: ").strip()
         mode_map = {"1": "stages_only", "2": "agent_status", "3": "all", "": "stages_only"}
@@ -171,14 +171,14 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
             ],
         }
 
-        display.print_success("")
+        display.print_info("")
         display.print_success("Notification configuration added!")
-        display.print_success(f"  Mode: {notification_mode}")
-        display.print_success("")
+        display.print_info(f"  Mode: {notification_mode}")
+        display.print_info("")
         display.print_warning("IMPORTANT: Set these environment variables:")
         display.print_warning(f"  export {token_env}='your-bot-token'")
         display.print_warning(f"  export {chat_id_env}='your-chat-id'")
-        display.print_success("")
+        display.print_info("")
 
         return True
 

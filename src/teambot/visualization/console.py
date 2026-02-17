@@ -303,3 +303,7 @@ class ConsoleDisplay:
     def print_warning(self, message: str) -> None:
         """Print a warning message."""
         self.console.print(f"[bold yellow]![/] {message}")
+
+    def print_info(self, message: str) -> None:
+        """Print an informational message (no special symbols for Windows compatibility)."""
+        self.console.print(message)
