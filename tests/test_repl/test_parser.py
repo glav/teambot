@@ -6,6 +6,7 @@ from teambot.repl.parser import (
     Command,
     CommandType,
     ParseError,
+    extract_references,
     needs_default_agent_for_pipeline,
     parse_command,
     prepend_default_agent,
@@ -470,3 +471,51 @@ class TestDefaultAgentPipeline:
     def test_needs_default_agent_with_special_chars(self):
         """Test detection with special characters in content."""
         assert needs_default_agent_for_pipeline("what's 2+2? -> @notify") is True
+
+
+class TestExtractReferences:
+    """Tests for extract_references() helper function."""
+
+    def test_extract_single_reference(self):
+        """Extract single $agent reference."""
+        assert extract_references("Summarize $ba output") == ["ba"]
+
+    def test_extract_multiple_references(self):
+        """Extract multiple references in order."""
+        assert extract_references("Check $ba and $pm feedback") == ["ba", "pm"]
+
+    def test_extract_duplicate_references(self):
+        """Deduplicate references while preserving first occurrence order."""
+        assert extract_references("$ba says $pm and $ba again") == ["ba", "pm"]
+
+    def test_extract_escaped_reference_ignored(self):
+        """Escaped \\$agent references are not extracted."""
+        assert extract_references(r"Use \$pm carefully") == []
+
+    def test_extract_mixed_escaped_and_real(self):
+        """Mix of escaped and real references."""
+        assert extract_references(r"\$pm but $ba is real") == ["ba"]
+
+    def test_extract_none_content(self):
+        """None content returns empty list."""
+        assert extract_references(None) == []
+
+    def test_extract_empty_content(self):
+        """Empty string returns empty list."""
+        assert extract_references("") == []
+
+    def test_extract_no_references(self):
+        """Content without references returns empty list."""
+        assert extract_references("Plain text without refs") == []
+
+    def test_extract_reference_with_hyphen(self):
+        """References with hyphens like $builder-1."""
+        assert extract_references("Check $builder-1 output") == ["builder-1"]
+
+    def test_extract_reference_with_underscore(self):
+        """References with underscores like $my_agent."""
+        assert extract_references("From $my_agent") == ["my_agent"]
+
+    def test_extract_ignores_numeric_start(self):
+        """$100 is not a valid reference (must start with letter)."""
+        assert extract_references("Cost is $100") == []

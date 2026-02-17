@@ -16,6 +16,7 @@ from teambot.repl.parser import (
     Command,
     CommandType,
     ParseError,
+    extract_references,
     needs_default_agent_for_pipeline,
     parse_command,
     prepend_default_agent,
@@ -311,6 +312,7 @@ class REPLLoop:
                                         agent_id=default_agent,
                                         agent_ids=[default_agent],
                                         content=command.content,
+                                        references=extract_references(command.content),
                                     )
 
                         # Check if this is an advanced agent command

@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 
-from teambot.repl.parser import Command, CommandType
+from teambot.repl.parser import Command, CommandType, extract_references
 
 
 class RouterError(Exception):
@@ -202,6 +202,7 @@ class AgentRouter:
                 agent_id=self._default_agent,
                 agent_ids=[self._default_agent],
                 content=command.content,
+                references=extract_references(command.content),
             )
             # Route to agent handler
             return await self._route_agent(agent_command)
