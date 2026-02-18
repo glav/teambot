@@ -142,9 +142,7 @@ class TestNotifyBypassAcceptanceScenarios:
         # Verify executor handles this correctly
         executor = TaskExecutor(sdk_client=AsyncMock(), config=config)
 
-        with patch(
-            "teambot.tasks.executor.create_event_bus_from_config"
-        ) as mock_create:
+        with patch("teambot.tasks.executor.create_event_bus_from_config") as mock_create:
             mock_bus = MagicMock()
             mock_bus._channels = []  # No channels
             mock_create.return_value = mock_bus
@@ -191,9 +189,7 @@ class TestNotifyBypassAcceptanceScenarios:
     # =========================================================================
     # AT-006: Explicit events array can exclude custom_message
     # =========================================================================
-    def test_at_006_explicit_events_array_excludes_custom_message(
-        self, monkeypatch
-    ) -> None:
+    def test_at_006_explicit_events_array_excludes_custom_message(self, monkeypatch) -> None:
         """AT-006: Explicit events array takes precedence over bypass.
 
         Scenario: User configures events: [] or events without custom_message
