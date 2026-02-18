@@ -1,7 +1,7 @@
 """Acceptance tests for @notify command bypass mode filtering.
 
 These tests validate the real implementation against acceptance scenarios.
-They use the actual implementation code, not mocks of core functionality.
+Core notification logic is tested directly; selective mocking is used for external dependencies.
 """
 
 from __future__ import annotations
