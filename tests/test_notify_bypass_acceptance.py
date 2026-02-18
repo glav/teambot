@@ -227,7 +227,7 @@ class TestNotifyBypassAcceptanceScenarios:
     # Integration: Full EventBus flow with stages_only mode
     # =========================================================================
     @pytest.mark.asyncio
-    async def test_at_001_full_event_bus_integration(self, monkeypatch) -> None:
+    async def test_full_event_bus_integration(self, monkeypatch) -> None:
         """Integration test: Full EventBus flow verifies custom_message delivery.
 
         This test uses the REAL EventBus with REAL channel creation to verify
