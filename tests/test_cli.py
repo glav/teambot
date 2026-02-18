@@ -217,6 +217,9 @@ class TestCLIRun:
 
         monkeypatch.chdir(tmp_path)
 
+        # Mock model validation to always return True (no SDK needed)
+        monkeypatch.setattr("teambot.config.loader.validate_model", lambda m: True)
+
         # Initialize first
         init_args = argparse.Namespace(force=False)
         cmd_init(init_args, ConsoleDisplay())

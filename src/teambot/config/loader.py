@@ -34,6 +34,8 @@ def create_default_config() -> dict[str, Any]:
     """Create default configuration with MVP agents."""
     return {
         "teambot_dir": ".teambot",
+        "default_model": "claude-sonnet-4",
+        "default_agent": "pm",
         "agents": [
             {
                 "id": "pm",

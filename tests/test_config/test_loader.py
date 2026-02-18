@@ -129,6 +129,24 @@ class TestDefaultConfig:
         assert "builder" in personas
         assert "reviewer" in personas
 
+    def test_default_config_has_default_model(self):
+        """Default config includes default_model field."""
+        from teambot.config.loader import create_default_config
+
+        config = create_default_config()
+
+        assert "default_model" in config
+        assert config["default_model"] == "claude-sonnet-4"
+
+    def test_default_config_has_default_agent(self):
+        """Default config includes default_agent field."""
+        from teambot.config.loader import create_default_config
+
+        config = create_default_config()
+
+        assert "default_agent" in config
+        assert config["default_agent"] == "pm"
+
     def test_save_config(self, tmp_path):
         """Save configuration to file."""
         from teambot.config.loader import ConfigLoader, create_default_config
