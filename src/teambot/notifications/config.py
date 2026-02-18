@@ -135,6 +135,11 @@ def _create_channel(channel_config: dict[str, Any]):
             # Mode-based filtering
             mode_events = resolve_notification_mode(resolved["notification_mode"])
             subscribed = set(mode_events) if mode_events else None
+            # Always allow custom_message for explicit @notify commands
+            # This ensures @notify bypasses mode filtering while preserving
+            # the ability to disable all notifications with events: []
+            if subscribed is not None:
+                subscribed.add("custom_message")
         # else: subscribed=None → accept all events (default, backwards compatible)
 
         # Build kwargs for TelegramChannel

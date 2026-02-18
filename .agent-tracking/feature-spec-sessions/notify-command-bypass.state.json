@@ -1,0 +1,48 @@
+{
+  "specFile": ".teambot/notify-command/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-18T00:53:53Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name", "target-users", "core-problem", "success-metrics",
+    "technical-stack", "testing-approach", "constraints", "scope"
+  ],
+  "answeredQuestions": {
+    "product-name": "@notify Command Mode Bypass",
+    "target-users": "TeamBot workflow operators, CI/CD engineers",
+    "core-problem": "@notify messages silently dropped when notification_mode is stages_only or agent_status",
+    "success-metrics": "100% delivery rate when enabled/configured",
+    "technical-stack": "Python, pytest with pytest-mock",
+    "testing-approach": "Follow existing pytest patterns",
+    "constraints": "Minimal surgical change, no large refactors, backwards compatible",
+    "scope": "Modify supports_event() to bypass mode filtering for custom_message"
+  },
+  "referencesProcessed": [
+    {
+      "file": ".teambot/notify-command/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Root cause is custom_message not in mode event sets"
+    },
+    {
+      "file": "src/teambot/notifications/modes.py",
+      "status": "analyzed",
+      "keyFindings": "NOTIFICATION_MODES defines stages_only, agent_status, all presets"
+    },
+    {
+      "file": "src/teambot/notifications/channels/telegram.py",
+      "status": "analyzed",
+      "keyFindings": "supports_event() is the filtering checkpoint"
+    }
+  ],
+  "nextActions": ["Implementation by builder agent", "Code review", "Documentation update"],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-testable",
+    "acceptance-tests-defined",
+    "risks-documented"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}

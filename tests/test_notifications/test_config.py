@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from teambot.notifications.config import (
+    _create_channel,
     create_event_bus_from_config,
     extract_env_var_name,
     resolve_config_secrets,
@@ -504,3 +505,73 @@ class TestNotificationModeConfig:
         # Empty events array should override notification_mode
         assert channel.supports_event("stage_changed") is False
         assert channel.supports_event("agent_running") is False
+
+
+class TestCustomMessageBypassMode:
+    """Tests for custom_message bypass of notification_mode filtering."""
+
+    def test_stages_only_mode_includes_custom_message(self, monkeypatch) -> None:
+        """custom_message is added to stages_only mode event set."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "test-token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel_config = {
+            "type": "telegram",
+            "notification_mode": "stages_only",
+        }
+        channel = _create_channel(channel_config)
+
+        # custom_message should bypass mode filtering
+        assert channel.supports_event("custom_message") is True
+        # Stage events should still work
+        assert channel.supports_event("stage_changed") is True
+        # Other events should still be filtered
+        assert channel.supports_event("agent_running") is False
+
+    def test_agent_status_mode_includes_custom_message(self, monkeypatch) -> None:
+        """custom_message is added to agent_status mode event set."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "test-token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel_config = {
+            "type": "telegram",
+            "notification_mode": "agent_status",
+        }
+        channel = _create_channel(channel_config)
+
+        # custom_message should bypass mode filtering
+        assert channel.supports_event("custom_message") is True
+        # Agent status events should work
+        assert channel.supports_event("agent_complete") is True
+        # Parallel group events should be filtered
+        assert channel.supports_event("parallel_group_start") is False
+
+    def test_explicit_empty_events_no_custom_message(self, monkeypatch) -> None:
+        """Explicit events: [] still blocks everything including custom_message."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "test-token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel_config = {
+            "type": "telegram",
+            "events": [],  # Explicitly disable all
+        }
+        channel = _create_channel(channel_config)
+
+        # Explicit empty events array should block everything
+        assert channel.supports_event("custom_message") is False
+        assert channel.supports_event("stage_changed") is False
+
+    def test_all_mode_unchanged(self, monkeypatch) -> None:
+        """all mode still accepts everything (subscribed=None)."""
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_TOKEN", "test-token")
+        monkeypatch.setenv("TEAMBOT_TELEGRAM_CHAT_ID", "12345")
+
+        channel_config = {
+            "type": "telegram",
+            "notification_mode": "all",
+        }
+        channel = _create_channel(channel_config)
+
+        # All mode accepts everything
+        assert channel.supports_event("custom_message") is True
+        assert channel.supports_event("any_other_event") is True
