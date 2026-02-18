@@ -146,7 +146,8 @@ def _display_post_init_guidance(display: ConsoleDisplay) -> None:
             elif line_stripped:
                 display.print_info(f"  {line}")
 
-    except Exception:
+    except Exception as e:
+        logging.debug(f"Failed to load init guidance file: {e}")
         # Fallback to basic hardcoded guidance
         display.print_info("")
         display.print_info("=== Recommended Next Steps ===")
