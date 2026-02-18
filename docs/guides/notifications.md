@@ -31,8 +31,18 @@ The `@notify` agent:
 - Supports `$ref` syntax for including agent output in messages
 - Returns a confirmation that downstream agents can reference
 - Appears in agent status display with model shown as "(n/a)"
+- **Bypasses `notification_mode` filtering** — always sends when enabled and channels configured
 
 > **Note:** Configure at least one notification channel (see below) before using `@notify`.
+
+### `@notify` Mode Bypass
+
+The `@notify` command bypasses `notification_mode` filtering. Even with `notification_mode: stages_only`, explicit `@notify` messages are delivered. This ensures user-requested notifications always work regardless of automated event filtering settings.
+
+To completely disable `@notify`, use one of these options:
+- Set `notifications.enabled: false`
+- Remove all channel configurations
+- Set `events: []` on the channel (explicitly disables all events including `custom_message`)
 
 ## Supported Channels
 
