@@ -72,30 +72,32 @@ The EventBus routes to channels, which filter based on their `subscribed_events`
 
 ### Desired Behavior
 
-Option A (Recommended): **Bypass filtering in the channel for `custom_message` events**
+**Implemented Approach: Bypass filtering during channel creation in `config.py`**
 
-Modify the channel's `supports_event()` method (e.g., `TelegramChannel.supports_event()` at lines 71-75) to always accept `custom_message` events, treating them as explicit user requests that bypass mode filtering:
+When a `notification_mode` is configured, the `_create_channel()` function in `config.py` expands the mode to a set of event types and then adds `custom_message` to that set before creating the channel. This ensures `custom_message` events (from `@notify` commands) bypass mode filtering while preserving the ability to disable all notifications with an explicit `events: []` configuration:
 
 ```python
-def supports_event(self, event_type: str) -> bool:
-    # Explicit @notify commands always bypass mode filtering
-    if event_type == "custom_message":
-        return True
-    if self._subscribed_events is None:
-        return True
-    return event_type in self._subscribed_events
+elif "notification_mode" in resolved:
+    # Mode-based filtering
+    mode_events = resolve_notification_mode(resolved["notification_mode"])
+    subscribed = set(mode_events) if mode_events else None
+    # Always allow custom_message for explicit @notify commands
+    # This ensures @notify bypasses mode filtering while preserving
+    # the ability to disable all notifications with events: []
+    if subscribed is not None:
+        subscribed.add("custom_message")
 ```
 
-Option B: **Bypass EventBus entirely for @notify**
-
-Modify `executor.py` to send directly to channels without going through event filtering. This would require restructuring how `@notify` integrates with the notification system.
-
-**Recommendation**: Option A is cleaner and maintains the existing architecture. The change is localized to the channel filtering logic.
+This approach maintains the existing architecture and respects the configuration precedence:
+1. Explicit `events` array (highest priority) — unchanged by this fix
+2. `notification_mode` preset expansion — now includes `custom_message`
+3. Default to `None` (all events) — unchanged by this fix
 
 ### Files Likely to Change
 
-- `src/teambot/notifications/channels/telegram.py` — Modify `supports_event()` to add `custom_message` bypass
-- `tests/test_notifications/` — Add tests for bypass behavior
+- `src/teambot/notifications/config.py` — Modify `_create_channel()` to add `custom_message` to mode-based event sets
+- `tests/test_notifications/test_config.py` — Add unit tests for bypass behavior
+- `tests/test_notify_bypass_acceptance.py` — Add acceptance tests for `@notify` command
 - `docs/guides/notifications.md` — Document that `@notify` bypasses mode filtering
 
 ### Event Reference
