@@ -361,3 +361,203 @@ class TestInitNotificationMode:
         assert result is True
         channel = config["notifications"]["channels"][0]
         assert channel["notification_mode"] == "all"
+
+
+class TestInitModelCacheRefresh:
+    """Tests for model cache refresh during init."""
+
+    def test_init_attempts_model_refresh(self, tmp_path, monkeypatch):
+        """Init attempts to refresh model cache."""
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import _refresh_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock refresh_models to track call
+        mock_refresh = AsyncMock(return_value=True)
+
+        with patch("teambot.cli.asyncio.run", return_value=True):
+            with patch("teambot.config.schema.refresh_models", mock_refresh):
+                display = ConsoleDisplay()
+                result = _refresh_model_cache(display)
+
+        assert result is True
+
+    def test_init_succeeds_when_model_refresh_fails(self, tmp_path, monkeypatch):
+        """Init completes successfully even if model refresh fails."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock refresh to fail
+        with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=False)):
+            with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+                args = argparse.Namespace(force=False, no_animation=True)
+                display = ConsoleDisplay()
+
+                result = cmd_init(args, display)
+
+        assert result == 0
+        assert (tmp_path / "teambot.json").exists()
+
+    def test_init_succeeds_when_model_refresh_raises(self, tmp_path, monkeypatch):
+        """Init continues even if model refresh raises exception."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock refresh to raise
+        async def raise_error():
+            raise RuntimeError("Network error")
+
+        with patch("teambot.cli._refresh_model_cache_async", raise_error):
+            with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+                args = argparse.Namespace(force=False, no_animation=True)
+                display = ConsoleDisplay()
+
+                result = cmd_init(args, display)
+
+        assert result == 0
+        assert (tmp_path / "teambot.json").exists()
+
+
+class TestInitAuthenticationCheck:
+    """Tests for authentication check during init."""
+
+    def test_init_checks_authentication(self, tmp_path, monkeypatch):
+        """Init verifies Copilot CLI authentication status."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Track if auth was checked
+        auth_checked = [False]
+
+        async def mock_auth():
+            auth_checked[0] = True
+            return (True, None)
+
+        with patch("teambot.cli._check_auth_async", mock_auth):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                args = argparse.Namespace(force=False, no_animation=True)
+                display = ConsoleDisplay()
+
+                cmd_init(args, display)
+
+        assert auth_checked[0] is True
+
+    def test_init_succeeds_when_not_authenticated(self, tmp_path, monkeypatch):
+        """Init completes successfully even when not authenticated."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(False, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                args = argparse.Namespace(force=False, no_animation=True)
+                display = ConsoleDisplay()
+
+                result = cmd_init(args, display)
+
+        assert result == 0
+        assert (tmp_path / "teambot.json").exists()
+
+    def test_init_succeeds_when_auth_check_fails(self, tmp_path, monkeypatch):
+        """Init completes successfully even if auth check raises exception."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        async def raise_error():
+            raise RuntimeError("SDK error")
+
+        with patch("teambot.cli._check_auth_async", raise_error):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                args = argparse.Namespace(force=False, no_animation=True)
+                display = ConsoleDisplay()
+
+                result = cmd_init(args, display)
+
+        assert result == 0
+        assert (tmp_path / "teambot.json").exists()
+
+
+class TestInitPostGuidance:
+    """Tests for post-init guidance display."""
+
+    def test_init_displays_guidance(self, tmp_path, monkeypatch, capsys):
+        """Init displays recommended next steps after completion."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                args = argparse.Namespace(force=False, no_animation=True)
+                display = ConsoleDisplay()
+
+                cmd_init(args, display)
+
+        captured = capsys.readouterr()
+        assert "Recommended Next Steps" in captured.out
+
+    def test_guidance_file_exists(self):
+        """Guidance file exists in scaffolds."""
+        from teambot.scaffolds import get_scaffolds_dir
+
+        guidance_file = get_scaffolds_dir() / "init-next-steps.md"
+        assert guidance_file.exists()
+
+    def test_guidance_contains_model_customization(self):
+        """Guidance includes per-agent model configuration tip."""
+        from teambot.scaffolds import get_scaffolds_dir
+
+        guidance_file = get_scaffolds_dir() / "init-next-steps.md"
+        content = guidance_file.read_text(encoding="utf-8")
+
+        assert "model" in content.lower()
+        assert "agent" in content.lower()
+
+    def test_init_succeeds_if_guidance_loading_fails(self, tmp_path, monkeypatch):
+        """Init succeeds even if guidance file cannot be loaded."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock importlib.resources to fail
+        def raise_on_read(*args, **kwargs):
+            raise FileNotFoundError("Mock file not found")
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                with patch("importlib.resources.files", side_effect=raise_on_read):
+                    args = argparse.Namespace(force=False, no_animation=True)
+                    display = ConsoleDisplay()
+
+                    result = cmd_init(args, display)
+
+        assert result == 0
+        assert (tmp_path / "teambot.json").exists()

@@ -32,9 +32,10 @@ REQUIRED_CHANNEL_FIELDS = {
 
 def create_default_config() -> dict[str, Any]:
     """Create default configuration with MVP agents."""
+    default_model = "claude-sonnet-4.5"
     return {
         "teambot_dir": ".teambot",
-        "default_model": "claude-sonnet-4",
+        "default_model": default_model,
         "default_agent": "pm",
         "agents": [
             {
@@ -43,6 +44,7 @@ def create_default_config() -> dict[str, Any]:
                 "display_name": "Project Manager",
                 "parallel_capable": False,
                 "workflow_stages": ["setup", "planning", "coordination"],
+                "model": default_model,
             },
             {
                 "id": "ba",
@@ -50,6 +52,7 @@ def create_default_config() -> dict[str, Any]:
                 "display_name": "Business Analyst",
                 "parallel_capable": False,
                 "workflow_stages": ["business_problem", "spec"],
+                "model": default_model,
             },
             {
                 "id": "writer",
@@ -57,6 +60,7 @@ def create_default_config() -> dict[str, Any]:
                 "display_name": "Technical Writer",
                 "parallel_capable": False,
                 "workflow_stages": ["documentation"],
+                "model": default_model,
             },
             {
                 "id": "builder-1",
@@ -64,6 +68,7 @@ def create_default_config() -> dict[str, Any]:
                 "display_name": "Builder (Primary)",
                 "parallel_capable": True,
                 "workflow_stages": ["implementation", "testing"],
+                "model": default_model,
             },
             {
                 "id": "builder-2",
@@ -71,6 +76,7 @@ def create_default_config() -> dict[str, Any]:
                 "display_name": "Builder (Secondary)",
                 "parallel_capable": True,
                 "workflow_stages": ["implementation", "testing"],
+                "model": default_model,
             },
             {
                 "id": "reviewer",
@@ -78,6 +84,7 @@ def create_default_config() -> dict[str, Any]:
                 "display_name": "Reviewer",
                 "parallel_capable": False,
                 "workflow_stages": ["review"],
+                "model": default_model,
             },
         ],
         "workflow": {

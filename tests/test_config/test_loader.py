@@ -136,7 +136,17 @@ class TestDefaultConfig:
         config = create_default_config()
 
         assert "default_model" in config
-        assert config["default_model"] == "claude-sonnet-4"
+        assert config["default_model"] == "claude-sonnet-4.5"
+
+    def test_default_config_agents_have_explicit_model_field(self):
+        """Default config agents have explicit model field."""
+        from teambot.config.loader import create_default_config
+
+        config = create_default_config()
+
+        for agent in config["agents"]:
+            assert "model" in agent, f"Agent {agent['id']} missing model field"
+            assert agent["model"] == "claude-sonnet-4.5"
 
     def test_default_config_has_default_agent(self):
         """Default config includes default_agent field."""
