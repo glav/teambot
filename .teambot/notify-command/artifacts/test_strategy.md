@@ -64,9 +64,9 @@ This feature is a surgical fix with well-defined requirements and clear acceptan
 ## Feature Analysis Summary
 
 ### Complexity Assessment
-* **Algorithm Complexity**: Low - Adding `event_type == "custom_message"` check
-* **Integration Depth**: Low - Single method modification in `TelegramChannel.supports_event()`
-* **State Management**: None - Stateless filtering logic
+* **Algorithm Complexity**: Low - Adding `custom_message` to mode-based subscribed set
+* **Integration Depth**: Low - Single modification in `_create_channel()` config processing
+* **State Management**: None - Stateless configuration transformation
 * **Error Scenarios**: Minimal - Only existing guards (disabled, no channels)
 
 ### Risk Profile
@@ -83,36 +83,36 @@ This feature is a surgical fix with well-defined requirements and clear acceptan
 
 ## Test Strategy by Component
 
-### Component 1: `TelegramChannel.supports_event()` - **TDD**
+### Component 1: Config Integration (`_create_channel`) - **TDD**
 
 **Approach**: TDD
-**Rationale**: This is the core logic change. Tests should be written first to document expected behavior and catch regressions.
+**Rationale**: This is the core logic change. The fix adds `custom_message` to the subscribed set when `notification_mode` is used (mode-based filtering). Tests should be written first to document expected behavior and catch regressions.
 
 **Test Requirements:**
 * Coverage Target: 100%
-* Test Types: Unit
+* Test Types: Integration
 * Critical Scenarios:
-  * `custom_message` returns `True` when `subscribed_events` is mode-based (from `notification_mode`)
-  * `custom_message` returns `True` with `stages_only` mode filtering
-  * `custom_message` returns `True` with `agent_status` mode filtering
-  * `custom_message` returns `False` when explicit `events` array excludes it
+  * `custom_message` is added to subscribed set when `notification_mode` is used
+  * `custom_message` is included with `stages_only` mode filtering
+  * `custom_message` is included with `agent_status` mode filtering
+  * `custom_message` is NOT added when explicit `events` array is used (preserves user choice)
 * Edge Cases:
-  * `custom_message` with `subscribed_events=None` (already returns `True`)
+  * `custom_message` with no `notification_mode` or `events` (subscribed_events=None, accepts all)
   * Explicit `events: ["custom_message"]` - should still work
-  * Explicit `events: []` (empty) - should return `False` (user explicitly disabled)
+  * Explicit `events: []` (empty) - should exclude `custom_message` (user explicitly disabled)
 
 **Testing Sequence** (TDD):
-1. Write test for `custom_message` bypass with `stages_only` mode
-2. Implement minimal passing code in `supports_event()`
-3. Write test for `custom_message` bypass with `agent_status` mode
-4. Verify implementation covers both cases
-5. Write test for explicit `events` array precedence
-6. Refine implementation to respect explicit configuration
+1. Write test for `custom_message` inclusion with `stages_only` mode
+2. Implement minimal passing code in `_create_channel()` to add `custom_message` to mode-based subscribed set
+3. Write test for `custom_message` inclusion with `agent_status` mode
+4. Verify implementation covers both mode cases
+5. Write test for explicit `events` array precedence (no modification)
+6. Refine implementation to only modify mode-based subscribed sets
 
-### Component 2: Config Integration (`_create_channel`) - **CODE_FIRST**
+### Component 2: `TelegramChannel.supports_event()` - **CODE_FIRST**
 
 **Approach**: Code-First (existing tests sufficient)
-**Rationale**: The `_create_channel` function already correctly passes `subscribed_events` to `TelegramChannel`. No changes expected here. Existing tests in `test_config.py` provide sufficient coverage.
+**Rationale**: The `TelegramChannel.supports_event()` method already correctly checks if an event is in the `subscribed_events` set. No changes needed here. The fix is implemented upstream in config.py by adding `custom_message` to the set before passing it to TelegramChannel. Existing tests in `test_telegram.py` provide sufficient coverage of the filtering logic.
 
 **Test Requirements:**
 * Coverage Target: No new tests needed
@@ -165,55 +165,55 @@ This feature is a surgical fix with well-defined requirements and clear acceptan
 
 | Component | Unit % | Integration % | Priority | Notes |
 |-----------|--------|---------------|----------|-------|
-| `TelegramChannel.supports_event()` | 100% | N/A | CRITICAL | Core change location |
-| `_create_channel()` | Existing | Existing | HIGH | No changes, verify no regression |
+| `_create_channel()` | N/A | 100% | CRITICAL | Core change location - adds custom_message to mode-based subscribed sets |
+| `TelegramChannel.supports_event()` | Existing | Existing | HIGH | No changes, verify no regression |
 | `_handle_notify()` | Existing | Existing | MEDIUM | No changes expected |
 
 ### Critical Test Scenarios
 
 Priority test scenarios that MUST be covered:
 
-1. **custom_message bypass with stages_only mode** (Priority: CRITICAL)
-   * **Description**: `@notify` delivers when `notification_mode: stages_only`
-   * **Test Type**: Unit
-   * **Success Criteria**: `supports_event("custom_message")` returns `True` when `subscribed_events` is `STAGES_ONLY_EVENTS`
+1. **custom_message inclusion with stages_only mode** (Priority: CRITICAL)
+   * **Description**: `@notify` delivers when `notification_mode: stages_only` because `custom_message` is added to the subscribed set
+   * **Test Type**: Integration
+   * **Success Criteria**: Channel created with `notification_mode: stages_only` includes `custom_message` in its `subscribed_events` set
    * **Test Approach**: TDD - Write first
 
-2. **custom_message bypass with agent_status mode** (Priority: CRITICAL)
-   * **Description**: `@notify` delivers when `notification_mode: agent_status`
-   * **Test Type**: Unit
-   * **Success Criteria**: `supports_event("custom_message")` returns `True` when `subscribed_events` is `AGENT_STATUS_EVENTS`
+2. **custom_message inclusion with agent_status mode** (Priority: CRITICAL)
+   * **Description**: `@notify` delivers when `notification_mode: agent_status` because `custom_message` is added to the subscribed set
+   * **Test Type**: Integration
+   * **Success Criteria**: Channel created with `notification_mode: agent_status` includes `custom_message` in its `subscribed_events` set
    * **Test Approach**: TDD - Write first
 
-3. **Explicit events array excludes custom_message** (Priority: HIGH)
-   * **Description**: User can explicitly exclude `custom_message` via `events` array
-   * **Test Type**: Unit
-   * **Success Criteria**: `supports_event("custom_message")` returns `False` when `events: ["stage_changed"]`
+3. **Explicit events array NOT modified** (Priority: HIGH)
+   * **Description**: User can explicitly exclude `custom_message` via `events` array - no automatic addition
+   * **Test Type**: Integration
+   * **Success Criteria**: Channel created with `events: ["stage_changed"]` does NOT include `custom_message` in its `subscribed_events` set
    * **Test Approach**: TDD
 
 4. **Mode filtering preserved for other events** (Priority: HIGH)
-   * **Description**: `stages_only` still filters `agent_running`, etc.
-   * **Test Type**: Unit
-   * **Success Criteria**: Existing tests continue to pass
+   * **Description**: `stages_only` still filters `agent_running`, etc. - only `custom_message` is added
+   * **Test Type**: Integration
+   * **Success Criteria**: Existing tests continue to pass, mode sets include expected events plus `custom_message`
    * **Test Approach**: Regression verification
 
 5. **All mode includes custom_message** (Priority: MEDIUM)
-   * **Description**: `notification_mode: all` continues to accept everything
-   * **Test Type**: Unit
-   * **Success Criteria**: `supports_event("custom_message")` returns `True` when `subscribed_events` is `None`
+   * **Description**: `notification_mode: all` continues to accept everything (subscribed_events=None)
+   * **Test Type**: Integration
+   * **Success Criteria**: Channel created with `notification_mode: all` has `subscribed_events=None` (no modification needed)
    * **Test Approach**: Existing test coverage
 
 6. **Empty events array excludes all** (Priority: MEDIUM)
-   * **Description**: `events: []` should exclude everything including `custom_message`
-   * **Test Type**: Unit
-   * **Success Criteria**: `supports_event("custom_message")` returns `False` when `subscribed_events` is empty set
+   * **Description**: `events: []` should exclude everything including `custom_message` - no modification
+   * **Test Type**: Integration
+   * **Success Criteria**: Channel created with `events: []` has `subscribed_events` as empty set (not modified)
    * **Test Approach**: Existing test + verify
 
 ### Edge Cases to Cover
 
-* **Explicit events with custom_message included**: `events: ["custom_message", "stage_changed"]` - should accept `custom_message`
-* **Empty subscribed_events (explicit empty set)**: Should return `False` for all including `custom_message`
-* **None subscribed_events (no filter)**: Should return `True` for all including `custom_message`
+* **Explicit events with custom_message included**: `events: ["custom_message", "stage_changed"]` - should NOT be modified (user explicitly included it)
+* **Empty subscribed_events (explicit empty set)**: `events: []` - should remain empty, no `custom_message` addition
+* **None subscribed_events (no filter)**: No `notification_mode` or `events` - should remain `None`, accepts all events by default
 
 ### Error Scenarios
 
@@ -235,64 +235,70 @@ Priority test scenarios that MUST be covered:
 
 ### Example from Codebase
 
-**File**: `tests/test_notifications/test_telegram.py`
-**Pattern**: Unit tests for `TelegramChannel.supports_event()`
+**File**: `tests/test_notifications/test_config.py`
+**Pattern**: Integration tests for `_create_channel()` with different notification configurations
 
 ```python
-class TestTelegramChannelSupportsEvent:
-    """Tests for TelegramChannel.supports_event()."""
-
-    def test_supports_all_when_no_filter(self) -> None:
-        """With no filter, supports all events."""
-        channel = TelegramChannel()
-        assert channel.supports_event("stage_changed") is True
-        assert channel.supports_event("agent_failed") is True
-        assert channel.supports_event("any_event") is True
-
-    def test_supports_only_subscribed_events(self) -> None:
-        """With filter, supports only listed events."""
-        channel = TelegramChannel(subscribed_events={"stage_changed", "agent_failed"})
-        assert channel.supports_event("stage_changed") is True
-        assert channel.supports_event("agent_failed") is True
-        assert channel.supports_event("agent_complete") is False
+def test_create_channel_with_notification_mode(monkeypatch):
+    """Channel created with notification_mode gets mode-based event filtering."""
+    monkeypatch.setenv("TELEGRAM_TOKEN", "test_token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    
+    channel_config = {
+        "type": "telegram",
+        "token": "${TELEGRAM_TOKEN}",
+        "chat_id": "${TELEGRAM_CHAT_ID}",
+        "notification_mode": "stages_only"
+    }
+    
+    channel = _create_channel(channel_config)
+    assert channel.subscribed_events == STAGES_ONLY_EVENTS
 ```
 
 **Key Conventions:**
-* Class-based test organization with descriptive names
+* Function-based test organization with descriptive names
 * Docstrings describe expected behavior
-* Multiple assertions per test for related checks
-* Direct construction of `TelegramChannel` with test configs
+* Use `monkeypatch` for environment variables
+* Direct call to `_create_channel()` with test configs
+* Assert on resulting channel's `subscribed_events` attribute
 
 ### Recommended Test Structure for New Tests
 
 ```python
-class TestCustomMessageBypass:
-    """Tests for custom_message event type bypass behavior."""
+def test_notification_mode_includes_custom_message(monkeypatch):
+    """Channels with notification_mode automatically include custom_message."""
+    monkeypatch.setenv("TELEGRAM_TOKEN", "test_token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    
+    channel_config = {
+        "type": "telegram",
+        "token": "${TELEGRAM_TOKEN}",
+        "chat_id": "${TELEGRAM_CHAT_ID}",
+        "notification_mode": "stages_only"
+    }
+    
+    channel = _create_channel(channel_config)
+    # Verify custom_message was added to the mode's event set
+    assert "custom_message" in channel.subscribed_events
+    # Verify base mode events are still present
+    assert "stage_changed" in channel.subscribed_events
 
-    def test_custom_message_bypasses_stages_only_mode(self) -> None:
-        """custom_message is delivered even with stages_only mode filtering."""
-        channel = TelegramChannel(subscribed_events=STAGES_ONLY_EVENTS)
-        assert channel.supports_event("custom_message") is True
-        # Verify other events still filtered
-        assert channel.supports_event("agent_running") is False
-
-    def test_custom_message_bypasses_agent_status_mode(self) -> None:
-        """custom_message is delivered even with agent_status mode filtering."""
-        channel = TelegramChannel(subscribed_events=AGENT_STATUS_EVENTS)
-        assert channel.supports_event("custom_message") is True
-        # Verify unrelated events still filtered
-        assert channel.supports_event("parallel_group_start") is False
-
-    def test_explicit_events_can_exclude_custom_message(self) -> None:
-        """Explicit events array takes precedence over bypass."""
-        channel = TelegramChannel(subscribed_events={"stage_changed"})
-        assert channel.supports_event("custom_message") is False
-        assert channel.supports_event("stage_changed") is True
-
-    def test_empty_events_excludes_custom_message(self) -> None:
-        """Empty events set excludes all events including custom_message."""
-        channel = TelegramChannel(subscribed_events=set())
-        assert channel.supports_event("custom_message") is False
+def test_explicit_events_not_modified(monkeypatch):
+    """Explicit events array is not modified - user choice is preserved."""
+    monkeypatch.setenv("TELEGRAM_TOKEN", "test_token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    
+    channel_config = {
+        "type": "telegram",
+        "token": "${TELEGRAM_TOKEN}",
+        "chat_id": "${TELEGRAM_CHAT_ID}",
+        "events": ["stage_changed"]
+    }
+    
+    channel = _create_channel(channel_config)
+    # Verify custom_message was NOT added
+    assert "custom_message" not in channel.subscribed_events
+    assert channel.subscribed_events == {"stage_changed"}
 ```
 
 ## Success Criteria
@@ -317,28 +323,37 @@ class TestCustomMessageBypass:
 
 ### For TDD Components:
 
-1. **Add new test class** `TestCustomMessageBypass` to `tests/test_notifications/test_telegram.py`
-2. **Write failing tests** for `custom_message` bypass scenarios
-3. **Run tests** to confirm they fail (`uv run pytest tests/test_notifications/test_telegram.py::TestCustomMessageBypass -v`)
-4. **Implement** minimal change in `TelegramChannel.supports_event()` to pass tests
+1. **Add new tests** to `tests/test_notifications/test_config.py`
+2. **Write failing tests** for `custom_message` inclusion in mode-based subscribed sets
+3. **Run tests** to confirm they fail (`uv run pytest tests/test_notifications/test_config.py -k custom_message -v`)
+4. **Implement** minimal change in `_create_channel()` to add `custom_message` to mode-based subscribed sets
 5. **Run all notification tests** to verify no regressions
 6. **Refactor** if needed while keeping tests green
 
 ### Implementation Approach
 
-The fix requires distinguishing between:
-- **Mode-based filtering** (`notification_mode` setting): `custom_message` should bypass
-- **Explicit events array**: User's explicit choice should be honored
+The fix distinguishes between:
+- **Mode-based filtering** (`notification_mode` setting): Automatically add `custom_message` to the subscribed set
+- **Explicit events array**: User's explicit choice should be honored - do NOT modify
 
-Two implementation options:
+**Implementation (as implemented in config.py lines 134-142)**:
 
-**Option A (Preferred)**: Modify `supports_event()` to always return `True` for `custom_message` UNLESS the channel has an explicit events filter that doesn't include it. This requires tracking whether `subscribed_events` came from a mode or explicit config.
+```python
+elif "notification_mode" in resolved:
+    # Mode-based filtering
+    mode_events = resolve_notification_mode(resolved["notification_mode"])
+    subscribed = set(mode_events) if mode_events else None
+    # Always allow custom_message for explicit @notify commands
+    # This ensures @notify bypasses mode filtering while preserving
+    # the ability to disable all notifications with events: []
+    if subscribed is not None:
+        subscribed.add("custom_message")
+```
 
-**Option B**: Add `custom_message` to all mode event sets (`STAGES_ONLY_EVENTS`, `AGENT_STATUS_EVENTS`). Simpler but changes the mode definitions.
-
-**Option C (Simplest)**: In `supports_event()`, check if `event_type == "custom_message"` and return `True` before checking subscribed_events, UNLESS we need to respect explicit exclusion. This requires knowing if events came from explicit config.
-
-The implementation should be guided by maintaining backwards compatibility and respecting FR-005 (explicit events array precedence).
+This implementation:
+- Only modifies the subscribed set when `notification_mode` is used (mode-based filtering)
+- Does NOT modify explicit `events` arrays - preserves user choice completely
+- Maintains backwards compatibility with `subscribed_events=None` (all events)
 
 ## Considerations and Trade-offs
 
@@ -360,8 +375,8 @@ The implementation should be guided by maintaining backwards compatibility and r
 
 * **Feature Spec**: [.teambot/notify-command/artifacts/feature_spec.md](./feature_spec.md)
 * **Spec Review**: [.teambot/notify-command/artifacts/spec_review.md](./spec_review.md)
-* **Test Examples**: `tests/test_notifications/test_telegram.py`, `tests/test_notifications/test_config.py`
-* **Implementation Location**: `src/teambot/notifications/channels/telegram.py:71-75`
+* **Test Examples**: `tests/test_notifications/test_config.py`, `tests/test_notifications/test_telegram.py`
+* **Implementation Location**: `src/teambot/notifications/config.py:134-142`
 * **Mode Definitions**: `src/teambot/notifications/modes.py`
 
 ## Next Steps
