@@ -115,6 +115,67 @@ def _check_copilot_authentication(display: ConsoleDisplay) -> bool:
         return False
 
 
+def _check_copilot_authentication_blocking(display: ConsoleDisplay) -> bool:
+    """Check Copilot authentication status (blocking version for cmd_run).
+
+    Unlike _check_copilot_authentication which continues with warnings,
+    this version treats authentication failure as a blocking error.
+
+    Args:
+        display: Console display for output.
+
+    Returns:
+        True if authenticated, False otherwise (blocks execution).
+    """
+    try:
+        is_auth, error = asyncio.run(_check_auth_async())
+
+        if is_auth:
+            return True
+        else:
+            display.print_error("Copilot not authenticated")
+            if error and "not available" not in error.lower():
+                display.print_error(f"  {error}")
+            display.print_info("Run 'copilot auth' to authenticate")
+            return False
+    except Exception as e:
+        logging.debug(f"Could not check authentication: {e}")
+        display.print_error("Could not verify authentication status")
+        display.print_info("Run 'copilot auth' to ensure you're authenticated")
+        return False
+
+
+def _ensure_model_cache(display: ConsoleDisplay) -> None:
+    """Ensure model cache is available, refreshing if needed.
+
+    Checks if model cache exists. If missing or empty, automatically refreshes
+    from SDK with status feedback.
+
+    Expired cache handling is intentionally left to the existing warning
+    path in schema._ensure_models_loaded() - this function only handles
+    the first-run case when no cache exists at all or cache is empty.
+
+    This is non-blocking - if refresh fails, execution continues
+    and ConfigLoader will report specific validation errors.
+
+    Args:
+        display: Console display for output.
+    """
+    from teambot.config.model_cache import load_cache
+
+    cache = load_cache()
+
+    # Only refresh when cache is missing or empty
+    # Expired cache is intentionally used as-is (schema will warn)
+    if cache is None:
+        display.print_info("Refreshing model cache...")
+        _refresh_model_cache(display)
+    elif not cache.models:
+        display.print_info("Model cache is empty, refreshing...")
+        _refresh_model_cache(display)
+    # Expired cache: don't refresh, let schema handle with warning
+
+
 def _display_post_init_guidance(display: ConsoleDisplay) -> None:
     """Display post-init recommended next steps.
 
@@ -396,10 +457,18 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     config_path = Path(args.config)
     teambot_dir = Path(".teambot")
 
+    # Fast-fail if config doesn't exist (no side effects)
     if not config_path.exists():
         display.print_error(f"Configuration not found: {config_path}")
         display.print_warning("Run 'teambot init' first")
         return 1
+
+    # Authentication check (blocking - exit if not authenticated)
+    if not _check_copilot_authentication_blocking(display):
+        return 1
+
+    # Ensure model cache is available (auto-refresh if needed)
+    _ensure_model_cache(display)
 
     try:
         loader = ConfigLoader()

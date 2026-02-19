@@ -220,6 +220,12 @@ class TestCLIRun:
         # Mock model validation to always return True (no SDK needed)
         monkeypatch.setattr("teambot.config.loader.validate_model", lambda m: True)
 
+        # Mock authentication check to return True (no SDK needed)
+        monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
+
+        # Mock model cache check (no SDK needed)
+        monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
         # Initialize first
         init_args = argparse.Namespace(force=False)
         cmd_init(init_args, ConsoleDisplay())
@@ -561,3 +567,215 @@ class TestInitPostGuidance:
 
         assert result == 0
         assert (tmp_path / "teambot.json").exists()
+
+
+class TestRunAuthCheck:
+    """Tests for authentication check blocking behavior in cmd_run flow."""
+
+    def test_auth_check_blocking_returns_true_when_authenticated(self, capsys):
+        """Blocking auth check returns True when user is authenticated."""
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import _check_copilot_authentication_blocking
+        from teambot.visualization.console import ConsoleDisplay
+
+        # Mock _check_auth_async to return (True, None)
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            display = ConsoleDisplay()
+            result = _check_copilot_authentication_blocking(display)
+
+        assert result is True
+        captured = capsys.readouterr()
+        # No error messages when authenticated
+        assert "not authenticated" not in captured.out.lower()
+
+    def test_auth_check_blocking_returns_false_when_not_authenticated(self, capsys):
+        """Blocking auth check returns False with guidance when not authenticated."""
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import _check_copilot_authentication_blocking
+        from teambot.visualization.console import ConsoleDisplay
+
+        # Mock _check_auth_async to return (False, "Not authenticated")
+        with patch(
+            "teambot.cli._check_auth_async", AsyncMock(return_value=(False, "Not authenticated"))
+        ):
+            display = ConsoleDisplay()
+            result = _check_copilot_authentication_blocking(display)
+
+        assert result is False
+        captured = capsys.readouterr()
+        assert "not authenticated" in captured.out.lower()
+        assert "copilot auth" in captured.out.lower()
+
+    def test_auth_check_blocking_handles_exception_gracefully(self, capsys):
+        """Blocking auth check returns False on exception."""
+        from unittest.mock import patch
+
+        from teambot.cli import _check_copilot_authentication_blocking
+        from teambot.visualization.console import ConsoleDisplay
+
+        # Mock _check_auth_async to raise Exception
+        async def raise_error():
+            raise RuntimeError("SDK error")
+
+        with patch("teambot.cli._check_auth_async", raise_error):
+            display = ConsoleDisplay()
+            result = _check_copilot_authentication_blocking(display)
+
+        assert result is False
+        captured = capsys.readouterr()
+        # Should show guidance about authentication
+        assert "copilot auth" in captured.out.lower()
+
+    def test_auth_check_blocking_shows_error_detail_when_available(self, capsys):
+        """Blocking auth check shows error details when provided."""
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import _check_copilot_authentication_blocking
+        from teambot.visualization.console import ConsoleDisplay
+
+        # Mock with specific error message (not "not available")
+        with patch(
+            "teambot.cli._check_auth_async", AsyncMock(return_value=(False, "Token expired"))
+        ):
+            display = ConsoleDisplay()
+            result = _check_copilot_authentication_blocking(display)
+
+        assert result is False
+        captured = capsys.readouterr()
+        assert "Token expired" in captured.out
+
+
+class TestRunModelCache:
+    """Tests for model cache auto-refresh in cmd_run flow."""
+
+    def test_ensure_cache_returns_immediately_when_valid(self, tmp_path, monkeypatch, capsys):
+        """_ensure_model_cache returns immediately when cache exists with models."""
+        from unittest.mock import MagicMock, patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock cache as existing with models (valid)
+        mock_cache = MagicMock()
+        mock_cache.models = ["gpt-5.2", "claude-sonnet-4.5"]
+        with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
+            with patch("teambot.cli._refresh_model_cache") as mock_refresh:
+                display = ConsoleDisplay()
+                _ensure_model_cache(display)
+
+        # Refresh should NOT be called when cache exists with models
+        mock_refresh.assert_not_called()
+        captured = capsys.readouterr()
+        assert "Refreshing model cache" not in captured.out
+
+    def test_ensure_cache_detects_missing_file(self, tmp_path, monkeypatch, capsys):
+        """_ensure_model_cache detects when cache file doesn't exist."""
+        from unittest.mock import patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock load_cache to return None (file doesn't exist)
+        with patch("teambot.config.model_cache.load_cache", return_value=None):
+            with patch("teambot.cli._refresh_model_cache", return_value=True) as mock_refresh:
+                display = ConsoleDisplay()
+                _ensure_model_cache(display)
+
+        # Refresh should be called when cache is missing
+        mock_refresh.assert_called_once()
+        captured = capsys.readouterr()
+        assert "Refreshing model cache" in captured.out
+
+    def test_ensure_cache_skips_refresh_when_expired(self, tmp_path, monkeypatch, capsys):
+        """_ensure_model_cache does NOT refresh when cache is expired.
+
+        Expired cache handling is left to schema._ensure_models_loaded()
+        which uses expired cache with a warning. Only missing/empty cache triggers refresh.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock expired cache (exists, has models, but expired - which is handled by load_cache)
+        mock_cache = MagicMock()
+        mock_cache.models = ["gpt-5.2", "claude-sonnet-4.5"]  # Has models
+        with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
+            with patch("teambot.cli._refresh_model_cache") as mock_refresh:
+                display = ConsoleDisplay()
+                _ensure_model_cache(display)
+
+        # Refresh should NOT be called when cache is expired (has models)
+        mock_refresh.assert_not_called()
+        captured = capsys.readouterr()
+        assert "Refreshing model cache" not in captured.out
+
+    def test_ensure_cache_detects_empty_models(self, tmp_path, monkeypatch, capsys):
+        """_ensure_model_cache detects when cache has empty models list."""
+        from unittest.mock import MagicMock, patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock cache with empty models list
+        mock_cache = MagicMock()
+        mock_cache.models = []
+        with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
+            with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
+                with patch("teambot.cli._refresh_model_cache", return_value=True) as mock_refresh:
+                    display = ConsoleDisplay()
+                    _ensure_model_cache(display)
+
+        # Refresh should be called when cache has no models
+        mock_refresh.assert_called_once()
+        captured = capsys.readouterr()
+        assert "empty" in captured.out.lower()
+
+    def test_ensure_cache_continues_after_successful_refresh(self, tmp_path, monkeypatch, capsys):
+        """Successful cache refresh allows workflow to continue."""
+        from unittest.mock import patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock load_cache to return None (missing)
+        with patch("teambot.config.model_cache.load_cache", return_value=None):
+            with patch("teambot.cli._refresh_model_cache", return_value=True):
+                display = ConsoleDisplay()
+                # Should not raise any exception
+                _ensure_model_cache(display)
+
+        captured = capsys.readouterr()
+        assert "Refreshing model cache" in captured.out
+
+    def test_ensure_cache_continues_even_if_refresh_fails(self, tmp_path, monkeypatch, capsys):
+        """Failed cache refresh continues - let ConfigLoader handle errors."""
+        from unittest.mock import patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock load_cache to return None (missing), refresh fails
+        with patch("teambot.config.model_cache.load_cache", return_value=None):
+            with patch("teambot.cli._refresh_model_cache", return_value=False):
+                display = ConsoleDisplay()
+                # Should not raise - function continues even on refresh failure
+                _ensure_model_cache(display)
+
+        # Function completes without error (ConfigLoader will handle validation errors)
+        captured = capsys.readouterr()
+        assert "Refreshing model cache" in captured.out

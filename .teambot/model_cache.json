@@ -61,12 +61,6 @@
       "multiplier": 1.0
     },
     {
-      "id": "gpt-5",
-      "name": "GPT-5",
-      "category": "standard",
-      "multiplier": 1.0
-    },
-    {
       "id": "gpt-5.1-codex-mini",
       "name": "GPT-5.1-Codex-Mini",
       "category": "fast",
@@ -85,6 +79,6 @@
       "multiplier": 0.0
     }
   ],
-  "timestamp": 1771376153.430875,
+  "timestamp": 1771471982.51332,
   "sdk_version": "0.1.23"
 }

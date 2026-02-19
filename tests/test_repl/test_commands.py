@@ -268,7 +268,7 @@ class TestModelsCommand:
 
         assert result.success is True
         assert "claude-sonnet-4.5" in result.output
-        assert "gpt-5" in result.output
+        assert "gpt-5.2" in result.output
         assert "gemini-3-pro-preview" in result.output
 
     async def test_models_shows_categories(self):
@@ -329,12 +329,12 @@ class TestModelCommand:
         # Should show some info about models
 
     async def test_model_sets_agent_model(self):
-        """'/model pm gpt-5' sets model for agent."""
+        """'/model pm gpt-5.2' sets model for agent."""
         commands = SystemCommands()
-        result = await commands.dispatch("model", ["pm", "gpt-5"])
+        result = await commands.dispatch("model", ["pm", "gpt-5.2"])
 
         assert result.success is True
-        assert commands._session_model_overrides.get("pm") == "gpt-5"
+        assert commands._session_model_overrides.get("pm") == "gpt-5.2"
 
     async def test_model_invalid_agent(self):
         """'/model invalid gpt-5' shows error for invalid agent."""
@@ -357,7 +357,7 @@ class TestModelCommand:
     async def test_model_clears_with_clear(self):
         """'/model pm clear' clears model for agent."""
         commands = SystemCommands()
-        commands._session_model_overrides["pm"] = "gpt-5"
+        commands._session_model_overrides["pm"] = "gpt-5.2"
 
         result = await commands.dispatch("model", ["pm", "clear"])
 

@@ -315,7 +315,7 @@ class TestAgentModelConfig:
                     "id": "pm",
                     "persona": "project_manager",
                     "display_name": "Project Manager",
-                    "model": "gpt-5",
+                    "model": "gpt-5.2",
                 }
             ]
         }
@@ -325,7 +325,7 @@ class TestAgentModelConfig:
         loader = ConfigLoader()
         config = loader.load(config_file)
 
-        assert config["agents"][0]["model"] == "gpt-5"
+        assert config["agents"][0]["model"] == "gpt-5.2"
 
     def test_agent_with_invalid_model_raises(self, tmp_path):
         """Agent with invalid model raises ConfigError."""
