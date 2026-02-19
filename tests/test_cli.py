@@ -651,7 +651,7 @@ class TestRunModelCache:
     """Tests for model cache auto-refresh in cmd_run flow."""
 
     def test_ensure_cache_returns_immediately_when_valid(self, tmp_path, monkeypatch, capsys):
-        """_ensure_model_cache returns immediately when cache exists."""
+        """_ensure_model_cache returns immediately when cache exists with models."""
         from unittest.mock import MagicMock, patch
 
         from teambot.cli import _ensure_model_cache
@@ -659,13 +659,15 @@ class TestRunModelCache:
 
         monkeypatch.chdir(tmp_path)
 
-        # Mock cache as existing (not None)
-        with patch("teambot.config.model_cache.load_cache", return_value=MagicMock()):
+        # Mock cache as existing with models (valid)
+        mock_cache = MagicMock()
+        mock_cache.models = ["gpt-5.2", "claude-sonnet-4.5"]
+        with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
             with patch("teambot.cli._refresh_model_cache") as mock_refresh:
                 display = ConsoleDisplay()
                 _ensure_model_cache(display)
 
-        # Refresh should NOT be called when cache exists
+        # Refresh should NOT be called when cache exists with models
         mock_refresh.assert_not_called()
         captured = capsys.readouterr()
         assert "Refreshing model cache" not in captured.out
@@ -692,9 +694,9 @@ class TestRunModelCache:
 
     def test_ensure_cache_skips_refresh_when_expired(self, tmp_path, monkeypatch, capsys):
         """_ensure_model_cache does NOT refresh when cache is expired.
-        
+
         Expired cache handling is left to schema._ensure_models_loaded()
-        which uses expired cache with a warning. Only missing cache triggers refresh.
+        which uses expired cache with a warning. Only missing/empty cache triggers refresh.
         """
         from unittest.mock import MagicMock, patch
 
@@ -703,14 +705,15 @@ class TestRunModelCache:
 
         monkeypatch.chdir(tmp_path)
 
-        # Mock expired cache (exists but invalid)
+        # Mock expired cache (exists, has models, but expired - which is handled by load_cache)
         mock_cache = MagicMock()
+        mock_cache.models = ["gpt-5.2", "claude-sonnet-4.5"]  # Has models
         with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
             with patch("teambot.cli._refresh_model_cache") as mock_refresh:
                 display = ConsoleDisplay()
                 _ensure_model_cache(display)
 
-        # Refresh should NOT be called when cache is expired
+        # Refresh should NOT be called when cache is expired (has models)
         mock_refresh.assert_not_called()
         captured = capsys.readouterr()
         assert "Refreshing model cache" not in captured.out

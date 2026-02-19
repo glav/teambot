@@ -148,12 +148,12 @@ def _check_copilot_authentication_blocking(display: ConsoleDisplay) -> bool:
 def _ensure_model_cache(display: ConsoleDisplay) -> None:
     """Ensure model cache is available, refreshing if needed.
 
-    Checks if model cache exists. If missing, automatically refreshes
+    Checks if model cache exists. If missing or empty, automatically refreshes
     from SDK with status feedback.
 
     Expired cache handling is intentionally left to the existing warning
     path in schema._ensure_models_loaded() - this function only handles
-    the first-run case when no cache exists at all.
+    the first-run case when no cache exists at all or cache is empty.
 
     This is non-blocking - if refresh fails, execution continues
     and ConfigLoader will report specific validation errors.
@@ -165,19 +165,15 @@ def _ensure_model_cache(display: ConsoleDisplay) -> None:
 
     cache = load_cache()
 
-    if is_cache_valid(cache):
-        # Cache exists and valid, no action needed
-        return
-
-    # Cache missing, expired, or empty - need to refresh
+    # Only refresh when cache is missing or empty
+    # Expired cache is intentionally used as-is (schema will warn)
     if cache is None:
         display.print_info("Refreshing model cache...")
+        _refresh_model_cache(display)
     elif not cache.models:
         display.print_info("Model cache is empty, refreshing...")
-    else:
-        display.print_info("Model cache expired, refreshing...")
-
-    _refresh_model_cache(display)
+        _refresh_model_cache(display)
+    # Expired cache: don't refresh, let schema handle with warning
 
 
 def _display_post_init_guidance(display: ConsoleDisplay) -> None:

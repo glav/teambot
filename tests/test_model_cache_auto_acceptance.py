@@ -241,8 +241,12 @@ class TestModelCacheAutoSetupAcceptance:
     # AT-005: Cache Exists But Expired
     # =========================================================================
 
-    def test_at_005_expired_cache_triggers_refresh(self, tmp_path, monkeypatch, capsys):
-        """AT-005: Expired cache triggers refresh with appropriate message."""
+    def test_at_005_expired_cache_skips_refresh(self, tmp_path, monkeypatch, capsys):
+        """AT-005: Expired cache is used as-is, no refresh triggered.
+
+        Per spec (Scenario 5), expired cache should be used to allow immediate
+        model access. Schema will warn about expiry. User can manually refresh.
+        """
         from teambot.cli import ConsoleDisplay, cmd_run
         from teambot.config.model_cache import CachedModel, ModelCache
 
@@ -252,32 +256,33 @@ class TestModelCacheAutoSetupAcceptance:
         (tmp_path / ".teambot").mkdir()
         (tmp_path / "teambot.json").write_text('{"agents": []}')
 
-        # Create expired cache
+        # Create expired cache (has models, so should NOT refresh)
         expired_cache = ModelCache(
             models=[CachedModel(id="test", name="Test", category="standard")],
             timestamp=0,  # Very old timestamp
             sdk_version="1.0",
         )
 
-        # Mock auth success, expired cache detected
+        # Mock auth success, expired cache with models
         with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
             with patch("teambot.config.model_cache.load_cache", return_value=expired_cache):
-                with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
-                    with patch(
-                        "teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)
-                    ):
+                with patch(
+                    "teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)
+                ) as mock_refresh:
 
-                        async def mock_repl(*args, **kwargs):
-                            pass
+                    async def mock_repl(*args, **kwargs):
+                        pass
 
-                        with patch("teambot.repl.run_interactive_mode", mock_repl):
-                            args = argparse.Namespace(
-                                config="teambot.json", objective=None, resume=False
-                            )
-                            display = ConsoleDisplay()
+                    with patch("teambot.repl.run_interactive_mode", mock_repl):
+                        args = argparse.Namespace(
+                            config="teambot.json", objective=None, resume=False
+                        )
+                        display = ConsoleDisplay()
 
-                            cmd_run(args, display)
+                        cmd_run(args, display)
 
+        # Refresh should NOT be called for expired cache with models
+        mock_refresh.assert_not_called()
         captured = capsys.readouterr()
-        # Should show expired message
-        assert "expired" in captured.out.lower()
+        # Should NOT show refresh messages
+        assert "refreshing" not in captured.out.lower()
