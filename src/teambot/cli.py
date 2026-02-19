@@ -457,17 +457,18 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     config_path = Path(args.config)
     teambot_dir = Path(".teambot")
 
+    # Fast-fail if config doesn't exist (no side effects)
+    if not config_path.exists():
+        display.print_error(f"Configuration not found: {config_path}")
+        display.print_warning("Run 'teambot init' first")
+        return 1
+
     # Authentication check (blocking - exit if not authenticated)
     if not _check_copilot_authentication_blocking(display):
         return 1
 
     # Ensure model cache is available (auto-refresh if needed)
     _ensure_model_cache(display)
-
-    if not config_path.exists():
-        display.print_error(f"Configuration not found: {config_path}")
-        display.print_warning("Run 'teambot init' first")
-        return 1
 
     try:
         loader = ConfigLoader()
