@@ -220,6 +220,12 @@ class TestCLIRun:
         # Mock model validation to always return True (no SDK needed)
         monkeypatch.setattr("teambot.config.loader.validate_model", lambda m: True)
 
+        # Mock authentication check to return True (no SDK needed)
+        monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
+
+        # Mock model cache check (no SDK needed)
+        monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
         # Initialize first
         init_args = argparse.Namespace(force=False)
         cmd_init(init_args, ConsoleDisplay())
