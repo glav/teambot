@@ -26,7 +26,7 @@ Users must manually run `/models --refresh` before TeamBot will work, which crea
 - [ ] `teambot run` detects when model cache is missing or empty
 - [ ] When model cache is missing, automatically performs model refresh (equivalent to `/models --refresh`)
 - [ ] User is informed that model cache refresh is occurring (e.g., "Refreshing model cache...")
-- [ ] If model cache refresh fails, provides clear error with actionable guidance
+- [ ] If model cache refresh fails, provides clear warning with actionable guidance (execution continues)
 - [ ] If model cache refresh succeeds, `teambot run` continues execution normally
 - [ ] All existing tests pass
 - [ ] New tests cover the login check and auto-refresh behavior
@@ -55,7 +55,7 @@ Users must manually run `/models --refresh` before TeamBot will work, which crea
 - Must not break existing `teambot init` or `teambot run` behavior when cache exists
 - Authentication check should be fast and not block unnecessarily
 - Model refresh should display status to the user
-- Must handle network failures gracefully with clear error messages
+- Must handle network failures gracefully with clear warning messages (allows execution to continue)
 - Should not change the startup behavior when everything is correctly set up
 
 ---
