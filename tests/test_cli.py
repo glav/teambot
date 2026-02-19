@@ -651,7 +651,7 @@ class TestRunModelCache:
     """Tests for model cache auto-refresh in cmd_run flow."""
 
     def test_ensure_cache_returns_immediately_when_valid(self, tmp_path, monkeypatch, capsys):
-        """_ensure_model_cache returns immediately when cache is valid."""
+        """_ensure_model_cache returns immediately when cache exists."""
         from unittest.mock import MagicMock, patch
 
         from teambot.cli import _ensure_model_cache
@@ -659,14 +659,13 @@ class TestRunModelCache:
 
         monkeypatch.chdir(tmp_path)
 
-        # Mock cache as valid (patch where imported)
+        # Mock cache as existing (not None)
         with patch("teambot.config.model_cache.load_cache", return_value=MagicMock()):
-            with patch("teambot.config.model_cache.is_cache_valid", return_value=True):
-                with patch("teambot.cli._refresh_model_cache") as mock_refresh:
-                    display = ConsoleDisplay()
-                    _ensure_model_cache(display)
+            with patch("teambot.cli._refresh_model_cache") as mock_refresh:
+                display = ConsoleDisplay()
+                _ensure_model_cache(display)
 
-        # Refresh should NOT be called when cache is valid
+        # Refresh should NOT be called when cache exists
         mock_refresh.assert_not_called()
         captured = capsys.readouterr()
         assert "Refreshing model cache" not in captured.out
@@ -682,18 +681,21 @@ class TestRunModelCache:
 
         # Mock load_cache to return None (file doesn't exist)
         with patch("teambot.config.model_cache.load_cache", return_value=None):
-            with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
-                with patch("teambot.cli._refresh_model_cache", return_value=True) as mock_refresh:
-                    display = ConsoleDisplay()
-                    _ensure_model_cache(display)
+            with patch("teambot.cli._refresh_model_cache", return_value=True) as mock_refresh:
+                display = ConsoleDisplay()
+                _ensure_model_cache(display)
 
         # Refresh should be called when cache is missing
         mock_refresh.assert_called_once()
         captured = capsys.readouterr()
         assert "Refreshing model cache" in captured.out
 
-    def test_ensure_cache_detects_expired_cache(self, tmp_path, monkeypatch, capsys):
-        """_ensure_model_cache detects when cache is expired."""
+    def test_ensure_cache_skips_refresh_when_expired(self, tmp_path, monkeypatch, capsys):
+        """_ensure_model_cache does NOT refresh when cache is expired.
+        
+        Expired cache handling is left to schema._ensure_models_loaded()
+        which uses expired cache with a warning. Only missing cache triggers refresh.
+        """
         from unittest.mock import MagicMock, patch
 
         from teambot.cli import _ensure_model_cache
@@ -704,15 +706,14 @@ class TestRunModelCache:
         # Mock expired cache (exists but invalid)
         mock_cache = MagicMock()
         with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
-            with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
-                with patch("teambot.cli._refresh_model_cache", return_value=True) as mock_refresh:
-                    display = ConsoleDisplay()
-                    _ensure_model_cache(display)
+            with patch("teambot.cli._refresh_model_cache") as mock_refresh:
+                display = ConsoleDisplay()
+                _ensure_model_cache(display)
 
-        # Refresh should be called when cache is expired
-        mock_refresh.assert_called_once()
+        # Refresh should NOT be called when cache is expired
+        mock_refresh.assert_not_called()
         captured = capsys.readouterr()
-        assert "expired" in captured.out.lower()
+        assert "Refreshing model cache" not in captured.out
 
     def test_ensure_cache_continues_after_successful_refresh(self, tmp_path, monkeypatch, capsys):
         """Successful cache refresh allows workflow to continue."""
@@ -725,11 +726,10 @@ class TestRunModelCache:
 
         # Mock load_cache to return None (missing)
         with patch("teambot.config.model_cache.load_cache", return_value=None):
-            with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
-                with patch("teambot.cli._refresh_model_cache", return_value=True):
-                    display = ConsoleDisplay()
-                    # Should not raise any exception
-                    _ensure_model_cache(display)
+            with patch("teambot.cli._refresh_model_cache", return_value=True):
+                display = ConsoleDisplay()
+                # Should not raise any exception
+                _ensure_model_cache(display)
 
         captured = capsys.readouterr()
         assert "Refreshing model cache" in captured.out
@@ -745,11 +745,10 @@ class TestRunModelCache:
 
         # Mock load_cache to return None (missing), refresh fails
         with patch("teambot.config.model_cache.load_cache", return_value=None):
-            with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
-                with patch("teambot.cli._refresh_model_cache", return_value=False):
-                    display = ConsoleDisplay()
-                    # Should not raise - function continues even on refresh failure
-                    _ensure_model_cache(display)
+            with patch("teambot.cli._refresh_model_cache", return_value=False):
+                display = ConsoleDisplay()
+                # Should not raise - function continues even on refresh failure
+                _ensure_model_cache(display)
 
         # Function completes without error (ConfigLoader will handle validation errors)
         captured = capsys.readouterr()
