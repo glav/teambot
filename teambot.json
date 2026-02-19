@@ -1,6 +1,6 @@
 {
   "teambot_dir": ".teambot",
-  "default_model": "claude-sonnet-4",
+  "default_model": "claude-sonnet-4.5",
   "default_agent": "pm",
   "agents": [
     {

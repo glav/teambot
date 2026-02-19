@@ -27,6 +27,136 @@ if TYPE_CHECKING:
 COPILOT_CLI_INSTALL_URL = "https://githubnext.com/projects/copilot-cli/"
 
 
+async def _refresh_model_cache_async() -> bool:
+    """Async helper to refresh model cache from SDK.
+
+    Returns:
+        True if refresh succeeded, False otherwise.
+    """
+    from teambot.config.schema import refresh_models
+
+    return await refresh_models()
+
+
+def _refresh_model_cache(display: ConsoleDisplay) -> bool:
+    """Refresh model cache, displaying status.
+
+    Args:
+        display: Console display for output.
+
+    Returns:
+        True if refresh succeeded, False otherwise.
+    """
+    try:
+        success = asyncio.run(_refresh_model_cache_async())
+        if success:
+            display.print_success("Model cache refreshed")
+            return True
+        else:
+            display.print_warning("Could not refresh model cache - models may not be available")
+            display.print_warning("Run '/models --refresh' later to update model list")
+            return False
+    except Exception as e:
+        logging.debug(f"Model cache refresh failed: {e}")
+        display.print_warning("Model cache refresh failed")
+        display.print_warning("Run '/models --refresh' later to update model list")
+        return False
+
+
+async def _check_auth_async() -> tuple[bool, str | None]:
+    """Check Copilot authentication status.
+
+    Returns:
+        Tuple of (is_authenticated, error_message).
+    """
+    from teambot.copilot.sdk_client import CopilotSDKClient, SDKClientError
+
+    client = CopilotSDKClient()
+    if not client.is_available():
+        return False, "Copilot SDK not available"
+
+    try:
+        await client.start()
+        is_auth = client.is_authenticated()
+        await client.stop()
+        return is_auth, None
+    except SDKClientError as e:
+        return False, str(e)
+    except Exception as e:
+        return False, str(e)
+
+
+def _check_copilot_authentication(display: ConsoleDisplay) -> bool:
+    """Check and display Copilot authentication status.
+
+    Args:
+        display: Console display for output.
+
+    Returns:
+        True if authenticated, False otherwise.
+    """
+    try:
+        is_auth, error = asyncio.run(_check_auth_async())
+
+        if is_auth:
+            display.print_success("Copilot authenticated")
+            return True
+        else:
+            display.print_warning("Copilot not authenticated")
+            if error and "not available" not in error.lower():
+                display.print_warning(f"  {error}")
+            display.print_info("  Run 'copilot auth' to authenticate")
+            display.print_info("  Or set GITHUB_TOKEN environment variable")
+            return False
+    except Exception as e:
+        logging.debug(f"Could not check authentication: {e}")
+        display.print_warning("Could not verify authentication status")
+        display.print_info("Run 'copilot auth' to ensure you're authenticated")
+        return False
+
+
+def _display_post_init_guidance(display: ConsoleDisplay) -> None:
+    """Display post-init recommended next steps.
+
+    Loads guidance from package file for maintainability.
+    Falls back to basic guidance if file cannot be loaded.
+    """
+    try:
+        from importlib.resources import files
+
+        pkg = files("teambot")
+        guidance_path = pkg.joinpath("scaffolds", "init-next-steps.md")
+
+        # Handle both traversable and path-like objects
+        if hasattr(guidance_path, "read_text"):
+            content = guidance_path.read_text(encoding="utf-8")
+        else:
+            content = Path(str(guidance_path)).read_text(encoding="utf-8")
+
+        display.print_info("")
+        display.print_info("=== Recommended Next Steps ===")
+
+        # Parse and display content (skip markdown headers/fences)
+        for line in content.strip().split("\n"):
+            line_stripped = line.strip()
+            if line_stripped.startswith("## ") or line_stripped.startswith("# "):
+                continue  # Skip markdown headers
+            elif line_stripped.startswith("```"):
+                continue  # Skip code fence markers
+            elif line_stripped:
+                display.print_info(f"  {line}")
+
+    except Exception as e:
+        logging.debug(f"Failed to load init guidance file: {e}")
+        # Fallback to basic hardcoded guidance
+        display.print_info("")
+        display.print_info("=== Recommended Next Steps ===")
+        display.print_info("  1. Edit teambot.json to customize per-agent models")
+        display.print_info("  2. Create an objective file in docs/objectives/")
+        display.print_info("  3. Run 'teambot run objectives/your-task.md'")
+        display.print_info("  4. Or use 'teambot run' for interactive mode")
+
+
 def check_copilot_cli(display: ConsoleDisplay | None = None) -> bool:
     """Check if Copilot CLI is installed and accessible.
 
@@ -236,6 +366,12 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     display.print_success("")
 
+    # Check authentication and refresh model cache (non-blocking)
+    display.print_info("")
+    display.print_info("=== Copilot Status ===")
+    _check_copilot_authentication(display)
+    _refresh_model_cache(display)
+
     # Show agents
     play_startup_animation(
         console=display.console,
@@ -248,6 +384,9 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         model = agent.get("model") or default_model
         display.add_agent(agent["id"], agent["persona"], agent.get("display_name"), model=model)
     display.print_status()
+
+    # Display recommended next steps
+    _display_post_init_guidance(display)
 
     return 0
 
