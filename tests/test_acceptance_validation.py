@@ -369,7 +369,7 @@ class TestAcceptanceScenarios:
         captured = capsys.readouterr()
 
         # Empty cache triggers refresh like missing cache
-        assert "Refreshing model cache" in captured.out or "expired" in captured.out.lower()
+        assert "Model cache is empty, refreshing" in captured.out
         assert result == 0
 
 
