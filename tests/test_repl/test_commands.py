@@ -330,8 +330,12 @@ class TestModelCommand:
 
     async def test_model_sets_agent_model(self):
         """'/model pm gpt-5' sets model for agent."""
+        from unittest.mock import patch
+
         commands = SystemCommands()
-        result = await commands.dispatch("model", ["pm", "gpt-5"])
+        # Mock model validation since test model may not be in cache
+        with patch("teambot.repl.commands.validate_model", return_value=True):
+            result = await commands.dispatch("model", ["pm", "gpt-5"])
 
         assert result.success is True
         assert commands._session_model_overrides.get("pm") == "gpt-5"

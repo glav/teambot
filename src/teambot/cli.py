@@ -115,6 +115,65 @@ def _check_copilot_authentication(display: ConsoleDisplay) -> bool:
         return False
 
 
+def _check_copilot_authentication_blocking(display: ConsoleDisplay) -> bool:
+    """Check Copilot authentication status (blocking version for cmd_run).
+
+    Unlike _check_copilot_authentication which continues with warnings,
+    this version treats authentication failure as a blocking error.
+
+    Args:
+        display: Console display for output.
+
+    Returns:
+        True if authenticated, False otherwise (blocks execution).
+    """
+    try:
+        is_auth, error = asyncio.run(_check_auth_async())
+
+        if is_auth:
+            return True
+        else:
+            display.print_error("Copilot not authenticated")
+            if error and "not available" not in error.lower():
+                display.print_error(f"  {error}")
+            display.print_info("Run 'copilot auth' to authenticate")
+            return False
+    except Exception as e:
+        logging.debug(f"Could not check authentication: {e}")
+        display.print_error("Could not verify authentication status")
+        display.print_info("Run 'copilot auth' to ensure you're authenticated")
+        return False
+
+
+def _ensure_model_cache(display: ConsoleDisplay) -> None:
+    """Ensure model cache is available, refreshing if needed.
+
+    Checks if model cache exists and is valid. If missing or expired,
+    automatically refreshes from SDK with status feedback.
+
+    This is non-blocking - if refresh fails, execution continues
+    and ConfigLoader will report specific validation errors.
+
+    Args:
+        display: Console display for output.
+    """
+    from teambot.config.model_cache import is_cache_valid, load_cache
+
+    cache = load_cache()
+
+    if is_cache_valid(cache):
+        # Cache exists and valid, no action needed
+        return
+
+    # Cache missing or expired - need to refresh
+    if cache is None:
+        display.print_info("Refreshing model cache...")
+    else:
+        display.print_info("Model cache expired, refreshing...")
+
+    _refresh_model_cache(display)
+
+
 def _display_post_init_guidance(display: ConsoleDisplay) -> None:
     """Display post-init recommended next steps.
 
@@ -395,6 +454,13 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Run TeamBot with an objective."""
     config_path = Path(args.config)
     teambot_dir = Path(".teambot")
+
+    # Authentication check (blocking - exit if not authenticated)
+    if not _check_copilot_authentication_blocking(display):
+        return 1
+
+    # Ensure model cache is available (auto-refresh if needed)
+    _ensure_model_cache(display)
 
     if not config_path.exists():
         display.print_error(f"Configuration not found: {config_path}")

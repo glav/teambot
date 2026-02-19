@@ -307,6 +307,8 @@ class TestAgentModelConfig:
 
     def test_agent_with_valid_model(self, tmp_path):
         """Agent with valid model loads successfully."""
+        from unittest.mock import patch
+
         from teambot.config.loader import ConfigLoader
 
         config_data = {
@@ -322,8 +324,10 @@ class TestAgentModelConfig:
         config_file = tmp_path / "teambot.json"
         config_file.write_text(json.dumps(config_data), encoding="utf-8")
 
-        loader = ConfigLoader()
-        config = loader.load(config_file)
+        # Mock model validation since test model may not be in cache
+        with patch("teambot.config.loader.validate_model", return_value=True):
+            loader = ConfigLoader()
+            config = loader.load(config_file)
 
         assert config["agents"][0]["model"] == "gpt-5"
 
