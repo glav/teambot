@@ -714,6 +714,29 @@ class TestRunModelCache:
         captured = capsys.readouterr()
         assert "expired" in captured.out.lower()
 
+    def test_ensure_cache_detects_empty_models(self, tmp_path, monkeypatch, capsys):
+        """_ensure_model_cache detects when cache has empty models list."""
+        from unittest.mock import MagicMock, patch
+
+        from teambot.cli import _ensure_model_cache
+        from teambot.visualization.console import ConsoleDisplay
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock cache with empty models list
+        mock_cache = MagicMock()
+        mock_cache.models = []
+        with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
+            with patch("teambot.config.model_cache.is_cache_valid", return_value=False):
+                with patch("teambot.cli._refresh_model_cache", return_value=True) as mock_refresh:
+                    display = ConsoleDisplay()
+                    _ensure_model_cache(display)
+
+        # Refresh should be called when cache has no models
+        mock_refresh.assert_called_once()
+        captured = capsys.readouterr()
+        assert "empty" in captured.out.lower()
+
     def test_ensure_cache_continues_after_successful_refresh(self, tmp_path, monkeypatch, capsys):
         """Successful cache refresh allows workflow to continue."""
         from unittest.mock import patch

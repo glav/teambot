@@ -165,9 +165,11 @@ def _ensure_model_cache(display: ConsoleDisplay) -> None:
         # Cache exists and valid, no action needed
         return
 
-    # Cache missing or expired - need to refresh
+    # Cache missing, expired, or empty - need to refresh
     if cache is None:
         display.print_info("Refreshing model cache...")
+    elif not cache.models:
+        display.print_info("Model cache is empty, refreshing...")
     else:
         display.print_info("Model cache expired, refreshing...")
 
