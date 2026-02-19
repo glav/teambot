@@ -148,8 +148,12 @@ def _check_copilot_authentication_blocking(display: ConsoleDisplay) -> bool:
 def _ensure_model_cache(display: ConsoleDisplay) -> None:
     """Ensure model cache is available, refreshing if needed.
 
-    Checks if model cache exists and is valid. If missing or expired,
-    automatically refreshes from SDK with status feedback.
+    Checks if model cache exists. If missing, automatically refreshes
+    from SDK with status feedback.
+
+    Expired cache handling is intentionally left to the existing warning
+    path in schema._ensure_models_loaded() - this function only handles
+    the first-run case when no cache exists at all.
 
     This is non-blocking - if refresh fails, execution continues
     and ConfigLoader will report specific validation errors.
@@ -157,7 +161,7 @@ def _ensure_model_cache(display: ConsoleDisplay) -> None:
     Args:
         display: Console display for output.
     """
-    from teambot.config.model_cache import is_cache_valid, load_cache
+    from teambot.config.model_cache import load_cache
 
     cache = load_cache()
 
