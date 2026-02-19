@@ -89,6 +89,21 @@ class TestModelCache:
 
         assert is_cache_valid(cache) is False
 
+    def test_cache_invalid_empty_models(self, mock_cwd, temp_cache_dir):
+        """Test cache with empty models list is invalid."""
+        from teambot.config.model_cache import ModelCache, is_cache_valid
+
+        # Create cache with recent timestamp but no models
+        recent_timestamp = time.time() - (1 * 60 * 60)  # 1 hour ago
+        cache = ModelCache(
+            models=[],  # Empty models list
+            timestamp=recent_timestamp,
+            sdk_version="1.0.0",
+        )
+
+        # Should be invalid even with fresh timestamp
+        assert is_cache_valid(cache) is False
+
     def test_cache_valid_within_ttl(self, mock_cwd, temp_cache_dir):
         """Test cache is valid within TTL."""
         from teambot.config.model_cache import (

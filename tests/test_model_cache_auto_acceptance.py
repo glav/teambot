@@ -208,8 +208,6 @@ class TestModelCacheAutoSetupAcceptance:
 
     def test_at_004_valid_cache_fast_startup(self, tmp_path, monkeypatch):
         """AT-004: Valid cache results in fast startup (no refresh delay)."""
-        import time
-
         from teambot.cli import ConsoleDisplay, cmd_run
 
         monkeypatch.chdir(tmp_path)
@@ -219,25 +217,25 @@ class TestModelCacheAutoSetupAcceptance:
         (tmp_path / "teambot.json").write_text('{"agents": []}')
 
         mock_cache = MagicMock()
-        start_time = time.time()
+        mock_refresh = AsyncMock(return_value=True)
 
         with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
             with patch("teambot.config.model_cache.load_cache", return_value=mock_cache):
                 with patch("teambot.config.model_cache.is_cache_valid", return_value=True):
+                    with patch("teambot.cli._refresh_model_cache_async", mock_refresh):
 
-                    async def mock_repl(*args, **kwargs):
-                        pass
+                        async def mock_repl(*args, **kwargs):
+                            pass
 
-                    with patch("teambot.repl.run_interactive_mode", mock_repl):
-                        args = argparse.Namespace(
-                            config="teambot.json", objective=None, resume=False
-                        )
-                        display = ConsoleDisplay()
-                        cmd_run(args, display)
+                        with patch("teambot.repl.run_interactive_mode", mock_repl):
+                            args = argparse.Namespace(
+                                config="teambot.json", objective=None, resume=False
+                            )
+                            display = ConsoleDisplay()
+                            cmd_run(args, display)
 
-        elapsed = time.time() - start_time
-        # Should complete quickly (no network refresh)
-        assert elapsed < 2.0
+        # Valid cache should skip refresh entirely (no network call)
+        mock_refresh.assert_not_called()
 
     # =========================================================================
     # AT-005: Cache Exists But Expired

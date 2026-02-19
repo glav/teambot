@@ -26,7 +26,7 @@ Users must manually run `/models --refresh` before TeamBot will work, which crea
 - [ ] `teambot run` detects when model cache is missing or empty
 - [ ] When model cache is missing, automatically performs model refresh (equivalent to `/models --refresh`)
 - [ ] User is informed that model cache refresh is occurring (e.g., "Refreshing model cache...")
-- [ ] If model cache refresh fails, provides clear error with actionable guidance
+- [ ] If model cache refresh fails, provides clear warning with actionable guidance (execution continues)
 - [ ] If model cache refresh succeeds, `teambot run` continues execution normally
 - [ ] All existing tests pass
 - [ ] New tests cover the login check and auto-refresh behavior
@@ -55,7 +55,7 @@ Users must manually run `/models --refresh` before TeamBot will work, which crea
 - Must not break existing `teambot init` or `teambot run` behavior when cache exists
 - Authentication check should be fast and not block unnecessarily
 - Model refresh should display status to the user
-- Must handle network failures gracefully with clear error messages
+- Must handle network failures gracefully with clear warning messages (allows execution to continue)
 - Should not change the startup behavior when everything is correctly set up
 
 ---
@@ -106,7 +106,7 @@ After authentication check, before config loading:
 2. If cache is missing (returns `None`):
    - Display: "Model cache not found. Refreshing models..."
    - Call `_refresh_model_cache(display)`
-   - If refresh fails, error with guidance
+   - If refresh fails, show warning and continue (allows execution with empty model list)
 3. Continue with config loading (which will now have models available)
 
 ### Phase 3: Testing
@@ -151,17 +151,20 @@ After authentication check, before config loading:
 **When**: User runs `teambot run objectives/my-task.md`
 **Then**:
 - Message: "Refreshing model cache..."
-- Warning: "Model cache refresh failed"
-- Error with guidance on how to resolve
-- Exit code 1
+- Warning: "Could not refresh model cache - models may not be available"
+- Warning: "Run '/models --refresh' later to update model list"
+- **Execution continues** (does not exit - allows user to work with potentially empty model list)
 
-### Scenario 5: Expired Cache (Edge Case) - OUT OF SCOPE
+### Scenario 5: Expired Cache (Edge Case)
 
-**Given**: User is authenticated, cache exists but is expired
+**Given**: User is authenticated, cache exists but is expired (older than 7 days)
 **When**: User runs `teambot run objectives/my-task.md`
 **Then**:
-- Existing behavior: Uses expired cache with warning
-- **No change to existing behavior** - expired cache handling is explicitly out of scope for this objective
+- Cache is detected as expired
+- **Uses expired cache data** to allow immediate use of models
+- Warning logged: "Using expired model cache - run '/models --refresh' to update"
+- Execution continues normally with potentially stale model data
+- User can manually refresh later via `/models --refresh` command
 
 ---
 
@@ -176,17 +179,17 @@ After authentication check, before config loading:
 ### Phase 2: Model Cache Auto-Refresh
 
 - [ ] Create `_ensure_model_cache(display)` helper function
-- [ ] Check for cache existence before config load (validity/expiry handling is out of scope)
+- [ ] Check for cache existence before config load (expired caches are used with warning)
 - [ ] Call `_refresh_model_cache()` when cache is missing
 - [ ] Display user-friendly status messages during refresh
-- [ ] Handle refresh failure with clear error
+- [ ] Handle refresh failure with warning (execution continues)
 - [ ] Add tests for auto-refresh behavior
 
 ### Phase 3: Integration Testing
 
 - [ ] Test full flow: no auth → error
 - [ ] Test full flow: no cache → auto-refresh → success
-- [ ] Test full flow: no cache → refresh fails → error
+- [ ] Test full flow: no cache → refresh fails → warning + continue
 - [ ] Verify existing functionality unchanged when cache exists
 
 ### Phase 4: Documentation

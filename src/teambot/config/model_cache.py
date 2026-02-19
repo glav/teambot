@@ -82,15 +82,19 @@ def _get_cache_path() -> Path:
 
 
 def is_cache_valid(cache: ModelCache | None) -> bool:
-    """Check if cache is valid (not expired).
+    """Check if cache is valid (not expired and has models).
 
     Args:
         cache: Cache data to check, or None.
 
     Returns:
-        True if cache exists and is not expired.
+        True if cache exists, is not expired, and contains models.
     """
     if cache is None:
+        return False
+
+    # Empty models list is invalid - requires refresh
+    if not cache.models:
         return False
 
     ttl = _get_cache_ttl()

@@ -165,10 +165,19 @@ def _ensure_model_cache(display: ConsoleDisplay) -> None:
 
     cache = load_cache()
 
-    # Only refresh if cache is completely missing
+    if is_cache_valid(cache):
+        # Cache exists and valid, no action needed
+        return
+
+    # Cache missing, expired, or empty - need to refresh
     if cache is None:
         display.print_info("Refreshing model cache...")
-        _refresh_model_cache(display)
+    elif not cache.models:
+        display.print_info("Model cache is empty, refreshing...")
+    else:
+        display.print_info("Model cache expired, refreshing...")
+
+    _refresh_model_cache(display)
 
 
 def _display_post_init_guidance(display: ConsoleDisplay) -> None:
@@ -452,17 +461,18 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     config_path = Path(args.config)
     teambot_dir = Path(".teambot")
 
+    # Fast-fail if config doesn't exist (no side effects)
+    if not config_path.exists():
+        display.print_error(f"Configuration not found: {config_path}")
+        display.print_warning("Run 'teambot init' first")
+        return 1
+
     # Authentication check (blocking - exit if not authenticated)
     if not _check_copilot_authentication_blocking(display):
         return 1
 
     # Ensure model cache is available (auto-refresh if needed)
     _ensure_model_cache(display)
-
-    if not config_path.exists():
-        display.print_error(f"Configuration not found: {config_path}")
-        display.print_warning("Run 'teambot init' first")
-        return 1
 
     try:
         loader = ConfigLoader()
