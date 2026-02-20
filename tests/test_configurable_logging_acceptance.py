@@ -8,10 +8,6 @@ dependencies like TTY detection.
 """
 
 import logging
-import os
-from pathlib import Path
-
-import pytest
 
 
 class TestAcceptanceScenarios:
