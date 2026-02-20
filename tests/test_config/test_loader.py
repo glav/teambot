@@ -666,3 +666,202 @@ class TestNotificationsConfigValidation:
         assert config["notifications"]["enabled"] is True
         # Default dry_run=False
         assert config["notifications"]["channels"][0]["dry_run"] is False
+
+
+class TestLoggingConfigValidation:
+    """Tests for logging configuration validation."""
+
+    def test_logging_section_parsed_correctly(self, tmp_path):
+        """Valid logging config is parsed without errors."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {
+                "console_output": False,
+                "file_output": True,
+                "log_file": ".teambot/logs/custom.log",
+                "level": "DEBUG",
+            },
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["logging"]["console_output"] is False
+        assert config["logging"]["file_output"] is True
+        assert config["logging"]["log_file"] == ".teambot/logs/custom.log"
+        assert config["logging"]["level"] == "DEBUG"
+
+    def test_logging_not_object_raises_config_error(self, tmp_path):
+        """logging must be an object, not string/number/array."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": "invalid",
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'logging' must be an object"):
+            loader.load(config_file)
+
+    def test_logging_console_output_boolean_or_null(self, tmp_path):
+        """console_output must be boolean or null."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"console_output": "invalid"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'logging.console_output' must be a boolean or null"):
+            loader.load(config_file)
+
+    def test_logging_console_output_null_valid(self, tmp_path):
+        """console_output can be null (mode-dependent)."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"console_output": None},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["logging"]["console_output"] is None
+
+    def test_logging_file_output_must_be_boolean(self, tmp_path):
+        """file_output must be boolean."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"file_output": "yes"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'logging.file_output' must be a boolean"):
+            loader.load(config_file)
+
+    def test_logging_log_file_must_be_string(self, tmp_path):
+        """log_file must be a string path."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"log_file": 123},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'logging.log_file' must be a string"):
+            loader.load(config_file)
+
+    def test_logging_level_must_be_valid(self, tmp_path):
+        """level must be DEBUG, INFO, WARNING, or ERROR."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"level": "INVALID"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'logging.level' must be one of"):
+            loader.load(config_file)
+
+    def test_logging_level_case_insensitive(self, tmp_path):
+        """level validation is case-insensitive."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"level": "debug"},  # lowercase
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["logging"]["level"] == "debug"
+
+    def test_logging_section_defaults_when_absent(self, tmp_path):
+        """Missing logging section applies default values."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert "logging" in config
+        assert config["logging"]["file_output"] is True
+        assert config["logging"]["log_file"] == ".teambot/logs/teambot.log"
+        assert config["logging"]["level"] == "INFO"
+
+    def test_logging_partial_config_fills_defaults(self, tmp_path):
+        """Partial logging config fills in missing defaults."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "logging": {"level": "DEBUG"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        # User-provided value preserved
+        assert config["logging"]["level"] == "DEBUG"
+        # Defaults applied for missing keys
+        assert config["logging"]["file_output"] is True
+        assert config["logging"]["log_file"] == ".teambot/logs/teambot.log"
+
+    def test_backwards_compatibility_no_logging_key(self, tmp_path):
+        """Existing config without logging key works unchanged."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [
+                {"id": "pm", "persona": "project_manager"},
+                {"id": "ba", "persona": "business_analyst"},
+            ],
+            "workflow": {"stages": ["setup", "implementation"]},
+            "notifications": {"enabled": False},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        # Should not raise any errors
+        config = loader.load(config_file)
+
+        # All existing sections preserved
+        assert len(config["agents"]) == 2
+        assert config["workflow"]["stages"] == ["setup", "implementation"]
+        assert config["notifications"]["enabled"] is False
+        # Logging defaults applied
+        assert "logging" in config

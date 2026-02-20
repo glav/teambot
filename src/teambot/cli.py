@@ -280,6 +280,11 @@ def create_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--max-hours", type=float, default=8.0, help="Maximum execution hours (default: 8)"
     )
+    run_parser.add_argument(
+        "--log-to-console",
+        action="store_true",
+        help="Enable console logging output (useful for debugging interactive mode)",
+    )
 
     # status command
     subparsers.add_parser("status", help="Show TeamBot status")
@@ -476,6 +481,18 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     except ConfigError as e:
         display.print_error(f"Configuration error: {e}")
         return 1
+
+    # Configure mode-aware logging after config is loaded
+    from teambot.config.logging_config import is_interactive_mode
+    from teambot.config.logging_config import setup_logging as setup_mode_logging
+
+    interactive = is_interactive_mode(has_objective=bool(args.objective))
+    setup_mode_logging(
+        config=config,
+        is_interactive=interactive,
+        force_console=getattr(args, "log_to_console", False),
+        verbose=getattr(args, "verbose", False),
+    )
 
     # Resume mode
     if getattr(args, "resume", False):
