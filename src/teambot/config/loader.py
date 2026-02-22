@@ -29,6 +29,8 @@ REQUIRED_CHANNEL_FIELDS = {
     "telegram": {"token", "chat_id"},
 }
 
+VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR"}
+
 
 def create_default_config() -> dict[str, Any]:
     """Create default configuration with MVP agents."""
@@ -159,6 +161,10 @@ class ConfigLoader:
         if "notifications" in config:
             self._validate_notifications(config["notifications"])
 
+        # Validate logging config if present
+        if "logging" in config:
+            self._validate_logging(config["logging"])
+
     def _validate_agent(self, agent: dict[str, Any], seen_ids: set[str]) -> None:
         """Validate a single agent configuration."""
         if "id" not in agent:
@@ -260,6 +266,38 @@ class ConfigLoader:
             if not isinstance(events, list):
                 raise ConfigError(f"'events' in notifications.channels[{index}] must be a list")
 
+    def _validate_logging(self, logging: dict[str, Any]) -> None:
+        """Validate logging configuration.
+
+        Args:
+            logging: The logging configuration dict.
+
+        Raises:
+            ConfigError: If validation fails.
+        """
+        if not isinstance(logging, dict):
+            raise ConfigError("'logging' must be an object")
+
+        if "console_output" in logging:
+            val = logging["console_output"]
+            if val is not None and not isinstance(val, bool):
+                raise ConfigError("'logging.console_output' must be a boolean or null")
+
+        if "file_output" in logging:
+            if not isinstance(logging["file_output"], bool):
+                raise ConfigError("'logging.file_output' must be a boolean")
+
+        if "log_file" in logging:
+            if not isinstance(logging["log_file"], str):
+                raise ConfigError("'logging.log_file' must be a string")
+
+        if "level" in logging:
+            level = logging["level"]
+            if not isinstance(level, str) or level.upper() not in VALID_LOG_LEVELS:
+                raise ConfigError(
+                    f"'logging.level' must be one of: {', '.join(sorted(VALID_LOG_LEVELS))}"
+                )
+
     def _apply_defaults(self, config: dict[str, Any]) -> None:
         """Apply default values for missing optional fields."""
         if "teambot_dir" not in config:
@@ -287,3 +325,15 @@ class ConfigLoader:
             for channel in notifications.get("channels", []):
                 if "dry_run" not in channel:
                     channel["dry_run"] = False
+
+        # Apply logging defaults
+        if "logging" not in config:
+            config["logging"] = {}
+        logging_cfg = config["logging"]
+        if "file_output" not in logging_cfg:
+            logging_cfg["file_output"] = True
+        if "log_file" not in logging_cfg:
+            logging_cfg["log_file"] = ".teambot/logs/teambot.log"
+        if "level" not in logging_cfg:
+            logging_cfg["level"] = "INFO"
+        # Note: console_output defaults to None (mode-dependent)
