@@ -59,9 +59,11 @@ def setup_logging(
     if verbose:
         level = logging.DEBUG
 
-    # Clear any existing handlers on root logger
+    # Remove and close any existing handlers on root logger to avoid fd leaks
     root_logger = logging.getLogger()
-    root_logger.handlers.clear()
+    for handler in root_logger.handlers[:]:
+        handler.close()
+        root_logger.removeHandler(handler)
     root_logger.setLevel(level)
 
     # Formatter for all handlers
