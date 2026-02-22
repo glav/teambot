@@ -69,23 +69,37 @@ def setup_logging(
     console_formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
 
     # File handler (always enabled unless explicitly disabled)
+    file_handler_added = False
     if logging_config.get("file_output", True):
         log_file = logging_config.get("log_file", ".teambot/logs/teambot.log")
         log_path = Path(log_file)
 
-        # Create directory if missing
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            # Create directory if missing
+            log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        file_handler = logging.FileHandler(log_path, encoding="utf-8")
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        root_logger.addHandler(file_handler)
+            file_handler = logging.FileHandler(log_path, encoding="utf-8")
+            file_handler.setLevel(level)
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
+            file_handler_added = True
+        except OSError:
+            # Fall back to console-only logging; warn via stderr to avoid recursion
+            print(  # noqa: T201
+                f"WARNING: Could not set up log file '{log_path}'."
+                " Falling back to console-only logging.",
+                file=sys.stderr,
+            )
 
     # Console handler (mode-dependent)
     console_enabled = logging_config.get("console_output")
     if console_enabled is None:
         # Default: console for file-orchestration, no console for interactive
         console_enabled = not is_interactive
+
+    # Always enable console if file handler setup failed (graceful degradation)
+    if not file_handler_added and logging_config.get("file_output", True):
+        console_enabled = True
 
     if force_console or console_enabled:
         console_handler = logging.StreamHandler()
