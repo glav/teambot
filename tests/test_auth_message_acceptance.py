@@ -142,9 +142,7 @@ class TestAuthMessageAcceptance:
         assert "copilot login" in content, "cli.py should contain 'copilot login'"
 
         # Should NOT have copilot auth
-        assert "copilot auth" not in content, (
-            "cli.py should NOT contain 'copilot auth'"
-        )
+        assert "copilot auth" not in content, "cli.py should NOT contain 'copilot auth'"
 
     def test_at_003_no_copilot_auth_in_test_assertions(self):
         """AT-003: Verify test files have no 'copilot auth' in assertions.
@@ -222,6 +220,4 @@ class TestAuthMessageAcceptance:
         for i, line in enumerate(lines, 1):
             # Check code lines (start with copilot or in code block)
             if line.strip().startswith("copilot auth"):
-                pytest.fail(
-                    f"installation.md:{i} contains 'copilot auth' command: {line.strip()}"
-                )
+                pytest.fail(f"installation.md:{i} contains 'copilot auth' command: {line.strip()}")
