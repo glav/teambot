@@ -14,7 +14,7 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 
 - **Python 3.10 or later** - [Download Python](https://www.python.org/downloads/)
 - **uv** - [Install uv](https://astral.sh/uv)
-- **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/) and authenticate with `copilot auth`
+- **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/) and authenticate with `copilot login`
 
 ### Installation Methods
 

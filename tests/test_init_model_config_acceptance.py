@@ -112,7 +112,8 @@ class TestInitModelConfigAcceptance:
 
         # Verify warning was displayed
         captured = capsys.readouterr()
-        assert "not authenticated" in captured.out.lower() or "copilot auth" in captured.out.lower()
+        output = captured.out.lower()
+        assert "not authenticated" in output or "copilot login" in output
 
     def test_at_002_auth_guidance_displayed_when_unauthenticated(
         self, tmp_path, monkeypatch, capsys
@@ -132,7 +133,7 @@ class TestInitModelConfigAcceptance:
 
         # Should display guidance about authentication
         output_lower = captured.out.lower()
-        assert "copilot auth" in output_lower or "github_token" in output_lower
+        assert "copilot login" in output_lower or "github_token" in output_lower
 
     # =========================================================================
     # AT-003: Init With Network Failure During Model Refresh

@@ -105,13 +105,13 @@ def _check_copilot_authentication(display: ConsoleDisplay) -> bool:
             display.print_warning("Copilot not authenticated")
             if error and "not available" not in error.lower():
                 display.print_warning(f"  {error}")
-            display.print_info("  Run 'copilot auth' to authenticate")
+            display.print_info("  Run 'copilot login' to authenticate")
             display.print_info("  Or set GITHUB_TOKEN environment variable")
             return False
     except Exception as e:
         logging.debug(f"Could not check authentication: {e}")
         display.print_warning("Could not verify authentication status")
-        display.print_info("Run 'copilot auth' to ensure you're authenticated")
+        display.print_info("Run 'copilot login' to ensure you're authenticated")
         return False
 
 
@@ -136,12 +136,12 @@ def _check_copilot_authentication_blocking(display: ConsoleDisplay) -> bool:
             display.print_error("Copilot not authenticated")
             if error and "not available" not in error.lower():
                 display.print_error(f"  {error}")
-            display.print_info("Run 'copilot auth' to authenticate")
+            display.print_info("Run 'copilot login' to authenticate")
             return False
     except Exception as e:
         logging.debug(f"Could not check authentication: {e}")
         display.print_error("Could not verify authentication status")
-        display.print_info("Run 'copilot auth' to ensure you're authenticated")
+        display.print_info("Run 'copilot login' to ensure you're authenticated")
         return False
 
 
@@ -236,7 +236,7 @@ def check_copilot_cli(display: ConsoleDisplay | None = None) -> bool:
 
     display.print_error("GitHub Copilot CLI is required but not found.")
     display.print_warning(f"Install from: {COPILOT_CLI_INSTALL_URL}")
-    display.print_warning("After installing, authenticate with: copilot auth")
+    display.print_warning("After installing, authenticate with: copilot login")
 
     return False
 

@@ -606,7 +606,7 @@ class TestRunAuthCheck:
         assert result is False
         captured = capsys.readouterr()
         assert "not authenticated" in captured.out.lower()
-        assert "copilot auth" in captured.out.lower()
+        assert "copilot login" in captured.out.lower()
 
     def test_auth_check_blocking_handles_exception_gracefully(self, capsys):
         """Blocking auth check returns False on exception."""
@@ -626,7 +626,7 @@ class TestRunAuthCheck:
         assert result is False
         captured = capsys.readouterr()
         # Should show guidance about authentication
-        assert "copilot auth" in captured.out.lower()
+        assert "copilot login" in captured.out.lower()
 
     def test_auth_check_blocking_shows_error_detail_when_available(self, capsys):
         """Blocking auth check shows error details when provided."""
