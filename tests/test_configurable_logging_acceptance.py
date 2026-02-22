@@ -9,7 +9,10 @@ dependencies like TTY detection.
 
 import logging
 
+import pytest
 
+
+@pytest.mark.acceptance
 class TestAcceptanceScenarios:
     """Acceptance test scenarios for configurable logging."""
 
