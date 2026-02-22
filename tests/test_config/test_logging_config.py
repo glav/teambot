@@ -282,3 +282,93 @@ class TestSetupLogging:
         # Note: pytest may add its own LogCaptureHandlers, so we just check
         # that our specific handler was removed
         assert existing_handler not in root.handlers
+
+    def test_permission_error_on_mkdir_falls_back_to_console(self, tmp_path, monkeypatch, capsys):
+        """PermissionError during mkdir falls back to console-only logging."""
+        from pathlib import Path
+
+        from teambot.config.logging_config import setup_logging
+
+        def raise_permission_error(*args, **kwargs):
+            raise PermissionError("Permission denied")
+
+        monkeypatch.setattr(Path, "mkdir", raise_permission_error)
+
+        config = {
+            "logging": {
+                "file_output": True,
+                "log_file": str(tmp_path / "no_access" / "test.log"),
+                "level": "INFO",
+            }
+        }
+
+        setup_logging(config, is_interactive=True, force_console=False)
+
+        root = logging.getLogger()
+        file_handlers = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
+        console_handlers = [
+            h
+            for h in root.handlers
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+        ]
+        assert len(file_handlers) == 0
+        assert len(console_handlers) == 1
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.err
+        assert "Falling back to console-only logging" in captured.err
+
+    def test_os_error_on_file_handler_falls_back_to_console(self, tmp_path, monkeypatch, capsys):
+        """OSError during FileHandler creation falls back to console-only logging."""
+        import logging as _logging
+
+        from teambot.config.logging_config import setup_logging
+
+        def raise_os_error(self, *args, **kwargs):
+            raise OSError("Simulated I/O error")
+
+        monkeypatch.setattr(_logging.FileHandler, "__init__", raise_os_error)
+
+        config = {
+            "logging": {
+                "file_output": True,
+                "log_file": str(tmp_path / "test.log"),
+                "level": "INFO",
+            }
+        }
+
+        setup_logging(config, is_interactive=True, force_console=False)
+
+        root = logging.getLogger()
+        file_handlers = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
+        console_handlers = [
+            h
+            for h in root.handlers
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+        ]
+        assert len(file_handlers) == 0
+        assert len(console_handlers) == 1
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.err
+        assert "Falling back to console-only logging" in captured.err
+
+    def test_file_handler_failure_does_not_crash(self, tmp_path, monkeypatch):
+        """setup_logging does not raise even when file handler setup fails."""
+        from pathlib import Path
+
+        from teambot.config.logging_config import setup_logging
+
+        def raise_os_error(*args, **kwargs):
+            raise OSError("fail")
+
+        monkeypatch.setattr(Path, "mkdir", raise_os_error)
+
+        config = {
+            "logging": {
+                "file_output": True,
+                "log_file": str(tmp_path / "bad" / "test.log"),
+                "level": "INFO",
+            }
+        }
+
+        # Should not raise
+        setup_logging(config, is_interactive=False, force_console=False)
