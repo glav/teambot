@@ -258,13 +258,16 @@ class TestSetupLogging:
         assert len(console_handlers) == 0
 
     def test_clears_existing_handlers(self, tmp_path):
-        """setup_logging clears existing handlers."""
+        """setup_logging closes and removes existing handlers."""
+        from unittest.mock import MagicMock
+
         from teambot.config.logging_config import setup_logging
 
-        # Add an existing handler
+        # Add an existing handler with a mock close method
         root = logging.getLogger()
         existing_handler = logging.StreamHandler()
         existing_handler.set_name("test_existing_handler")
+        existing_handler.close = MagicMock()
         root.addHandler(existing_handler)
         assert existing_handler in root.handlers
 
@@ -278,9 +281,8 @@ class TestSetupLogging:
 
         setup_logging(config, is_interactive=True, force_console=False)
 
-        # Old handler should be gone (not in handlers list anymore)
-        # Note: pytest may add its own LogCaptureHandlers, so we just check
-        # that our specific handler was removed
+        # Old handler should be closed and removed
+        existing_handler.close.assert_called_once()
         assert existing_handler not in root.handlers
 
     def test_permission_error_on_mkdir_falls_back_to_console(self, tmp_path, monkeypatch, capsys):
