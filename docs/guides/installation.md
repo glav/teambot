@@ -14,7 +14,7 @@ Before installing TeamBot, ensure you have:
 
 ```bash
 copilot --version
-copilot auth  # Authenticate if needed
+copilot login  # Authenticate if needed
 ```
 
 ---
@@ -224,7 +224,7 @@ TeamBot requires the GitHub Copilot CLI:
 # Follow: https://githubnext.com/projects/copilot-cli/
 
 # Authenticate
-copilot auth
+copilot login
 ```
 
 ### "uv: command not found"

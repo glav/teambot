@@ -115,7 +115,7 @@ class TestAcceptanceScenarios:
     # =========================================================================
 
     def test_at_002_unauthenticated_blocks_with_guidance(self, tmp_path, monkeypatch, capsys):
-        """AT-002: Unauthenticated user sees clear error with 'copilot auth' guidance.
+        """AT-002: Unauthenticated user sees clear error with 'copilot login' guidance.
 
         Tests the REAL implementation:
         - _check_copilot_authentication_blocking() returns False
@@ -151,9 +151,9 @@ class TestAcceptanceScenarios:
             f"Expected auth error in: {captured.out}"
         )
 
-        # 3. Guidance to run copilot auth
-        assert "copilot auth" in captured.out.lower(), (
-            f"Expected 'copilot auth' guidance in: {captured.out}"
+        # 3. Guidance to run copilot login
+        assert "copilot login" in captured.out.lower(), (
+            f"Expected 'copilot login' guidance in: {captured.out}"
         )
 
     def test_at_002_auth_failure_prevents_config_loading(self, tmp_path, monkeypatch, capsys):
@@ -405,7 +405,7 @@ class TestRealFunctionBehavior:
         assert result is False
         captured = capsys.readouterr()
         assert "not authenticated" in captured.out.lower()
-        assert "copilot auth" in captured.out.lower()
+        assert "copilot login" in captured.out.lower()
 
     def test_at_004_helper_ensure_model_cache_valid(self, capsys):
         """Test _ensure_model_cache with valid cache - no refresh."""

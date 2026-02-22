@@ -107,7 +107,7 @@ class TestModelCacheAutoSetupAcceptance:
         assert result == 1
         captured = capsys.readouterr()
         assert "not authenticated" in captured.out.lower()
-        assert "copilot auth" in captured.out.lower()
+        assert "copilot login" in captured.out.lower()
 
     def test_at_002_unauthenticated_does_not_proceed_to_config(self, tmp_path, monkeypatch, capsys):
         """AT-002: Unauthenticated state blocks before config loading."""
