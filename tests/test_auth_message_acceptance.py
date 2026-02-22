@@ -136,7 +136,7 @@ class TestAuthMessageAcceptance:
         cli_path = pathlib.Path("src/teambot/cli.py")
         assert cli_path.exists(), "cli.py not found"
 
-        content = cli_path.read_text()
+        content = cli_path.read_text(encoding="utf-8")
 
         # Should have copilot login
         assert "copilot login" in content, "cli.py should contain 'copilot login'"
@@ -162,7 +162,7 @@ class TestAuthMessageAcceptance:
             path = pathlib.Path(test_file)
             assert path.exists(), f"{test_file} not found"
 
-            content = path.read_text()
+            content = path.read_text(encoding="utf-8")
 
             # Check for copilot auth in assertions (not in comments/docstrings about the change)
             lines = content.split("\n")
@@ -186,7 +186,7 @@ class TestAuthMessageAcceptance:
         readme_path = pathlib.Path("README.md")
         assert readme_path.exists(), "README.md not found"
 
-        content = readme_path.read_text()
+        content = readme_path.read_text(encoding="utf-8")
 
         # Should have copilot login
         assert "copilot login" in content, "README.md should contain 'copilot login'"
@@ -207,7 +207,7 @@ class TestAuthMessageAcceptance:
         install_path = pathlib.Path("docs/guides/installation.md")
         assert install_path.exists(), "installation.md not found"
 
-        content = install_path.read_text()
+        content = install_path.read_text(encoding="utf-8")
 
         # Should have copilot login (at least twice - lines 17 and 227)
         assert content.count("copilot login") >= 2, (
