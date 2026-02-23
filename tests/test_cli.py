@@ -152,7 +152,7 @@ class TestCLIInit:
         assert (tmp_path / ".agent").exists()
 
     def test_init_skips_existing_scaffolds(self, tmp_path, monkeypatch):
-        """Init doesn't overwrite existing scaffold files."""
+        """Init doesn't overwrite existing scaffold files but may append template reference."""
         import argparse
 
         from teambot.cli import ConsoleDisplay, cmd_init
@@ -167,8 +167,9 @@ class TestCLIInit:
 
         cmd_init(args, display)
 
-        # Should preserve existing content
-        assert (tmp_path / "AGENTS.md").read_text() == "My custom AGENTS"
+        # Should preserve existing content (appends template reference if template copied)
+        content = (tmp_path / "AGENTS.md").read_text()
+        assert content.startswith("My custom AGENTS")
 
     def test_init_force_overwrites_scaffolds(self, tmp_path, monkeypatch):
         """Init with --force overwrites scaffold files."""

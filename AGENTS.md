@@ -30,6 +30,14 @@ teambot/
 └── teambot.json              # Default configuration
 ```
 
+## Objective Template
+
+TeamBot provides an objective template for defining development tasks:
+
+| File | Description |
+|------|-------------|
+| `docs/sdd-objective-template.md` | Template for creating TeamBot objectives. Copy this file and fill in the sections to define your development task. Run with `teambot run objectives/my-objective.md`. |
+
 ## Setup
 
 ### Install uv

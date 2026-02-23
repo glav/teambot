@@ -26,6 +26,113 @@ if TYPE_CHECKING:
 
 COPILOT_CLI_INSTALL_URL = "https://githubnext.com/projects/copilot-cli/"
 
+# Constants for AGENTS.md template reference update
+OBJECTIVE_TEMPLATE_MARKER = "## Objective Template"
+
+OBJECTIVE_TEMPLATE_SECTION = """
+## Objective Template
+
+TeamBot provides an objective template for defining development tasks:
+
+**File**: `docs/sdd-objective-template.md`
+
+Copy this template, fill in the sections, then run:
+
+```bash
+teambot run objectives/my-feature.md
+```
+"""
+
+
+def _agents_md_has_template_reference(agents_md_path: Path) -> bool:
+    """Check if AGENTS.md already has the objective template reference.
+
+    Args:
+        agents_md_path: Path to AGENTS.md file
+
+    Returns:
+        True if the template reference section exists, False otherwise
+    """
+    try:
+        content = agents_md_path.read_text(encoding="utf-8")
+        return OBJECTIVE_TEMPLATE_MARKER in content
+    except OSError:
+        return False
+
+
+def _should_update_agents_md(results: list) -> bool:
+    """Determine if AGENTS.md should be updated with template reference.
+
+    Update is triggered when:
+    1. sdd-objective-template.md was successfully copied (newly added)
+    2. AGENTS.md exists but was skipped (not overwritten)
+
+    Args:
+        results: List of CopyResult from scaffold copying
+
+    Returns:
+        True if AGENTS.md should be updated
+    """
+    template_copied = False
+    agents_md_skipped = False
+
+    for result in results:
+        if result.source == "sdd-objective-template.md" and result.copied:
+            template_copied = True
+        if result.source == "AGENTS.md" and result.reason == "skipped_exists":
+            agents_md_skipped = True
+
+    return template_copied and agents_md_skipped
+
+
+def _update_agents_md_with_template_reference(
+    results: list,
+    target_root: Path,
+    display,
+) -> bool:
+    """Update AGENTS.md with objective template reference if needed.
+
+    Only updates if:
+    1. AGENTS.md exists but was skipped (not force-overwritten)
+    2. sdd-objective-template.md was successfully copied
+    3. AGENTS.md doesn't already have the template reference
+
+    Args:
+        results: Copy results from scaffold operation
+        target_root: Root directory (typically Path.cwd())
+        display: Console display for user feedback (can be None)
+
+    Returns:
+        True if AGENTS.md was updated, False if skipped
+    """
+    if not _should_update_agents_md(results):
+        return False
+
+    agents_md_path = target_root / "AGENTS.md"
+
+    if not agents_md_path.exists():
+        return False
+
+    if _agents_md_has_template_reference(agents_md_path):
+        if display:
+            display.print_info("  AGENTS.md already has objective template reference")
+        return False
+
+    try:
+        content = agents_md_path.read_text(encoding="utf-8")
+        # Ensure proper newline separation
+        if content and not content.endswith("\n"):
+            content += "\n"
+        content += OBJECTIVE_TEMPLATE_SECTION.strip() + "\n"
+        agents_md_path.write_text(content, encoding="utf-8")
+
+        if display:
+            display.print_success("  Updated AGENTS.md with objective template reference")
+        return True
+    except OSError as e:
+        logging.debug(f"Failed to update AGENTS.md: {e}")
+        return False
+
 
 async def _refresh_model_cache_async() -> bool:
     """Async helper to refresh model cache from SDK.
@@ -429,6 +536,9 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             display.print_warning(f"  Skipped (not empty): {result.target}")
         elif result.reason == "source_missing":
             display.print_error(f"  Missing from package: {result.source}")
+
+    # Update AGENTS.md with template reference if applicable
+    _update_agents_md_with_template_reference(results, Path.cwd(), display)
 
     display.print_success("")
 
