@@ -22,6 +22,7 @@ from teambot.visualization.console import ConsoleDisplay
 if TYPE_CHECKING:
     from teambot.notifications.event_bus import EventBus
     from teambot.orchestration import ExecutionLoop, ExecutionResult
+    from teambot.scaffolds import CopyResult
 
 
 COPILOT_CLI_INSTALL_URL = "https://githubnext.com/projects/copilot-cli/"
@@ -61,7 +62,7 @@ def _agents_md_has_template_reference(agents_md_path: Path) -> bool:
         return False
 
 
-def _should_update_agents_md(results: list) -> bool:
+def _should_update_agents_md(results: list[CopyResult]) -> bool:
     """Determine if AGENTS.md should be updated with template reference.
 
     Update is triggered when:
@@ -87,7 +88,7 @@ def _should_update_agents_md(results: list) -> bool:
 
 
 def _update_agents_md_with_template_reference(
-    results: list,
+    results: list[CopyResult],
     target_root: Path,
     display,
 ) -> bool:
