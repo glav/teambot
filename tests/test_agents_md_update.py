@@ -219,7 +219,7 @@ class TestUpdateAgentsMdWithTemplateReference:
 
         agents_md = tmp_path / "AGENTS.md"
         original = "# AGENTS\n\n## Section 1\n\nContent with special chars: 日本語\n"
-        agents_md.write_text(original)
+        agents_md.write_text(original, encoding="utf-8")
 
         results = [
             CopyResult(
@@ -230,7 +230,7 @@ class TestUpdateAgentsMdWithTemplateReference:
 
         _update_agents_md_with_template_reference(results, tmp_path, display=None)
 
-        content = agents_md.read_text()
+        content = agents_md.read_text(encoding="utf-8")
         assert content.startswith(original.rstrip("\n"))
 
     def test_returns_false_when_conditions_not_met(self, tmp_path, agents_md_without_reference):
