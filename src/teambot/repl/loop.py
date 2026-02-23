@@ -42,6 +42,7 @@ class REPLLoop:
         console: Console | None = None,
         sdk_client: CopilotSDKClient | None = None,
         config: dict | None = None,
+        worktree_context=None,
     ):
         """Initialize the REPL loop.
 
@@ -49,10 +50,12 @@ class REPLLoop:
             console: Rich console for output.
             sdk_client: Copilot SDK client (created if not provided).
             config: Optional configuration dict with default_agent setting.
+            worktree_context: Optional WorktreeContext for prompt indicator.
         """
         self._console = console or Console()
         self._sdk_client = sdk_client or CopilotSDKClient()
         self._config = config
+        self._worktree_context = worktree_context
 
         # Extract default agent from config if provided
         default_agent = None
@@ -363,9 +366,18 @@ class REPLLoop:
         """
         try:
             loop = asyncio.get_running_loop()
-            line = await loop.run_in_executor(
-                None, lambda: Prompt.ask("[bold green]teambot[/bold green]")
-            )
+
+            # Build prompt with worktree indicator if present
+            if self._worktree_context is not None:
+                branch = self._worktree_context.branch_name
+                # Truncate long branch names
+                if len(branch) > 20:
+                    branch = branch[:17] + "..."
+                prompt = f"[bold cyan][wt:{branch}][/bold cyan] [bold green]teambot[/bold green]"
+            else:
+                prompt = "[bold green]teambot[/bold green]"
+
+            line = await loop.run_in_executor(None, lambda: Prompt.ask(prompt))
             # Backslash continuation for multi-line input in legacy mode
             lines = [line]
             while lines[-1].endswith("\\"):
@@ -394,12 +406,15 @@ class REPLLoop:
         self._console.print("[dim]Session ended.[/dim]")
 
 
-async def run_interactive_mode(console: Console | None = None, config: dict | None = None) -> None:
+async def run_interactive_mode(
+    console: Console | None = None, config: dict | None = None, worktree_context=None
+) -> None:
     """Run TeamBot in interactive mode.
 
     Args:
         console: Optional Rich console for output.
         config: Optional configuration dict with default_agent setting.
+        worktree_context: Optional WorktreeContext for prompt indicator.
 
     Uses split-pane Textual interface when supported, falls back to legacy mode
     for narrow terminals or when TEAMBOT_LEGACY_MODE=true.
@@ -445,5 +460,5 @@ async def run_interactive_mode(console: Console | None = None, config: dict | No
                 pass
     else:
         # Legacy mode
-        repl = REPLLoop(console=console, config=config)
+        repl = REPLLoop(console=console, config=config, worktree_context=worktree_context)
         await repl.run()

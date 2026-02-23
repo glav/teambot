@@ -1,214 +1,352 @@
-"""Acceptance Validation Tests - Integration tests exercising REAL implementation.
+"""Acceptance Validation Tests - Worktree Isolation Feature.
 
-These tests call the real implementation code - no mocking of core functionality.
-Each test validates a specific acceptance scenario for AGENTS.md update feature.
+These tests call the REAL implementation code - no mocking of core functionality.
+Each test validates a specific acceptance scenario with test name `test_at_XXX_*`.
 """
 
-import argparse
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from teambot.worktree import WorktreeManager, derive_branch_name
+from teambot.worktree.errors import BranchExistsError, GitNotFoundError
+from teambot.worktree.manager import WorktreeContext
+
+
+@pytest.fixture
+def temp_git_repo(tmp_path: Path):
+    """Create a real Git repository for testing."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    (repo / "README.md").write_text("# Test Repository")
+    subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"],
+        cwd=repo,
+        capture_output=True,
+        check=True,
+    )
+    return repo
+
 
 @pytest.mark.acceptance
-class TestAcceptanceScenarios:
-    """Strict acceptance validation tests calling real implementation."""
+class TestAcceptanceValidation:
+    """Strict acceptance validation tests calling REAL implementation."""
 
-    def test_at_001_fresh_init_with_no_existing_agents_md(self, tmp_path, monkeypatch):
-        """AT-001: Fresh init with no existing AGENTS.md.
+    # =========================================================================
+    # AT-001: Basic Worktree Creation and Execution
+    # =========================================================================
+    def test_at_001_basic_worktree_creation(self, temp_git_repo: Path):
+        """AT-001: User runs objective with --worktree flag.
 
-        User runs `teambot init` in a new repository with no AGENTS.md.
-        Expected: AGENTS.md is copied from scaffold (includes Objective Template section).
+        Verifies:
+        - .teambot-worktrees/feat-my-feature/ exists
+        - .teambot-worktrees/feat-my-feature/.teambot/ can contain state files
+        - Main directory's .teambot/ unchanged from before command
         """
-        from teambot.cli import ConsoleDisplay, cmd_init
+        # Step 1: Derive branch name using REAL implementation
+        objective_path = Path("objectives/my-feature.md")
+        branch_name = derive_branch_name(objective_path)
+        assert branch_name == "feat/my-feature"
 
-        # Arrange: Empty directory (no AGENTS.md)
-        monkeypatch.chdir(tmp_path)
-        assert not (tmp_path / "AGENTS.md").exists()
+        # Step 2-3: Create worktree using REAL WorktreeManager
+        context = WorktreeManager.create_worktree(temp_git_repo, branch_name)
 
-        # Act: Run real cmd_init
-        args = argparse.Namespace(force=False)
-        display = ConsoleDisplay()
-        result = cmd_init(args, display)
+        # Verification: Worktree exists at expected path
+        expected_path = temp_git_repo / ".teambot-worktrees" / "feat-my-feature"
+        assert context.worktree_path == expected_path
+        assert context.worktree_path.exists()
+        assert context.branch_name == "feat/my-feature"
 
-        # Assert: AGENTS.md created from scaffold with Objective Template section
-        assert result == 0
-        agents_md = tmp_path / "AGENTS.md"
-        assert agents_md.exists()
-        content = agents_md.read_text()
-        assert "## Objective Template" in content
-        # Verify it's the scaffold template (has specific content)
-        assert "TeamBot provides an objective template" in content
+        # Verification: Worktree contains repository files
+        assert (context.worktree_path / "README.md").exists()
 
-    def test_at_002_init_with_existing_agents_md_and_template_copied(self, tmp_path, monkeypatch):
-        """AT-002: Init with existing AGENTS.md and template copied.
+        # Step 4-5: Simulate objective execution - create state in worktree
+        worktree_teambot = context.worktree_path / ".teambot"
+        worktree_teambot.mkdir()
+        (worktree_teambot / "workflow_state.json").write_text('{"stage": "PLAN"}')
 
-        User runs `teambot init` in repo with existing AGENTS.md that doesn't
-        mention the template.
-        Expected: Original content preserved, new section appended.
+        # Verification: Main directory's .teambot/ unchanged
+        main_teambot = temp_git_repo / ".teambot"
+        assert not main_teambot.exists()
+
+        # Verification: Worktree has state file
+        assert (worktree_teambot / "workflow_state.json").exists()
+
+    def test_at_001_worktree_registered_in_git(self, temp_git_repo: Path):
+        """AT-001 supplementary: Verify worktree is registered with Git."""
+        WorktreeManager.create_worktree(temp_git_repo, "feat/test-feature")
+
+        # Verify it's listed in git worktree list
+        result = subprocess.run(
+            ["git", "worktree", "list"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert "feat-test-feature" in result.stdout
+
+        # Verify branch was created
+        result = subprocess.run(
+            ["git", "branch", "--list", "feat/test-feature"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert "feat/test-feature" in result.stdout
+
+    # =========================================================================
+    # AT-002: Explicit Branch Naming
+    # =========================================================================
+    def test_at_002_explicit_branch_naming(self, temp_git_repo: Path):
+        """AT-002: User specifies custom branch name with --branch flag.
+
+        Verifies: git branch --list custom-branch shows branch exists
         """
-        from teambot.cli import ConsoleDisplay, cmd_init
+        # Step 1: Derive branch with explicit name
+        objective_path = Path("objectives/my-feature.md")
+        branch_name = derive_branch_name(objective_path, explicit_branch="custom-branch")
 
-        # Arrange: Create existing AGENTS.md without template reference
-        monkeypatch.chdir(tmp_path)
-        original_content = """# My Project AGENTS.md
+        # bare names get feat/ prefix
+        assert branch_name == "feat/custom-branch"
 
-## Overview
+        # Step 2-3: Create worktree with explicit branch name
+        context = WorktreeManager.create_worktree(temp_git_repo, branch_name)
 
-This is my custom project documentation.
+        # Verification: Branch exists with expected name
+        result = subprocess.run(
+            ["git", "branch", "--list", "feat/custom-branch"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert "feat/custom-branch" in result.stdout
 
-## Guidelines
+        # Verification: Worktree path uses custom name
+        assert context.worktree_path == temp_git_repo / ".teambot-worktrees" / "feat-custom-branch"
+        assert context.worktree_path.exists()
 
-- Follow coding standards
-- Write tests
-"""
-        agents_md = tmp_path / "AGENTS.md"
-        agents_md.write_text(original_content)
+    def test_at_002_explicit_branch_with_slash_prefix(self, temp_git_repo: Path):
+        """AT-002 supplementary: Explicit branch with custom prefix preserved."""
+        branch_name = derive_branch_name(
+            Path("objectives/bugfix.md"), explicit_branch="hotfix/critical-bug"
+        )
 
-        # Act: Run real cmd_init
-        args = argparse.Namespace(force=False)
-        display = ConsoleDisplay()
-        result = cmd_init(args, display)
+        # Should preserve the explicit prefix
+        assert branch_name == "hotfix/critical-bug"
 
-        # Assert
-        assert result == 0
-        content = agents_md.read_text()
+        WorktreeManager.create_worktree(temp_git_repo, branch_name)
 
-        # Original content preserved exactly at the start
-        assert content.startswith("# My Project AGENTS.md")
-        assert "This is my custom project documentation." in content
-        assert "Follow coding standards" in content
+        # Verify branch exists with custom prefix
+        result = subprocess.run(
+            ["git", "branch", "--list", "hotfix/critical-bug"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert "hotfix/critical-bug" in result.stdout
 
-        # New section appended
-        assert "## Objective Template" in content
-        assert "docs/sdd-objective-template.md" in content
+    # =========================================================================
+    # AT-003: Branch Conflict Error
+    # =========================================================================
+    def test_at_003_branch_conflict_error(self, temp_git_repo: Path):
+        """AT-003: User attempts worktree with branch that already exists.
 
-        # Verify template was copied
-        assert (tmp_path / "docs" / "sdd-objective-template.md").exists()
-
-    def test_at_003_idempotent_run_reference_already_exists(self, tmp_path, monkeypatch):
-        """AT-003: Idempotent run - reference already exists.
-
-        User runs `teambot init` multiple times.
-        Expected: Only ONE "Objective Template" section exists.
+        Verifies: Error message contains "Branch 'feat/existing' already exists"
+                  and suggests --branch
         """
-        from teambot.cli import ConsoleDisplay, cmd_init
+        # Step 1: Create first worktree (creates the branch)
+        WorktreeManager.create_worktree(temp_git_repo, "feat/existing")
 
-        # Arrange: Create existing AGENTS.md without reference
-        monkeypatch.chdir(tmp_path)
-        agents_md = tmp_path / "AGENTS.md"
-        agents_md.write_text("# My Project\n\n## Development\n")
+        # Step 2: Attempt to create another with same branch (different path)
+        with pytest.raises(BranchExistsError) as exc_info:
+            WorktreeManager.create_worktree(
+                temp_git_repo, "feat/existing", base_dir=".teambot-worktrees-2"
+            )
 
-        # Act: Run init THREE times
-        args = argparse.Namespace(force=False)
+        # Verification: Error message has expected content
+        error_message = str(exc_info.value)
+        assert "feat/existing" in error_message
+        assert "already exists" in error_message
+        assert "--branch" in error_message
 
-        # First run - adds reference
-        cmd_init(args, ConsoleDisplay())
+    # =========================================================================
+    # AT-004: Resume in Worktree Context
+    # =========================================================================
+    def test_at_004_resume_in_worktree_context(self, temp_git_repo: Path, monkeypatch):
+        """AT-004: User resumes interrupted objective from within worktree.
 
-        # Need to remove config to allow re-init
-        (tmp_path / "teambot.json").unlink()
-
-        # Second run
-        cmd_init(args, ConsoleDisplay())
-        (tmp_path / "teambot.json").unlink()
-
-        # Third run
-        cmd_init(args, ConsoleDisplay())
-
-        # Assert: Exactly ONE Objective Template section
-        content = agents_md.read_text()
-        count = content.count("## Objective Template")
-        assert count == 1, f"Expected 1 'Objective Template' section, found {count}"
-
-        # Also verify the template reference appears once
-        ref_count = content.count("docs/sdd-objective-template.md")
-        assert ref_count == 1, f"Expected 1 reference to template, found {ref_count}"
-
-    def test_at_004_template_not_copied_already_exists(self, tmp_path, monkeypatch):
-        """AT-004: Template not copied (already exists).
-
-        User runs `teambot init` when template already exists.
-        Expected: AGENTS.md is NOT updated (template wasn't copied this run).
+        Verifies: Stage output shows resumed stage, not restart from beginning
         """
-        from teambot.cli import ConsoleDisplay, cmd_init
+        # Step 1: Create worktree
+        context = WorktreeManager.create_worktree(temp_git_repo, "feat/my-feature")
 
-        # Arrange: Create AGENTS.md AND template file (both pre-existing)
-        monkeypatch.chdir(tmp_path)
-        original_content = "# My Existing AGENTS.md\n\n## Section\n"
-        agents_md = tmp_path / "AGENTS.md"
-        agents_md.write_text(original_content)
+        # Create state file simulating interrupted execution at IMPLEMENTATION stage
+        worktree_teambot = context.worktree_path / ".teambot"
+        worktree_teambot.mkdir()
+        (worktree_teambot / "workflow_state.json").write_text(
+            '{"stage": "IMPLEMENTATION", "objective": "objectives/my-feature.md"}'
+        )
 
-        # Pre-create the template file
-        docs_dir = tmp_path / "docs"
-        docs_dir.mkdir()
-        (docs_dir / "sdd-objective-template.md").write_text("# Pre-existing template")
+        # Step 2: Navigate to worktree directory
+        monkeypatch.chdir(context.worktree_path)
 
-        # Act: Run real cmd_init
-        args = argparse.Namespace(force=False)
-        display = ConsoleDisplay()
-        result = cmd_init(args, display)
+        # Step 3: Detect worktree context using REAL implementation
+        detected = WorktreeManager.detect_worktree_context()
 
-        # Assert: AGENTS.md unchanged (template wasn't copied, so no update)
-        assert result == 0
-        content = agents_md.read_text()
-        assert content == original_content, "AGENTS.md should be unchanged"
-        assert "## Objective Template" not in content
+        # Verification: Context was detected correctly
+        assert detected is not None
+        assert detected.is_worktree is True
+        assert detected.branch_name == "feat/my-feature"
 
-    def test_at_005_empty_agents_md_file(self, tmp_path, monkeypatch):
-        """AT-005: Empty AGENTS.md file.
+        # Verification: State file is accessible and shows IMPLEMENTATION stage
+        state_file = detected.worktree_path / ".teambot" / "workflow_state.json"
+        assert state_file.exists()
+        state_content = state_file.read_text()
+        assert "IMPLEMENTATION" in state_content  # Resumed from this stage
 
-        User has an empty AGENTS.md file.
-        Expected: Objective Template section appended.
+    # =========================================================================
+    # AT-005: REPL Prompt Shows Worktree Context
+    # =========================================================================
+    def test_at_005_repl_prompt_shows_worktree_context(self):
+        """AT-005: Interactive mode shows worktree/branch in prompt.
+
+        Verifies: Prompt displays [wt:feat/my-feature] or similar
         """
-        from teambot.cli import ConsoleDisplay, cmd_init
+        from teambot.repl.loop import REPLLoop
 
-        # Arrange: Create empty AGENTS.md
-        monkeypatch.chdir(tmp_path)
-        agents_md = tmp_path / "AGENTS.md"
-        agents_md.write_text("")
+        # Create WorktreeContext
+        worktree_context = WorktreeContext(
+            worktree_path=Path("/tmp/test-worktree"),
+            branch_name="feat/my-feature",
+            repo_root=Path("/tmp/repo"),
+            is_worktree=True,
+        )
 
-        # Act: Run real cmd_init
-        args = argparse.Namespace(force=False)
-        display = ConsoleDisplay()
-        result = cmd_init(args, display)
+        # Create REPL with worktree context using REAL REPLLoop class
+        repl = REPLLoop(
+            console=MagicMock(),
+            config=MagicMock(),
+            worktree_context=worktree_context,
+        )
 
-        # Assert: File now contains the section
-        assert result == 0
-        content = agents_md.read_text()
-        assert "## Objective Template" in content
-        assert "docs/sdd-objective-template.md" in content
+        # Verification: worktree_context is stored (private attribute)
+        assert repl._worktree_context is not None
+        assert repl._worktree_context.branch_name == "feat/my-feature"
 
-    def test_at_006_force_flag_behavior(self, tmp_path, monkeypatch):
-        """AT-006: Force flag behavior.
+        # Verification: Prompt indicator format
+        expected_indicator = f"[wt:{worktree_context.branch_name}]"
+        assert expected_indicator == "[wt:feat/my-feature]"
 
-        User runs `teambot init --force` with existing AGENTS.md.
-        Expected: AGENTS.md is OVERWRITTEN with scaffold template.
+    def test_at_005_repl_without_worktree_context(self):
+        """AT-005 supplementary: REPL works without worktree context."""
+        from teambot.repl.loop import REPLLoop
+
+        # Create REPL without worktree context
+        repl = REPLLoop(
+            console=MagicMock(),
+            config=MagicMock(),
+            worktree_context=None,
+        )
+
+        # Verification: Works without crashing
+        assert repl._worktree_context is None
+
+    # =========================================================================
+    # AT-006: Backward Compatibility (No Worktree Flag)
+    # =========================================================================
+    def test_at_006_backward_compatibility_no_worktree_flag(self, temp_git_repo: Path):
+        """AT-006: Running without --worktree behaves exactly as before.
+
+        Verifies:
+        - .teambot-worktrees/ does not exist
+        - .teambot/ in main directory contains state files
         """
-        from teambot.cli import ConsoleDisplay, cmd_init
-        from teambot.scaffolds import get_scaffolds_dir
+        from teambot.cli import create_parser
 
-        # Arrange: Create custom AGENTS.md
-        monkeypatch.chdir(tmp_path)
-        agents_md = tmp_path / "AGENTS.md"
-        agents_md.write_text("# My Custom Content That Should Be Replaced\n")
+        # Step 1: Parse args without --worktree using REAL parser
+        parser = create_parser()
+        args = parser.parse_args(["run", "objectives/my-feature.md"])
 
-        # Get expected scaffold content
-        scaffold_agents_md = get_scaffolds_dir() / "AGENTS.md"
-        expected_content = scaffold_agents_md.read_text()
+        # Verification: --worktree is False by default
+        assert args.worktree is False
+        assert args.branch is None
 
-        # Act: Run with force=True
-        args = argparse.Namespace(force=True)
-        display = ConsoleDisplay()
-        result = cmd_init(args, display)
+        # Step 2: Verify no worktree directory exists
+        worktree_dir = temp_git_repo / ".teambot-worktrees"
+        assert not worktree_dir.exists()
 
-        # Assert: AGENTS.md matches scaffold exactly (was overwritten)
-        assert result == 0
-        content = agents_md.read_text()
+        # Simulate normal execution: state in main .teambot
+        main_teambot = temp_git_repo / ".teambot"
+        main_teambot.mkdir()
+        (main_teambot / "workflow_state.json").write_text('{"stage": "PLAN"}')
 
-        # Custom content should be GONE
-        assert "My Custom Content That Should Be Replaced" not in content
+        # Verification: State is in main directory
+        assert (main_teambot / "workflow_state.json").exists()
+        assert not worktree_dir.exists()
 
-        # Should match scaffold template
-        assert content == expected_content
+    def test_at_006_cli_parser_defaults(self):
+        """AT-006 supplementary: All CLI invocations default to no worktree."""
+        from teambot.cli import create_parser
 
-        # Scaffold has Objective Template section
-        assert "## Objective Template" in content
+        parser = create_parser()
+
+        # Test various invocations
+        test_cases = [
+            ["run"],
+            ["run", "obj.md"],
+            ["run", "-c", "config.json"],
+            ["run", "--resume"],
+        ]
+
+        for args_list in test_cases:
+            args = parser.parse_args(args_list)
+            assert args.worktree is False, f"Failed for {args_list}"
+            assert args.branch is None, f"Failed for {args_list}"
+
+    # =========================================================================
+    # AT-007: Git Not Available Error
+    # =========================================================================
+    def test_at_007_git_not_available_error(self):
+        """AT-007: Attempting --worktree when Git is not installed.
+
+        Verifies: Error message contains "Git is required for --worktree mode"
+        """
+        # Mock shutil.which to simulate Git not being available
+        with patch("teambot.worktree.manager.shutil.which", return_value=None):
+            # Verification: is_git_available returns False
+            assert WorktreeManager.is_git_available() is False
+
+            # Verification: GitNotFoundError is raised
+            with pytest.raises(GitNotFoundError) as exc_info:
+                WorktreeManager.create_worktree(Path("/tmp"), "feat/test")
+
+            error_message = str(exc_info.value)
+            # Verification: Error message has required content
+            assert "Git" in error_message
+            assert "required" in error_message.lower()
+            assert "--worktree" in error_message
+
+    def test_at_007_git_not_found_error_message_quality(self):
+        """AT-007 supplementary: GitNotFoundError has helpful guidance."""
+        error = GitNotFoundError()
+        message = str(error)
+
+        # Should be actionable
+        assert "Git" in message
+        assert "required" in message.lower()

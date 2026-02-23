@@ -394,6 +394,18 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable console logging output (useful for debugging interactive mode)",
     )
+    run_parser.add_argument(
+        "--worktree",
+        action="store_true",
+        help="Run in isolated Git worktree with feature branch",
+    )
+    run_parser.add_argument(
+        "--branch",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help="Branch name for worktree (default: feat/<objective-name>)",
+    )
 
     # status command
     subparsers.add_parser("status", help="Show TeamBot status")
@@ -571,14 +583,87 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
 def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Run TeamBot with an objective."""
+    import os
+
     config_path = Path(args.config)
     teambot_dir = Path(".teambot")
+    worktree_context = None  # Track worktree context for UI indicators
 
     # Fast-fail if config doesn't exist (no side effects)
     if not config_path.exists():
         display.print_error(f"Configuration not found: {config_path}")
         display.print_warning("Run 'teambot init' first")
         return 1
+
+    # Handle worktree mode (before other validations that might change directory)
+    if getattr(args, "worktree", False):
+        # Worktree mode requires an objective file
+        if not args.objective:
+            display.print_error("--worktree requires an objective file")
+            display.print_warning("Usage: teambot run objectives/my-task.md --worktree")
+            return 1
+
+        from teambot.worktree import WorktreeManager, derive_branch_name
+        from teambot.worktree.errors import (
+            BranchExistsError,
+            WorktreeError,
+            WorktreeExistsError,
+        )
+
+        # Validate Git is available
+        if not WorktreeManager.is_git_available():
+            display.print_error("Git is required for --worktree mode but was not found.")
+            display.print_warning("Install Git and ensure it's on your PATH.")
+            return 1
+
+        # Get repository root
+        repo_root = WorktreeManager.get_repo_root()
+        if repo_root is None:
+            display.print_error("Not in a Git repository.")
+            display.print_warning("--worktree requires a Git repository.")
+            return 1
+
+        # Derive branch name from objective
+        objective_path = Path(args.objective)
+        if not objective_path.exists():
+            display.print_error(f"Objective file not found: {objective_path}")
+            return 1
+
+        branch_name = derive_branch_name(objective_path, getattr(args, "branch", None))
+
+        # Create worktree
+        try:
+            worktree_context = WorktreeManager.create_worktree(repo_root, branch_name)
+            display.print_success(f"Created worktree: {worktree_context.worktree_path}")
+            display.print_success(f"Branch: {worktree_context.branch_name}")
+
+            # Change to worktree directory
+            os.chdir(worktree_context.worktree_path)
+
+            # Update teambot_dir to be relative to new working directory
+            teambot_dir = Path(".teambot")
+
+            # Update config path - use repo root config
+            config_path = repo_root / "teambot.json"
+
+        except BranchExistsError as e:
+            display.print_error(str(e))
+            return 1
+        except WorktreeExistsError as e:
+            display.print_error(str(e))
+            return 1
+        except WorktreeError as e:
+            display.print_error(f"Worktree creation failed: {e}")
+            return 1
+
+    # Detect if running in existing worktree (for resume and interactive modes)
+    elif worktree_context is None:
+        try:
+            from teambot.worktree import WorktreeManager
+
+            worktree_context = WorktreeManager.detect_worktree_context()
+        except ImportError:
+            pass  # Module not available
 
     # Authentication check (blocking - exit if not authenticated)
     if not _check_copilot_authentication_blocking(display):
@@ -647,7 +732,12 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     if objective and objective_path:
         return _run_orchestration(
-            objective_path, config, teambot_dir, getattr(args, "max_hours", 8.0), display
+            objective_path,
+            config,
+            teambot_dir,
+            getattr(args, "max_hours", 8.0),
+            display,
+            worktree_context=worktree_context,
         )
 
     # No objective - run interactive mode
@@ -656,7 +746,11 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     from teambot.repl import run_interactive_mode
 
     try:
-        asyncio.run(run_interactive_mode(console=display.console, config=config))
+        asyncio.run(
+            run_interactive_mode(
+                console=display.console, config=config, worktree_context=worktree_context
+            )
+        )
     except KeyboardInterrupt:
         display.print_warning("Interrupted")
 
@@ -693,6 +787,7 @@ def _run_orchestration(
     teambot_dir: Path,
     max_hours: float,
     display: ConsoleDisplay,
+    worktree_context=None,
 ) -> int:
     """Run file-based orchestration."""
     import signal
@@ -740,7 +835,12 @@ def _run_orchestration(
     def on_progress(event_type: str, data: dict) -> None:
         # Console display logic
         if event_type == "stage_changed":
-            display.print_success(f"Stage: {data.get('stage', 'unknown')}")
+            stage = data.get("stage", "unknown")
+            # Include worktree context in stage header if present
+            if worktree_context is not None:
+                display.print_success(f"Stage: {stage} [worktree: {worktree_context.branch_name}]")
+            else:
+                display.print_success(f"Stage: {stage}")
         elif event_type == "orchestration_started":
             objective = data.get("objective_name", "orchestration run")
             display.print_success(f"Starting: {objective}")

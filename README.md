@@ -70,6 +70,28 @@ teambot run objectives/my-feature.md
 teambot run
 ```
 
+## Worktree Isolation
+
+TeamBot supports isolated execution using Git worktrees, enabling parallel feature development:
+
+```bash
+# Run objective in isolated worktree
+teambot run objectives/my-feature.md --worktree
+
+# With explicit branch name
+teambot run objectives/my-feature.md --worktree --branch feat/custom-name
+```
+
+**Requirements**: Git 2.5+
+
+**Behavior**:
+- Creates worktree at `.teambot-worktrees/<branch-name>/`
+- State files scoped to worktree (no cross-contamination)
+- Visual indicators show current branch in REPL and stage headers
+- Worktree persists after completion for user review
+
+See [Worktree Isolation Guide](docs/guides/worktree-isolation.md) for detailed usage.
+
 ### What `teambot init` Creates
 
 The init command sets up your project with:
@@ -93,6 +115,7 @@ For development from source, see [Development Guide](docs/guides/development.md)
 | [Getting Started](docs/guides/getting-started.md) | Installation, setup, first run, troubleshooting |
 | [File-Based Orchestration](docs/guides/file-based-orchestration.md) | Running objectives autonomously |
 | [Interactive Mode](docs/guides/interactive-mode.md) | REPL, pipelines, multi-agent mode |
+| [Worktree Isolation](docs/guides/worktree-isolation.md) | Parallel feature development with Git worktrees |
 | [CLI Reference](docs/guides/cli-reference.md) | All commands and options |
 | [Agent Personas](docs/guides/agent-personas.md) | The 6 specialized AI agents |
 | [Workflow Stages](docs/guides/workflow-stages.md) | 14-stage development process |

@@ -73,6 +73,188 @@ class TestCLIParser:
         assert args.no_animation is False
 
 
+class TestCLIParserWorktree:
+    """Tests for worktree CLI argument parsing."""
+
+    def test_parser_worktree_flag(self):
+        """Parser recognizes --worktree flag."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md", "--worktree"])
+
+        assert args.worktree is True
+
+    def test_parser_worktree_flag_default_false(self):
+        """--worktree flag defaults to False."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md"])
+
+        assert args.worktree is False
+
+    def test_parser_branch_flag(self):
+        """Parser recognizes --branch flag."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md", "--branch", "feat/custom"])
+
+        assert args.branch == "feat/custom"
+
+    def test_parser_branch_flag_default_none(self):
+        """--branch flag defaults to None."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md"])
+
+        assert args.branch is None
+
+    def test_parser_worktree_with_branch(self):
+        """Parser accepts both --worktree and --branch flags."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md", "--worktree", "--branch", "fix/bug-123"])
+
+        assert args.worktree is True
+        assert args.branch == "fix/bug-123"
+
+    def test_parser_backward_compatibility_no_worktree(self):
+        """Existing run commands work without --worktree flag."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "my-objective.md", "--max-hours", "4"])
+
+        assert args.command == "run"
+        assert args.objective == "my-objective.md"
+        assert args.max_hours == 4
+        assert args.worktree is False
+        assert args.branch is None
+
+
+class TestCmdRunWorktree:
+    """Tests for cmd_run with --worktree flag."""
+
+    def test_cmd_run_worktree_requires_objective(self, tmp_path, monkeypatch):
+        """--worktree without objective file returns error."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create config so we get past config check
+        (tmp_path / "teambot.json").write_text('{"agents": []}')
+
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective=None,
+            worktree=True,
+            branch=None,
+        )
+        display = ConsoleDisplay()
+
+        result = cmd_run(args, display)
+
+        assert result == 1
+
+    def test_cmd_run_worktree_git_not_available(self, tmp_path, monkeypatch):
+        """--worktree fails when Git is not available."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create config and objective
+        (tmp_path / "teambot.json").write_text('{"agents": []}')
+        (tmp_path / "my-feature.md").write_text("# Objective\n")
+
+        # Mock Git as not available
+        monkeypatch.setattr("teambot.worktree.manager.shutil.which", lambda x: None)
+
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective="my-feature.md",
+            worktree=True,
+            branch=None,
+        )
+        display = ConsoleDisplay()
+
+        result = cmd_run(args, display)
+
+        assert result == 1
+
+    def test_cmd_run_worktree_not_in_git_repo(self, tmp_path, monkeypatch):
+        """--worktree fails when not in a Git repository."""
+        import argparse
+        from unittest.mock import MagicMock
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create config and objective
+        (tmp_path / "teambot.json").write_text('{"agents": []}')
+        (tmp_path / "my-feature.md").write_text("# Objective\n")
+
+        # Mock Git as available but not in repo
+        monkeypatch.setattr("teambot.worktree.manager.shutil.which", lambda x: "/usr/bin/git")
+        mock_run = MagicMock(return_value=MagicMock(returncode=128, stdout=""))
+        monkeypatch.setattr("teambot.worktree.manager.subprocess.run", mock_run)
+
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective="my-feature.md",
+            worktree=True,
+            branch=None,
+        )
+        display = ConsoleDisplay()
+
+        result = cmd_run(args, display)
+
+        assert result == 1
+
+    def test_cmd_run_without_worktree_unchanged(self, tmp_path, monkeypatch):
+        """Running without --worktree behaves as before (regression)."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_init, cmd_run
+
+        monkeypatch.chdir(tmp_path)
+
+        # Mock model validation
+        monkeypatch.setattr("teambot.config.loader.validate_model", lambda m: True)
+        monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
+        monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
+        # Initialize first
+        init_args = argparse.Namespace(force=False)
+        cmd_init(init_args, ConsoleDisplay())
+
+        # Mock the REPL
+        async def mock_repl(*args, **kwargs):
+            pass
+
+        monkeypatch.setattr("teambot.repl.run_interactive_mode", mock_repl)
+
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective=None,
+            worktree=False,
+            branch=None,
+        )
+        display = ConsoleDisplay()
+
+        result = cmd_run(args, display)
+
+        assert result == 0
+
+
 class TestCLIInit:
     """Tests for init command."""
 
