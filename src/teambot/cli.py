@@ -90,7 +90,7 @@ def _should_update_agents_md(results: list[CopyResult]) -> bool:
 def _update_agents_md_with_template_reference(
     results: list[CopyResult],
     target_root: Path,
-    display,
+    display: ConsoleDisplay | None,
 ) -> bool:
     """Update AGENTS.md with objective template reference if needed.
 
