@@ -55,7 +55,8 @@ def _agents_md_has_template_reference(agents_md_path: Path) -> bool:
     """
     try:
         content = agents_md_path.read_text(encoding="utf-8")
-        return OBJECTIVE_TEMPLATE_MARKER in content
+        # Perform case-insensitive check to avoid duplicate sections if heading casing differs
+        return OBJECTIVE_TEMPLATE_MARKER.casefold() in content.casefold()
     except OSError:
         return False
 
