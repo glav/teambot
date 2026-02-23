@@ -206,7 +206,7 @@ Templates and standards referenced by commands and instructions.
 ## Clean commits
 - When committing or changing code, always ensure properly linted code by running:
 - `uv run ruff format -- .` and `uv run ruff check . --fix` as part of the process.
-- Also ensure thet `uv run ruff format --check .` is executed as part of the process.
+- Also ensure that `uv run ruff format --check .` is executed as part of the process.
 
 ## Troubleshooting
 
