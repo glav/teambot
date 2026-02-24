@@ -588,6 +588,25 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     return 0
 
 
+def _copy_objective_to_worktree(objective: str, repo_root: Path) -> bool:
+    """Copy objective file from source repo to worktree if not already present.
+
+    Must be called from within the worktree directory (objective is a relative path).
+
+    Returns True if the objective file is available (already present or successfully copied).
+    Returns False if the file is missing from both worktree and source repo.
+    """
+    worktree_objective = Path(objective)
+    if worktree_objective.exists():
+        return True
+    source_objective = repo_root / objective
+    if not source_objective.exists():
+        return False
+    worktree_objective.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_objective, worktree_objective)
+    return True
+
+
 def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Run TeamBot with an objective."""
     import os

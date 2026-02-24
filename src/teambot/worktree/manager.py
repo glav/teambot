@@ -198,6 +198,18 @@ class WorktreeManager:
         # Ensure base directory exists
         (repo_root / base_dir).mkdir(exist_ok=True)
 
+        # Validate base_branch explicitly before creating worktree
+        if base_branch is not None:
+            verify_result = subprocess.run(
+                ["git", "rev-parse", "--verify", f"{base_branch}^{{commit}}"],
+                capture_output=True,
+                text=True,
+                cwd=repo_root,
+            )
+            if verify_result.returncode != 0:
+                git_error = verify_result.stderr.strip() or f"'{base_branch}' is not a valid ref"
+                raise WorktreeError(f"Base branch not found: {base_branch}: {git_error}")
+
         # Build git worktree command
         cmd = ["git", "worktree", "add", "-b", branch_name, str(worktree_path)]
         if base_branch:
@@ -214,8 +226,6 @@ class WorktreeManager:
             stderr = result.stderr.strip()
             if "already exists" in stderr:
                 raise BranchExistsError(branch_name)
-            if "invalid reference" in stderr or "not a valid ref" in stderr:
-                raise WorktreeError(f"Base branch not found: {base_branch}")
             raise WorktreeError(f"Failed to create worktree: {stderr}")
 
         return WorktreeContext(
