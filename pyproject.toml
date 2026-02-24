@@ -47,7 +47,7 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 # AGENT_DIRECTORY_SECTION contains markdown tables that must match the scaffold
-"src/teambot/cli.py" = ["E501"]
+"src/teambot/markdown_constants.py" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"
