@@ -588,6 +588,25 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     return 0
 
 
+def _copy_objective_to_worktree(objective: str, repo_root: Path) -> bool:
+    """Copy objective file from source repo to worktree if not already present.
+
+    Must be called from within the worktree directory (objective is a relative path).
+
+    Returns True if the objective file is available (already present or successfully copied).
+    Returns False if the file is missing from both worktree and source repo.
+    """
+    worktree_objective = Path(objective)
+    if worktree_objective.exists():
+        return True
+    source_objective = repo_root / objective
+    if not source_objective.exists():
+        return False
+    worktree_objective.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_objective, worktree_objective)
+    return True
+
+
 def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Run TeamBot with an objective."""
     import os
@@ -649,20 +668,13 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             os.chdir(worktree_context.worktree_path)
 
             # Check if objective exists in worktree, if not copy from source
-            worktree_objective = Path(args.objective)
-            if not worktree_objective.exists():
-                # Check if objective exists in source repo (working directory)
-                source_objective = repo_root / args.objective
-                if source_objective.exists():
-                    # Create parent directories if needed
-                    worktree_objective.parent.mkdir(parents=True, exist_ok=True)
-                    # Copy file to worktree
-                    shutil.copy2(source_objective, worktree_objective)
-                    display.print_success(f"Copied objective file to worktree: {args.objective}")
-                else:
-                    display.print_error(f"Objective file not found: {args.objective}")
-                    display.print_warning("File must exist in source repository or worktree")
-                    return 1
+            objective_was_missing = not Path(args.objective).exists()
+            if not _copy_objective_to_worktree(args.objective, repo_root):
+                display.print_error(f"Objective file not found: {args.objective}")
+                display.print_warning("File must exist in source repository or worktree")
+                return 1
+            if objective_was_missing:
+                display.print_success(f"Copied objective file to worktree: {args.objective}")
 
             # Update teambot_dir to be relative to new working directory
             teambot_dir = Path(".teambot")

@@ -461,9 +461,12 @@ class TestWorktreeEnhancementAcceptanceValidation:
         Verification:
         - Worktree contains `objectives/new-task.md`
         - Content matches source repository working directory version
+
+        Core logic is tested directly; selective mocking is used for external dependencies.
         """
         import os
-        import shutil
+
+        from teambot.cli import _copy_objective_to_worktree
 
         # Create repo with initial commit (no objective yet)
         repo = tmp_path / "repo"
@@ -506,18 +509,15 @@ class TestWorktreeEnhancementAcceptanceValidation:
         os.chdir(context.worktree_path)
 
         try:
-            worktree_objective = Path("objectives/new-task.md")
-
             # File should NOT exist in worktree (not committed)
-            # This is where the CLI copy logic kicks in
-            if not worktree_objective.exists():
-                # Simulate CLI copy logic using REAL shutil
-                source_objective = repo / "objectives" / "new-task.md"
-                if source_objective.exists():
-                    worktree_objective.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(source_objective, worktree_objective)
+            worktree_objective = Path("objectives/new-task.md")
+            assert not worktree_objective.exists(), "File must not exist before copy"
+
+            # Call the REAL CLI copy implementation (not a manual shutil copy)
+            result = _copy_objective_to_worktree("objectives/new-task.md", repo)
 
             # Verification: File now exists with correct content
+            assert result, "Copy should succeed"
             assert worktree_objective.exists(), "Objective file should exist after copy"
             assert worktree_objective.read_text() == staged_content, (
                 "Content must match working directory"
