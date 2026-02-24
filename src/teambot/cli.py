@@ -630,10 +630,24 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             display.print_warning("--worktree requires a Git repository.")
             return 1
 
-        # Derive branch name from objective (path doesn't need to exist yet - may be copied)
-        objective_path = Path(args.objective)
+        # Normalize objective path before chdir() so relative paths are resolved
+        # correctly from the original working directory, not from the worktree.
+        original_cwd = Path.cwd()
+        raw_objective = Path(args.objective)
+        if raw_objective.is_absolute():
+            resolved_objective = raw_objective.resolve()
+        else:
+            resolved_objective = (original_cwd / raw_objective).resolve()
 
-        branch_name = derive_branch_name(objective_path, getattr(args, "branch", None))
+        # Reject paths that escape the repository root (path traversal protection)
+        try:
+            rel_objective = resolved_objective.relative_to(repo_root)
+        except ValueError:
+            display.print_error(f"Objective path must be within the repository: {args.objective}")
+            return 1
+
+        # Derive branch name from objective (path doesn't need to exist yet - may be copied)
+        branch_name = derive_branch_name(rel_objective, getattr(args, "branch", None))
 
         # Create worktree
         try:
@@ -648,19 +662,20 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             # Change to worktree directory
             os.chdir(worktree_context.worktree_path)
 
-            # Check if objective exists in worktree, if not copy from source
-            worktree_objective = Path(args.objective)
+            # Check if objective exists in worktree, if not copy from source.
+            # Use the pre-resolved repo-relative path so the destination is always
+            # inside the worktree and the source is always inside repo_root.
+            worktree_objective = Path(rel_objective)
             if not worktree_objective.exists():
-                # Check if objective exists in source repo (working directory)
-                source_objective = repo_root / args.objective
+                source_objective = repo_root / rel_objective
                 if source_objective.exists():
                     # Create parent directories if needed
                     worktree_objective.parent.mkdir(parents=True, exist_ok=True)
                     # Copy file to worktree
                     shutil.copy2(source_objective, worktree_objective)
-                    display.print_success(f"Copied objective file to worktree: {args.objective}")
+                    display.print_success(f"Copied objective file to worktree: {rel_objective}")
                 else:
-                    display.print_error(f"Objective file not found: {args.objective}")
+                    display.print_error(f"Objective file not found: {rel_objective}")
                     display.print_warning("File must exist in source repository or worktree")
                     return 1
 
