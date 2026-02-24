@@ -323,14 +323,8 @@ class TestCmdRunWorktreeObjectiveMigration:
             check=True,
         )
 
-        # Create config and objective
+        # Commit only config (no objective) so the worktree won't have the objective
         (repo / "teambot.json").write_text('{"agents": []}')
-        objectives_dir = repo / "objectives"
-        objectives_dir.mkdir()
-        objective_file = objectives_dir / "my-task.md"
-        objective_file.write_text("# Test Objective\n\nGoals here.")
-
-        # Commit objective
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", "Initial commit"],
@@ -339,9 +333,20 @@ class TestCmdRunWorktreeObjectiveMigration:
             check=True,
         )
 
+        # Create objective in source repo but do NOT commit it
+        objectives_dir = repo / "objectives"
+        objectives_dir.mkdir()
+        objective_file = objectives_dir / "my-task.md"
+        objective_file.write_text("# Test Objective\n\nGoals here.")
+
         monkeypatch.chdir(repo)
         monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
         monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
+        # Compute the expected worktree path (branch feat/my-task → dir feat-my-task)
+        expected_worktree_objective = (
+            repo / ".teambot-worktrees" / "feat-my-task" / "objectives" / "my-task.md"
+        )
 
         # Mock the orchestration to avoid full run
         with patch("teambot.cli._run_orchestration", return_value=0):
@@ -361,9 +366,10 @@ class TestCmdRunWorktreeObjectiveMigration:
 
             result = cmd_run(args, display)
 
-        # Verify the worktree was created (even if objective copy logic not yet implemented)
-        # The test will pass once the feature is implemented
         assert result == 0
+        # Verify objective was copied from source repo into the worktree
+        assert expected_worktree_objective.exists(), "Objective was not copied into the worktree"
+        assert expected_worktree_objective.read_text() == "# Test Objective\n\nGoals here."
 
     def test_cmd_run_worktree_creates_parent_dirs_for_objective(self, tmp_path, monkeypatch):
         """Parent directories created when copying nested objective file."""
@@ -390,14 +396,8 @@ class TestCmdRunWorktreeObjectiveMigration:
             check=True,
         )
 
-        # Create config and nested objective
+        # Commit only config (no objective) so the worktree won't have the nested objective
         (repo / "teambot.json").write_text('{"agents": []}')
-        nested_dir = repo / "docs" / "objectives" / "features"
-        nested_dir.mkdir(parents=True)
-        objective_file = nested_dir / "my-task.md"
-        objective_file.write_text("# Nested Objective\n\nWith subdirectories.")
-
-        # Commit objective
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", "Initial commit"],
@@ -406,9 +406,26 @@ class TestCmdRunWorktreeObjectiveMigration:
             check=True,
         )
 
+        # Create nested objective in source repo but do NOT commit it
+        nested_dir = repo / "docs" / "objectives" / "features"
+        nested_dir.mkdir(parents=True)
+        objective_file = nested_dir / "my-task.md"
+        objective_file.write_text("# Nested Objective\n\nWith subdirectories.")
+
         monkeypatch.chdir(repo)
         monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
         monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
+        # Compute the expected worktree path (branch feat/my-task → dir feat-my-task)
+        expected_worktree_objective = (
+            repo
+            / ".teambot-worktrees"
+            / "feat-my-task"
+            / "docs"
+            / "objectives"
+            / "features"
+            / "my-task.md"
+        )
 
         with patch("teambot.cli._run_orchestration", return_value=0):
             args = argparse.Namespace(
@@ -428,6 +445,13 @@ class TestCmdRunWorktreeObjectiveMigration:
             result = cmd_run(args, display)
 
         assert result == 0
+        # Verify nested objective was copied with parent directories created
+        assert expected_worktree_objective.exists(), (
+            "Nested objective was not copied into the worktree"
+        )
+        assert expected_worktree_objective.parent.is_dir(), (
+            "Parent directories were not created in the worktree"
+        )
 
     def test_cmd_run_worktree_no_copy_when_exists(self, tmp_path, monkeypatch):
         """No copy when objective already exists in worktree."""
@@ -472,7 +496,10 @@ class TestCmdRunWorktreeObjectiveMigration:
         monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
         monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
 
-        with patch("teambot.cli._run_orchestration", return_value=0):
+        with (
+            patch("teambot.cli._run_orchestration", return_value=0),
+            patch("teambot.cli.shutil.copy2") as mock_copy,
+        ):
             args = argparse.Namespace(
                 config="teambot.json",
                 objective="objectives/my-task.md",
@@ -491,6 +518,8 @@ class TestCmdRunWorktreeObjectiveMigration:
             result = cmd_run(args, display)
 
         assert result == 0
+        # Verify no copy was performed since the file already existed in the worktree
+        mock_copy.assert_not_called()
 
     def test_cmd_run_worktree_error_when_objective_not_found(self, tmp_path, monkeypatch):
         """Error when objective file doesn't exist in source or worktree."""
