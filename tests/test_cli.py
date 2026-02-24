@@ -298,6 +298,35 @@ class TestCmdRunWorktree:
 class TestCmdRunWorktreeObjectiveMigration:
     """TDD tests for objective file migration to worktree."""
 
+    @staticmethod
+    def _make_git_repo(path) -> None:
+        """Create a minimal committed git repo with only teambot.json and README."""
+        import subprocess
+
+        path.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init"], cwd=path, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=path,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=path,
+            capture_output=True,
+            check=True,
+        )
+        (path / "teambot.json").write_text('{"agents": []}')
+        (path / "README.md").write_text("# Test")
+        subprocess.run(["git", "add", "."], cwd=path, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=path,
+            capture_output=True,
+            check=True,
+        )
+
     def test_cmd_run_worktree_copies_objective_from_source(self, tmp_path, monkeypatch):
         """Objective file is copied from source repo when missing in worktree."""
         import argparse
@@ -568,6 +597,58 @@ class TestCmdRunWorktreeObjectiveMigration:
         display = ConsoleDisplay()
 
         # Should fail because objective file doesn't exist anywhere
+        result = cmd_run(args, display)
+
+        assert result == 1
+
+    def test_cmd_run_worktree_rejects_objective_outside_repo(self, tmp_path, monkeypatch):
+        """Objective path escaping the repo root is rejected before any copy."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        repo = tmp_path / "repo"
+        self._make_git_repo(repo)
+        monkeypatch.chdir(repo)
+
+        # Path traversal that resolves outside repo_root
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective="../../outside/task.md",
+            worktree=True,
+            branch=None,
+            base_branch=None,
+        )
+        display = ConsoleDisplay()
+
+        result = cmd_run(args, display)
+
+        assert result == 1
+
+    def test_cmd_run_worktree_rejects_absolute_objective_outside_repo(self, tmp_path, monkeypatch):
+        """Absolute objective path pointing outside repo root is rejected."""
+        import argparse
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        repo = tmp_path / "repo"
+        self._make_git_repo(repo)
+        monkeypatch.chdir(repo)
+
+        # Create a file outside the repo to use as an absolute path target
+        outside_file = tmp_path / "outside" / "secret.md"
+        outside_file.parent.mkdir(parents=True)
+        outside_file.write_text("secret content")
+
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective=str(outside_file),
+            worktree=True,
+            branch=None,
+            base_branch=None,
+        )
+        display = ConsoleDisplay()
+
         result = cmd_run(args, display)
 
         assert result == 1
