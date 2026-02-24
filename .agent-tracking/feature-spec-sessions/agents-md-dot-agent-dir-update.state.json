@@ -1,0 +1,62 @@
+{
+  "specFile": ".teambot/constants/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-24T04:02:51Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries",
+    "success-criteria"
+  ],
+  "answeredQuestions": {
+    "product-name": "AGENTS.md .agent Directory Reference Update",
+    "target-users": "Developers using TeamBot with existing AGENTS.md files",
+    "core-problem": "When .agent/ directory is copied, user's AGENTS.md is not updated to document it",
+    "technical-stack": "Python (existing codebase), pytest for testing",
+    "testing-approach": "TDD - Test-Driven Development",
+    "scope-boundaries": "Only update AGENTS.md when .agent/ copied AND AGENTS.md exists (skipped)",
+    "success-criteria": "Idempotent update with full section content, no data loss, graceful error handling"
+  },
+  "referencesProcessed": [
+    {
+      "file": "src/teambot/cli.py",
+      "status": "analyzed",
+      "keyFindings": "Existing pattern at lines 48-136 for objective template update",
+      "integratedSections": ["functional-requirements", "implementation-notes"]
+    },
+    {
+      "file": "src/teambot/scaffolds/AGENTS.md",
+      "status": "analyzed",
+      "keyFindings": "Canonical content at lines 130-191 with 25 total entries",
+      "integratedSections": ["content-specification", "functional-requirements"]
+    },
+    {
+      "file": "tests/test_agents_md_update.py",
+      "status": "analyzed",
+      "keyFindings": "Test patterns for existing AGENTS.md update functionality",
+      "integratedSections": ["acceptance-tests", "implementation-notes"]
+    },
+    {
+      "file": ".teambot/constants/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Business problem definition and success criteria",
+      "integratedSections": ["problem-definition", "goals"]
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-testable",
+    "acceptance-tests-defined",
+    "no-placeholders",
+    "technical-stack-defined"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}

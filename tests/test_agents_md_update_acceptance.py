@@ -84,8 +84,8 @@ class TestAgentsMdUpdateAcceptance:
         assert "Custom content" not in content
 
     def test_at_004_template_exists_no_update(self, tmp_path, monkeypatch):
-        """AT-004: No update when template already exists."""
-        from teambot.cli import ConsoleDisplay, cmd_init
+        """AT-004: No template update when template already exists."""
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
 
         monkeypatch.chdir(tmp_path)
 
@@ -103,10 +103,12 @@ class TestAgentsMdUpdateAcceptance:
         cmd_init(args, ConsoleDisplay())
 
         content = agents_md.read_text()
-        # Reference should NOT be added (template was not newly copied)
+        # Template reference should NOT be added (template was not newly copied)
         assert "## Objective Template" not in content
-        # Original content preserved
-        assert content == "# My Project\n"
+        # But .agent directory reference IS added (.agent was newly copied)
+        assert AGENT_DIRECTORY_MARKER in content
+        # Original content preserved at start
+        assert content.startswith("# My Project\n")
 
     def test_at_005_existing_reference_not_duplicated(self, tmp_path, monkeypatch):
         """AT-005: No duplicate when AGENTS.md already has reference."""
@@ -170,3 +172,103 @@ End of file.
         assert "| Column 1 | Column 2 |" in content
         # Reference added
         assert "## Objective Template" in content
+
+    # === Acceptance tests for .agent directory reference ===
+
+    def test_at_007_appends_agent_dir_reference_when_newly_copied(self, tmp_path, monkeypatch):
+        """AT-007: .agent dir reference appended when .agent copied and AGENTS.md exists."""
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange: Create existing AGENTS.md without .agent reference
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# My Project\n\n## Development\n")
+        # Note: .agent directory does NOT exist yet - will be copied
+
+        # Act
+        args = argparse.Namespace(force=False)
+        display = ConsoleDisplay()
+        result = cmd_init(args, display)
+
+        # Assert
+        assert result == 0
+        content = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER in content
+        # Original content preserved
+        assert content.startswith("# My Project\n\n## Development\n")
+        # Verify full section content (25 entries across 4 tables)
+        assert "commands/sdd/sdd.0-initialize.prompt.md" in content
+        assert "instructions/prompt.instructions.md" in content
+        assert "standards/feature-spec-template.md" in content
+
+    def test_at_008_no_agent_dir_reference_when_dir_exists(self, tmp_path, monkeypatch):
+        """AT-008: No .agent reference added when .agent directory already existed."""
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange: Create existing AGENTS.md and .agent directory
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# My Project\n")
+
+        # Create non-empty .agent directory (will be skipped)
+        agent_dir = tmp_path / ".agent"
+        agent_dir.mkdir()
+        (agent_dir / "custom.md").write_text("Custom content")
+
+        # Act
+        args = argparse.Namespace(force=False)
+        cmd_init(args, ConsoleDisplay())
+
+        # Assert: .agent reference NOT added (directory was skipped)
+        content = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER not in content
+
+    def test_at_009_no_duplicate_agent_dir_reference(self, tmp_path, monkeypatch):
+        """AT-009: No duplicate .agent reference when running init twice."""
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# My Project\n")
+
+        # First init - adds .agent reference
+        args = argparse.Namespace(force=False)
+        cmd_init(args, ConsoleDisplay())
+
+        # Re-run requires removing config first
+        (tmp_path / "teambot.json").unlink()
+
+        # Second init - should NOT add duplicate
+        cmd_init(args, ConsoleDisplay())
+
+        # Assert
+        content = agents_md.read_text()
+        count = content.count(AGENT_DIRECTORY_MARKER)
+        assert count == 1, f"Expected 1 .agent reference, found {count}"
+
+    def test_at_010_both_references_added_on_fresh_existing_agents(self, tmp_path, monkeypatch):
+        """AT-010: Both template AND .agent references added when applicable."""
+        from teambot.cli import (
+            AGENT_DIRECTORY_MARKER,
+            ConsoleDisplay,
+            cmd_init,
+        )
+
+        # Arrange: Create existing AGENTS.md without either reference
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# My Project\n")
+        # No .agent directory, no template file
+
+        # Act
+        args = argparse.Namespace(force=False)
+        result = cmd_init(args, ConsoleDisplay())
+
+        # Assert: Both references added
+        assert result == 0
+        content = agents_md.read_text()
+        assert "## Objective Template" in content
+        assert AGENT_DIRECTORY_MARKER in content
+        # Original content preserved at start
+        assert content.startswith("# My Project\n")

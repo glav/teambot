@@ -339,3 +339,403 @@ class TestUpdateAgentsMdWithTemplateReference:
         assert updated is True
         content = agents_md.read_text()
         assert "## Objective Template" in content
+
+
+# === Fixtures for .agent directory reference tests ===
+
+
+@pytest.fixture
+def agents_md_with_agent_dir_reference():
+    """AGENTS.md content that already has the .agent directory reference."""
+    return """# AGENTS.md
+
+## Project Overview
+This is a sample project.
+
+## Copilot / AI Assisted Workflow
+
+- All Copilot and AI assisted workflows exist in the `.agent/` directory
+"""
+
+
+@pytest.fixture
+def agents_md_without_agent_dir_reference():
+    """AGENTS.md content without .agent directory reference."""
+    return """# AGENTS.md
+
+## Project Overview
+This is a sample project.
+
+## Development Guidelines
+- Follow coding standards
+- Write tests
+"""
+
+
+# === Tests for .agent directory reference detection ===
+
+
+class TestAgentsMdHasAgentDirectoryReference:
+    """Tests for _agents_md_has_agent_directory_reference() function."""
+
+    def test_returns_true_when_reference_exists(self, tmp_path, agents_md_with_agent_dir_reference):
+        """Returns True when AGENTS.md contains the .agent directory reference."""
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(agents_md_with_agent_dir_reference)
+
+        from teambot.cli import _agents_md_has_agent_directory_reference
+
+        result = _agents_md_has_agent_directory_reference(agents_md)
+
+        assert result is True
+
+    def test_returns_false_when_no_reference(self, tmp_path, agents_md_without_agent_dir_reference):
+        """Returns False when AGENTS.md lacks the .agent directory reference."""
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(agents_md_without_agent_dir_reference)
+
+        from teambot.cli import _agents_md_has_agent_directory_reference
+
+        result = _agents_md_has_agent_directory_reference(agents_md)
+
+        assert result is False
+
+    def test_returns_false_for_empty_file(self, tmp_path):
+        """Returns False for empty AGENTS.md."""
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("")
+
+        from teambot.cli import _agents_md_has_agent_directory_reference
+
+        result = _agents_md_has_agent_directory_reference(agents_md)
+
+        assert result is False
+
+    def test_returns_false_for_missing_file(self, tmp_path):
+        """Returns False when file doesn't exist."""
+        agents_md = tmp_path / "AGENTS.md"
+
+        from teambot.cli import _agents_md_has_agent_directory_reference
+
+        result = _agents_md_has_agent_directory_reference(agents_md)
+
+        assert result is False
+
+    def test_case_insensitive_detection(self, tmp_path):
+        """Detects reference regardless of heading case."""
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# AGENTS\n\n## copilot / ai assisted workflow\n")
+
+        from teambot.cli import _agents_md_has_agent_directory_reference
+
+        result = _agents_md_has_agent_directory_reference(agents_md)
+
+        assert result is True
+
+
+class TestShouldUpdateAgentsMdWithAgentDirectory:
+    """Tests for _should_update_agents_md_with_agent_directory() function."""
+
+    def test_returns_true_when_agent_dir_copied_and_agents_skipped(self, tmp_path):
+        """Returns True when .agent copied and AGENTS.md skipped."""
+        from teambot.cli import _should_update_agents_md_with_agent_directory
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        result = _should_update_agents_md_with_agent_directory(results)
+
+        assert result is True
+
+    def test_returns_false_when_agent_dir_not_copied(self, tmp_path):
+        """Returns False when .agent directory was not copied (skipped_not_empty)."""
+        from teambot.cli import _should_update_agents_md_with_agent_directory
+
+        results = [
+            CopyResult(
+                source=".agent",
+                target=tmp_path / ".agent",
+                copied=False,
+                reason="skipped_not_empty",
+            ),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        result = _should_update_agents_md_with_agent_directory(results)
+
+        assert result is False
+
+    def test_returns_false_when_agents_freshly_copied(self, tmp_path):
+        """Returns False when AGENTS.md was freshly copied (has reference)."""
+        from teambot.cli import _should_update_agents_md_with_agent_directory
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md", target=tmp_path / "AGENTS.md", copied=True, reason="copied"
+            ),
+        ]
+
+        result = _should_update_agents_md_with_agent_directory(results)
+
+        assert result is False
+
+    def test_returns_false_when_both_skipped(self, tmp_path):
+        """Returns False when both files already existed."""
+        from teambot.cli import _should_update_agents_md_with_agent_directory
+
+        results = [
+            CopyResult(
+                source=".agent",
+                target=tmp_path / ".agent",
+                copied=False,
+                reason="skipped_not_empty",
+            ),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        result = _should_update_agents_md_with_agent_directory(results)
+
+        assert result is False
+
+    def test_handles_empty_results_list(self):
+        """Returns False when results list is empty."""
+        from teambot.cli import _should_update_agents_md_with_agent_directory
+
+        results = []
+
+        result = _should_update_agents_md_with_agent_directory(results)
+
+        assert result is False
+
+
+class TestUpdateAgentsMdWithAgentDirectoryReference:
+    """Tests for _update_agents_md_with_agent_directory_reference() function."""
+
+    def test_appends_reference_when_conditions_met(
+        self, tmp_path, agents_md_without_agent_dir_reference
+    ):
+        """Appends .agent directory reference when all conditions are met."""
+        from teambot.cli import (
+            AGENT_DIRECTORY_MARKER,
+            _update_agents_md_with_agent_directory_reference,
+        )
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(agents_md_without_agent_dir_reference)
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        updated = _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        assert updated is True
+        content = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER in content
+        assert "# AGENTS.md" in content  # Original content preserved
+
+    def test_skips_when_reference_exists(self, tmp_path, agents_md_with_agent_dir_reference):
+        """Skips update when reference already exists."""
+        from teambot.cli import _update_agents_md_with_agent_directory_reference
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(agents_md_with_agent_dir_reference)
+        original_content = agents_md.read_text()
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        updated = _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        assert updated is False
+        assert agents_md.read_text() == original_content
+
+    def test_preserves_existing_content_exactly(self, tmp_path):
+        """Original content is preserved exactly after update."""
+        from teambot.cli import _update_agents_md_with_agent_directory_reference
+
+        agents_md = tmp_path / "AGENTS.md"
+        original = "# AGENTS\n\n## Section 1\n\nContent with special chars: 日本語\n"
+        agents_md.write_text(original, encoding="utf-8")
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        content = agents_md.read_text(encoding="utf-8")
+        assert content.startswith(original.rstrip("\n"))
+
+    def test_returns_false_when_conditions_not_met(
+        self, tmp_path, agents_md_without_agent_dir_reference
+    ):
+        """Returns False when trigger conditions are not met."""
+        from teambot.cli import _update_agents_md_with_agent_directory_reference
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(agents_md_without_agent_dir_reference)
+
+        # .agent directory was not copied
+        results = [
+            CopyResult(
+                source=".agent",
+                target=tmp_path / ".agent",
+                copied=False,
+                reason="skipped_not_empty",
+            ),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        updated = _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        assert updated is False
+
+    def test_idempotent_multiple_runs(self, tmp_path, agents_md_without_agent_dir_reference):
+        """Running update multiple times produces exactly one reference."""
+        from teambot.cli import (
+            AGENT_DIRECTORY_MARKER,
+            _update_agents_md_with_agent_directory_reference,
+        )
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text(agents_md_without_agent_dir_reference)
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        # Run multiple times
+        _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+        _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+        _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        content = agents_md.read_text()
+        count = content.count(AGENT_DIRECTORY_MARKER)
+        assert count == 1, f"Expected 1 reference, found {count}"
+
+    def test_handles_empty_file(self, tmp_path):
+        """Appends reference to empty AGENTS.md."""
+        from teambot.cli import (
+            AGENT_DIRECTORY_MARKER,
+            _update_agents_md_with_agent_directory_reference,
+        )
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("")
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        updated = _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        assert updated is True
+        content = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER in content
+
+    def test_handles_no_trailing_newline(self, tmp_path):
+        """Handles AGENTS.md without trailing newline."""
+        from teambot.cli import (
+            AGENT_DIRECTORY_MARKER,
+            _update_agents_md_with_agent_directory_reference,
+        )
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# AGENTS\n\nSome content")  # No trailing newline
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        content = agents_md.read_text()
+        # Should have proper separation
+        assert AGENT_DIRECTORY_MARKER in content
+        # Verify original content is preserved
+        assert content.startswith("# AGENTS\n\nSome content")
+
+    def test_handles_permission_error(self, tmp_path, mocker):
+        """Returns False and logs debug on permission error."""
+        from teambot.cli import _update_agents_md_with_agent_directory_reference
+
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# AGENTS\n")
+
+        results = [
+            CopyResult(source=".agent", target=tmp_path / ".agent", copied=True, reason="copied"),
+            CopyResult(
+                source="AGENTS.md",
+                target=tmp_path / "AGENTS.md",
+                copied=False,
+                reason="skipped_exists",
+            ),
+        ]
+
+        # Mock write_text to raise PermissionError
+        mocker.patch.object(Path, "write_text", side_effect=PermissionError("Access denied"))
+
+        updated = _update_agents_md_with_agent_directory_reference(results, tmp_path, display=None)
+
+        assert updated is False

@@ -350,3 +350,272 @@ class TestAcceptanceValidation:
         # Should be actionable
         assert "Git" in message
         assert "required" in message.lower()
+
+
+# ==============================================================================
+# AGENTS.md .agent Directory Reference - Acceptance Validation Tests
+# ==============================================================================
+
+
+@pytest.mark.acceptance
+class TestAgentsMdAgentDirectoryAcceptanceValidation:
+    """Strict acceptance validation tests for .agent directory reference feature.
+
+    These tests call the REAL implementation code - no mocking of core functionality.
+    """
+
+    def test_at_001_fresh_repository_with_agent_copy(self, tmp_path, monkeypatch):
+        """AT-001: User runs teambot init on repository with existing AGENTS.md.
+
+        Steps:
+        1. User runs `teambot init`
+        2. `.agent/` directory is copied (new)
+        3. `AGENTS.md` is skipped (exists)
+        4. System detects both conditions
+
+        Expected: AGENTS.md is updated with full .agent directory reference section
+        """
+        import argparse
+
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange: Create existing AGENTS.md without .agent reference
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        original_content = "# My Project\n\n## Overview\n\nThis is my project.\n"
+        agents_md.write_text(original_content)
+
+        # Act: Run teambot init
+        args = argparse.Namespace(force=False)
+        display = ConsoleDisplay()
+        result = cmd_init(args, display)
+
+        # Assert: Init succeeds
+        assert result == 0
+
+        # Assert: AGENTS.md contains the reference section
+        content = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER in content
+
+        # Assert: Original content preserved at start
+        assert content.startswith(original_content.rstrip())
+
+        # Assert: Commands table (4 entries)
+        assert "commands/azdo/azdo.generate-pr-description.prompt.md" in content
+        assert "commands/docs/docs.create-adr.prompt.md" in content
+        assert "commands/project/proj.sprint-planning.prompt.md" in content
+        assert "commands/setup/setup.agents-md-creation.prompt.md" in content
+
+        # Assert: SDD workflow table (10 entries)
+        assert "commands/sdd/README.md" in content
+        assert "commands/sdd/sdd.0-initialize.prompt.md" in content
+        assert "commands/sdd/sdd.1-create-feature-spec.prompt.md" in content
+        assert "commands/sdd/sdd.2-review-spec.prompt.md" in content
+        assert "commands/sdd/sdd.3-research-feature.prompt.md" in content
+        assert "commands/sdd/sdd.4-determine-test-strategy.prompt.md" in content
+        assert "commands/sdd/sdd.5-task-planner-for-feature.prompt.md" in content
+        assert "commands/sdd/sdd.6-review-plan.prompt.md" in content
+        assert "commands/sdd/sdd.7-task-implementer-for-feature.prompt.md" in content
+        assert "commands/sdd/sdd.8-post-implementation-review.prompt.md" in content
+
+        # Assert: Instructions table (6 entries)
+        assert "instructions/prompt.instructions.md" in content
+        assert "instructions/bash/bash.instructions.md" in content
+        assert "instructions/bash/bash.md" in content
+        assert "instructions/bicep/bicep-standards.md" in content
+        assert "instructions/bicep/bicep.instructions.md" in content
+        assert "instructions/bicep/bicep.md" in content
+
+        # Assert: Standards table (5 entries)
+        assert "standards/decision-record-standards.md" in content
+        assert "standards/decision-record-template.md" in content
+        assert "standards/feature-spec-template.md" in content
+        assert "standards/research-feature-template.md" in content
+        assert "standards/task-planning-template.md" in content
+
+    def test_at_002_rerun_after_previous_update(self, tmp_path, monkeypatch, capsys):
+        """AT-002: User runs teambot init multiple times after .agent was already copied.
+
+        Steps:
+        1. User runs `teambot init` (second time)
+        2. `.agent/` directory exists (skipped)
+        3. `AGENTS.md` exists (skipped)
+
+        Expected: No duplicate section added
+        """
+        import argparse
+
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange: Set up directory
+        monkeypatch.chdir(tmp_path)
+
+        # First run: Create AGENTS.md without reference, let init add it
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# My Project\n")
+
+        args = argparse.Namespace(force=False)
+        cmd_init(args, ConsoleDisplay())
+
+        # Verify first run added the reference
+        content_after_first = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER in content_after_first
+
+        # Remove config to allow second init run
+        (tmp_path / "teambot.json").unlink()
+
+        # Act: Second run
+        cmd_init(args, ConsoleDisplay())
+
+        # Assert: AGENTS.md contains exactly one reference section
+        content_after_second = agents_md.read_text()
+        count = content_after_second.count(AGENT_DIRECTORY_MARKER)
+        assert count == 1, f"Expected exactly 1 reference, found {count}"
+
+        # Assert: Console shows info about existing reference (captured in stdout)
+        captured = capsys.readouterr()
+        # The info message is printed by display.print_info()
+        assert (
+            "already has .agent directory reference" in captured.out
+            or content_after_first == content_after_second
+        )
+
+    def test_at_003_permission_error_handling(self, tmp_path, monkeypatch, mocker):
+        """AT-003: User runs teambot init when AGENTS.md is not writable.
+
+        Steps:
+        1. User runs `teambot init`
+        2. `.agent/` directory is copied
+        3. System attempts to update AGENTS.md
+        4. Write operation fails (permission denied)
+
+        Expected: Error logged via logging.debug(); init continues; no crash
+        """
+        import argparse
+        import logging
+        from pathlib import Path
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        # Arrange: Set up directory
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("# My Project\n")
+
+        # Mock write_text to raise PermissionError AFTER reading succeeds
+        original_write = Path.write_text
+        write_call_count = [0]
+
+        def mock_write_text(self, content, encoding=None):
+            if self.name == "AGENTS.md":
+                write_call_count[0] += 1
+                raise PermissionError("Access denied")
+            return original_write(self, content, encoding=encoding)
+
+        mocker.patch.object(Path, "write_text", mock_write_text)
+
+        # Capture debug logs
+        debug_logs = []
+        original_debug = logging.debug
+
+        def capture_debug(msg, *args, **kwargs):
+            debug_logs.append(msg)
+            return original_debug(msg, *args, **kwargs)
+
+        mocker.patch("teambot.cli.logging.debug", capture_debug)
+
+        # Act: Run teambot init - should NOT crash
+        args = argparse.Namespace(force=False)
+        display = ConsoleDisplay()
+
+        # Init should complete without raising exception
+        try:
+            result = cmd_init(args, display)
+            # Init may return non-zero due to other permission issues, but shouldn't crash
+            assert result is not None
+        except PermissionError:
+            pytest.fail("PermissionError should be caught, not raised")
+
+        # Assert: Debug log contains error message
+        assert any(".agent reference" in log or "Failed to update" in log for log in debug_logs), (
+            f"Expected debug log about permission error, got: {debug_logs}"
+        )
+
+    def test_at_004_case_insensitive_reference_detection(self, tmp_path, monkeypatch):
+        """AT-004: User has manually added .agent reference with different casing.
+
+        Steps:
+        1. User runs `teambot init`
+        2. `.agent/` directory is copied
+        3. System checks for existing reference
+
+        Expected: Detected as existing; no update performed
+        """
+        import argparse
+
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange: Create AGENTS.md with lowercase version of marker
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        lowercase_marker = AGENT_DIRECTORY_MARKER.lower()
+        original_content = f"# My Project\n\n{lowercase_marker}\n\nSome content here.\n"
+        agents_md.write_text(original_content)
+
+        # Act: Run teambot init
+        args = argparse.Namespace(force=False)
+        result = cmd_init(args, ConsoleDisplay())
+
+        # Assert: Init succeeds
+        assert result == 0
+
+        # Assert: Original content unchanged (case-insensitive detection)
+        content = agents_md.read_text()
+
+        # Should have exactly one occurrence (the original lowercase one)
+        # Not two (would mean duplicate was added)
+        count = content.lower().count(AGENT_DIRECTORY_MARKER.lower())
+        assert count == 1, f"Expected 1 reference (case-insensitive), found {count}"
+
+        # Assert: Original marker preserved
+        assert lowercase_marker in content
+
+    def test_at_005_empty_agents_md_file(self, tmp_path, monkeypatch):
+        """AT-005: User has empty AGENTS.md file.
+
+        Steps:
+        1. User runs `teambot init`
+        2. `.agent/` directory is copied
+        3. AGENTS.md is skipped (exists)
+
+        Expected: Reference section appended to empty file
+        """
+        import argparse
+
+        from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
+
+        # Arrange: Create empty AGENTS.md
+        monkeypatch.chdir(tmp_path)
+        agents_md = tmp_path / "AGENTS.md"
+        agents_md.write_text("")
+
+        # Act: Run teambot init
+        args = argparse.Namespace(force=False)
+        result = cmd_init(args, ConsoleDisplay())
+
+        # Assert: Init succeeds
+        assert result == 0
+
+        # Assert: AGENTS.md now contains the reference section
+        content = agents_md.read_text()
+        assert AGENT_DIRECTORY_MARKER in content
+
+        # Assert: File is valid markdown (contains heading)
+        # Note: Objective template may also be added, so check both exist
+        assert "## Copilot / AI Assisted Workflow" in content
+
+        # Assert: Contains expected tables
+        assert "| Path | Description |" in content
+        assert "commands/sdd/" in content
+        assert "instructions/" in content
+        assert "standards/" in content

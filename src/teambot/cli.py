@@ -44,6 +44,74 @@ teambot run objectives/my-feature.md
 ```
 """
 
+# Constants for AGENTS.md .agent directory reference update
+AGENT_DIRECTORY_MARKER = "## Copilot / AI Assisted Workflow"
+
+AGENT_DIRECTORY_SECTION = """
+## Copilot / AI Assisted Workflow
+
+- All Copilot and AI assisted workflows exist in the `.agent/` directory
+- SDD (Spec-Driven Development) workflow in `.agent/commands/sdd/`
+- Artifacts tracked in `.agent-tracking/`
+
+### `.agent` directory structure
+
+The `.agent` directory contains commands, instructions, and standards used by AI-assisted workflows.
+
+#### Commands (`commands/`)
+
+Prompt files invoked as slash commands (e.g. `/sdd:0-initialize`).
+
+| Path | Description |
+|------|-------------|
+| `commands/azdo/azdo.generate-pr-description.prompt.md` | Generates pull request descriptions using Azure DevOps templates. |
+| `commands/docs/docs.create-adr.prompt.md` | Creates architecture decision records following organisational standards. |
+| `commands/project/proj.sprint-planning.prompt.md` | Builds sprint plans for software engineering teams to deliver implementation engagements. |
+| `commands/setup/setup.agents-md-creation.prompt.md` | Generates or updates the `AGENTS.md` file for the repository. |
+
+**Spec-Driven Development (SDD) workflow** (`commands/sdd/`)
+
+A sequential workflow with quality gates for taking a feature from specification through to implementation.
+
+| Path | Description |
+|------|-------------|
+| `commands/sdd/README.md` | Documents the SDD workflow overview and its 9 sequential steps. |
+| `commands/sdd/sdd.0-initialize.prompt.md` | Initialises the SDD workflow by verifying prerequisites and creating tracking directories. |
+| `commands/sdd/sdd.1-create-feature-spec.prompt.md` | Guides creation of feature specifications with Q&A and reference integration. |
+| `commands/sdd/sdd.2-review-spec.prompt.md` | Reviews and validates specifications before the research phase. |
+| `commands/sdd/sdd.3-research-feature.prompt.md` | Conducts comprehensive research and analysis for the feature. |
+| `commands/sdd/sdd.4-determine-test-strategy.prompt.md` | Analyses specs and research to recommend an optimal testing strategy. |
+| `commands/sdd/sdd.5-task-planner-for-feature.prompt.md` | Creates actionable implementation plans for the feature. |
+| `commands/sdd/sdd.6-review-plan.prompt.md` | Reviews and validates implementation plans before execution. |
+| `commands/sdd/sdd.7-task-implementer-for-feature.prompt.md` | Implements task plans with progressive tracking and change records. |
+| `commands/sdd/sdd.8-post-implementation-review.prompt.md` | Performs post-implementation review and final validation. |
+
+#### Instructions (`instructions/`)
+
+Contextual guidelines automatically applied to AI interactions.
+
+| Path | Description |
+|------|-------------|
+| `instructions/prompt.instructions.md` | Guidelines for creating high-quality prompt files for GitHub Copilot. |
+| `instructions/bash/bash.instructions.md` | Instructions for bash script implementation with established conventions. |
+| `instructions/bash/bash.md` | Guidelines for secure, maintainable bash scripting practices. |
+| `instructions/bicep/bicep-standards.md` | Coding standards and best practices for Bicep Infrastructure as Code. |
+| `instructions/bicep/bicep.instructions.md` | Instructions for Bicep infrastructure implementation. |
+| `instructions/bicep/bicep.md` | Structural guidelines for Bicep development. |
+
+#### Standards (`standards/`)
+
+Templates and standards referenced by commands and instructions.
+
+| Path | Description |
+|------|-------------|
+| `standards/decision-record-standards.md` | Standards for creating decision records capturing architectural and policy decisions. |
+| `standards/decision-record-template.md` | Template for decision records with status, deciders, context, and consequences. |
+| `standards/feature-spec-template.md` | Template for feature specification documents with progress tracking. |
+| `standards/research-feature-template.md` | Template for task research documents with implementation analysis. |
+| `standards/task-planning-template.md` | Template for task checklists with overview and implementation instructions. |
+"""
+
 
 def _agents_md_has_template_reference(agents_md_path: Path) -> bool:
     """Check if AGENTS.md already has the objective template reference.
@@ -133,6 +201,97 @@ def _update_agents_md_with_template_reference(
         return True
     except OSError as e:
         logging.debug(f"Failed to update AGENTS.md: {e}")
+        return False
+
+
+def _agents_md_has_agent_directory_reference(agents_md_path: Path) -> bool:
+    """Check if AGENTS.md already has the .agent directory reference.
+
+    Args:
+        agents_md_path: Path to AGENTS.md file
+
+    Returns:
+        True if the .agent directory section exists, False otherwise
+    """
+    try:
+        content = agents_md_path.read_text(encoding="utf-8")
+        # Case-insensitive check to avoid duplicate sections if heading casing differs
+        return AGENT_DIRECTORY_MARKER.casefold() in content.casefold()
+    except OSError:
+        return False
+
+
+def _should_update_agents_md_with_agent_directory(results: list[CopyResult]) -> bool:
+    """Determine if AGENTS.md should be updated with .agent directory reference.
+
+    Update is triggered when:
+    1. .agent directory was successfully copied (newly added)
+    2. AGENTS.md exists but was skipped (not overwritten)
+
+    Args:
+        results: List of CopyResult from scaffold copying
+
+    Returns:
+        True if AGENTS.md should be updated
+    """
+    agent_dir_copied = False
+    agents_md_skipped = False
+
+    for result in results:
+        if result.source == ".agent" and result.copied:
+            agent_dir_copied = True
+        if result.source == "AGENTS.md" and result.reason == "skipped_exists":
+            agents_md_skipped = True
+
+    return agent_dir_copied and agents_md_skipped
+
+
+def _update_agents_md_with_agent_directory_reference(
+    results: list[CopyResult],
+    target_root: Path,
+    display: ConsoleDisplay | None,
+) -> bool:
+    """Update AGENTS.md with .agent directory reference if needed.
+
+    Only updates if:
+    1. AGENTS.md exists but was skipped (not force-overwritten)
+    2. .agent directory was successfully copied
+    3. AGENTS.md doesn't already have the .agent directory reference
+
+    Args:
+        results: Copy results from scaffold operation
+        target_root: Root directory (typically Path.cwd())
+        display: Console display for user feedback (can be None)
+
+    Returns:
+        True if AGENTS.md was updated, False if skipped
+    """
+    if not _should_update_agents_md_with_agent_directory(results):
+        return False
+
+    agents_md_path = target_root / "AGENTS.md"
+
+    if not agents_md_path.exists():
+        return False
+
+    if _agents_md_has_agent_directory_reference(agents_md_path):
+        if display:
+            display.print_info("  AGENTS.md already has .agent directory reference")
+        return False
+
+    try:
+        content = agents_md_path.read_text(encoding="utf-8")
+        # Ensure proper newline separation
+        if content and not content.endswith("\n"):
+            content += "\n"
+        content += AGENT_DIRECTORY_SECTION.strip() + "\n"
+        agents_md_path.write_text(content, encoding="utf-8")
+
+        if display:
+            display.print_success("  Updated AGENTS.md with .agent directory reference")
+        return True
+    except OSError as e:
+        logging.debug(f"Failed to update AGENTS.md with .agent reference: {e}")
         return False
 
 
@@ -553,6 +712,9 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     # Update AGENTS.md with template reference if applicable
     _update_agents_md_with_template_reference(results, Path.cwd(), display)
+
+    # Update AGENTS.md with .agent directory reference if applicable
+    _update_agents_md_with_agent_directory_reference(results, Path.cwd(), display)
 
     display.print_success("")
 
