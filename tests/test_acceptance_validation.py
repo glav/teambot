@@ -619,6 +619,8 @@ class TestAgentsMdAgentDirectoryAcceptanceValidation:
         assert "commands/sdd/" in content
         assert "instructions/" in content
         assert "standards/" in content
+
+
 # =============================================================================
 # Worktree Workflow Enhancement - Acceptance Validation Tests
 # Tests for --base-branch option and automatic objective file copying
