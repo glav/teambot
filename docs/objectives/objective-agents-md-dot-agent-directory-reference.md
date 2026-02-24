@@ -15,7 +15,7 @@
 - [ ] The update includes the FULL directory structure matching `src/teambot/scaffolds/AGENTS.md` (lines 130-191)
 - [ ] Section includes: Commands table (4 entries), SDD workflow table (10 entries), Instructions table (6 entries), Standards table (5 entries)
 - [ ] If AGENTS.md already contains a reference to `.agent` directory, no duplicate is added
-- [ ] File permission errors are handled gracefully (log warning, don't crash)
+- [ ] File permission errors are handled gracefully (log debug, don't crash)
 - [ ] All existing tests continue to pass
 - [ ] New tests cover the AGENTS.md update logic for `.agent` directory
 
