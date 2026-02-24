@@ -310,9 +310,7 @@ End of file.
         assert "standards/feature-spec-template.md" in content
         assert "standards/task-planning-template.md" in content
 
-    def test_at_012_permission_error_logged_and_init_continues(
-        self, tmp_path, monkeypatch, mocker
-    ):
+    def test_at_012_permission_error_logged_and_init_continues(self, tmp_path, monkeypatch, mocker):
         """AT-012: PermissionError on AGENTS.md write is logged; init does not crash."""
         import logging
         from pathlib import Path
@@ -352,9 +350,7 @@ End of file.
             f"Expected debug log about permission error, got: {debug_logs}"
         )
 
-    def test_at_013_case_insensitive_agent_dir_reference_detection(
-        self, tmp_path, monkeypatch
-    ):
+    def test_at_013_case_insensitive_agent_dir_reference_detection(self, tmp_path, monkeypatch):
         """AT-013: Existing .agent reference detected case-insensitively; no duplicate added."""
         from teambot.cli import AGENT_DIRECTORY_MARKER, ConsoleDisplay, cmd_init
 
