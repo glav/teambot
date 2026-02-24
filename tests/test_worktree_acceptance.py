@@ -240,3 +240,141 @@ class TestWorktreeResumeAcceptance:
         assert (context.worktree_path / "README.md").exists()
         assert (context.worktree_path / "src" / "main.py").exists()
         assert (context.worktree_path / "src" / "main.py").read_text() == "print('hello')"
+
+
+@pytest.mark.acceptance
+class TestWorktreeEnhancementAcceptance:
+    """Acceptance tests for worktree workflow enhancement (objective copy and base-branch)."""
+
+    def test_at_011_base_branch_creates_from_specified_branch(self, temp_git_repo: Path):
+        """AT-011: --base-branch main creates worktree from main branch."""
+        from teambot.worktree import WorktreeManager
+
+        # Get the default branch name (usually main or master)
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        default_branch = result.stdout.strip()
+
+        # Create a develop branch with different content
+        subprocess.run(
+            ["git", "checkout", "-b", "develop"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            check=True,
+        )
+        (temp_git_repo / "develop-only.txt").write_text("develop content")
+        subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add develop content"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Stay on develop but create worktree from the default branch
+        # The worktree should NOT have develop-only.txt since we're branching from main
+        context = WorktreeManager.create_worktree(
+            temp_git_repo, "feat/from-main", base_branch=default_branch
+        )
+
+        # Verify worktree was created from main (no develop-only.txt)
+        assert context.worktree_path.exists()
+        assert not (context.worktree_path / "develop-only.txt").exists()
+        assert (context.worktree_path / "README.md").exists()
+
+    def test_at_012_base_branch_from_develop_includes_develop_content(self, temp_git_repo: Path):
+        """AT-012: --base-branch develop creates worktree with develop content."""
+        from teambot.worktree import WorktreeManager
+
+        # Create a develop branch with different content
+        subprocess.run(
+            ["git", "checkout", "-b", "develop"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            check=True,
+        )
+        (temp_git_repo / "develop-feature.txt").write_text("feature content")
+        subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add feature on develop"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Create worktree from develop branch
+        context = WorktreeManager.create_worktree(
+            temp_git_repo, "feat/from-develop", base_branch="develop"
+        )
+
+        # Verify worktree has develop content
+        assert context.worktree_path.exists()
+        assert (context.worktree_path / "develop-feature.txt").exists()
+        assert (context.worktree_path / "develop-feature.txt").read_text() == "feature content"
+
+    def test_at_013_invalid_base_branch_raises_error(self, temp_git_repo: Path):
+        """AT-013: Non-existent base branch produces clear error."""
+        from teambot.worktree import WorktreeManager
+        from teambot.worktree.errors import WorktreeError
+
+        with pytest.raises(WorktreeError) as exc_info:
+            WorktreeManager.create_worktree(
+                temp_git_repo, "feat/test", base_branch="nonexistent-branch"
+            )
+
+        assert (
+            "nonexistent-branch" in str(exc_info.value)
+            or "not found" in str(exc_info.value).lower()
+        )
+
+    def test_at_014_base_branch_none_preserves_current_behavior(self, temp_git_repo: Path):
+        """AT-014: No --base-branch defaults to current HEAD (backward compatible)."""
+        from teambot.worktree import WorktreeManager
+
+        # Create a feature branch
+        subprocess.run(
+            ["git", "checkout", "-b", "feature/existing"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            check=True,
+        )
+        (temp_git_repo / "feature-file.txt").write_text("feature content")
+        subprocess.run(["git", "add", "."], cwd=temp_git_repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add feature file"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Create worktree without base_branch (should branch from current HEAD = feature/existing)
+        context = WorktreeManager.create_worktree(temp_git_repo, "feat/new-work")
+
+        # Worktree should have content from feature/existing
+        assert (context.worktree_path / "feature-file.txt").exists()
+
+    def test_at_015_worktree_with_branch_name_containing_slash(self, temp_git_repo: Path):
+        """AT-015: Branch names with slashes handled correctly."""
+        from teambot.worktree import WorktreeManager
+
+        # Create worktree with branch containing multiple slashes
+        context = WorktreeManager.create_worktree(
+            temp_git_repo, "feature/auth/login", base_branch=None
+        )
+
+        # Verify directory name sanitized correctly
+        assert context.worktree_path.name == "feature-auth-login"
+        assert context.branch_name == "feature/auth/login"
+
+        # Verify branch was created correctly
+        result = subprocess.run(
+            ["git", "branch", "--list", "feature/auth/login"],
+            cwd=temp_git_repo,
+            capture_output=True,
+            text=True,
+        )
+        assert "feature/auth/login" in result.stdout

@@ -406,6 +406,13 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="Branch name for worktree (default: feat/<objective-name>)",
     )
+    run_parser.add_argument(
+        "--base-branch",
+        type=str,
+        default=None,
+        metavar="BRANCH",
+        help="Branch to base the worktree on (default: current HEAD)",
+    )
 
     # status command
     subparsers.add_parser("status", help="Show TeamBot status")
@@ -581,6 +588,25 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     return 0
 
 
+def _copy_objective_to_worktree(objective: str, repo_root: Path) -> bool:
+    """Copy objective file from source repo to worktree if not already present.
+
+    Must be called from within the worktree directory (objective is a relative path).
+
+    Returns True if the objective file is available (already present or successfully copied).
+    Returns False if the file is missing from both worktree and source repo.
+    """
+    worktree_objective = Path(objective)
+    if worktree_objective.exists():
+        return True
+    source_objective = repo_root / objective
+    if not source_objective.exists():
+        return False
+    worktree_objective.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_objective, worktree_objective)
+    return True
+
+
 def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Run TeamBot with an objective."""
     import os
@@ -623,22 +649,54 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             display.print_warning("--worktree requires a Git repository.")
             return 1
 
-        # Derive branch name from objective
-        objective_path = Path(args.objective)
-        if not objective_path.exists():
-            display.print_error(f"Objective file not found: {objective_path}")
+        # Normalize objective path before chdir() so relative paths are resolved
+        # correctly from the original working directory, not from the worktree.
+        original_cwd = Path.cwd()
+        raw_objective = Path(args.objective)
+        if raw_objective.is_absolute():
+            resolved_objective = raw_objective.resolve()
+        else:
+            resolved_objective = (original_cwd / raw_objective).resolve()
+
+        # Reject paths that escape the repository root (path traversal protection)
+        try:
+            rel_objective = resolved_objective.relative_to(repo_root)
+        except ValueError:
+            display.print_error(f"Objective path must be within the repository: {args.objective}")
             return 1
 
-        branch_name = derive_branch_name(objective_path, getattr(args, "branch", None))
+        # Derive branch name from objective (path doesn't need to exist yet - may be copied)
+        branch_name = derive_branch_name(rel_objective, getattr(args, "branch", None))
 
         # Create worktree
         try:
-            worktree_context = WorktreeManager.create_worktree(repo_root, branch_name)
+            worktree_context = WorktreeManager.create_worktree(
+                repo_root,
+                branch_name,
+                base_branch=getattr(args, "base_branch", None),
+            )
             display.print_success(f"Created worktree: {worktree_context.worktree_path}")
             display.print_success(f"Branch: {worktree_context.branch_name}")
 
             # Change to worktree directory
             os.chdir(worktree_context.worktree_path)
+
+            # Check if objective exists in worktree, if not copy from source.
+            # Use the pre-resolved repo-relative path so the destination is always
+            # inside the worktree and the source is always inside repo_root.
+            worktree_objective = Path(rel_objective)
+            if not worktree_objective.exists():
+                source_objective = repo_root / rel_objective
+                if source_objective.exists():
+                    # Create parent directories if needed
+                    worktree_objective.parent.mkdir(parents=True, exist_ok=True)
+                    # Copy file to worktree
+                    shutil.copy2(source_objective, worktree_objective)
+                    display.print_success(f"Copied objective file to worktree: {rel_objective}")
+                else:
+                    display.print_error(f"Objective file not found: {rel_objective}")
+                    display.print_warning("File must exist in source repository or worktree")
+                    return 1
 
             # Update teambot_dir to be relative to new working directory
             teambot_dir = Path(".teambot")
