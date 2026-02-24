@@ -138,6 +138,99 @@ class TestCreateWorktree:
             cwd=tmp_path,
         )
 
+    def test_create_worktree_with_base_branch(self, tmp_path, mocker, mock_git_version_check):
+        """Creates worktree from specified base branch."""
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        # First call: git rev-parse --verify (validation), second call: git worktree add
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="abc1234\n", stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+        ]
+
+        WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch="main")
+
+        expected_path = str(tmp_path / ".teambot-worktrees" / "feat-task")
+        assert mock_run.call_count == 2
+        verify_call = mock_run.call_args_list[0].args[0]
+        assert verify_call == ["git", "rev-parse", "--verify", "main^{commit}"]
+        worktree_call = mock_run.call_args_list[1].args[0]
+        assert worktree_call == ["git", "worktree", "add", "-b", "feat/task", expected_path, "main"]
+
+    def test_create_worktree_base_branch_none_preserves_behavior(
+        self, tmp_path, mocker, mock_git_version_check
+    ):
+        """When base_branch is None, git command unchanged (backward compatible)."""
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch=None)
+
+        expected_path = str(tmp_path / ".teambot-worktrees" / "feat-task")
+        call_args = mock_run.call_args[0][0]
+        # Should NOT include base branch at the end
+        assert call_args == ["git", "worktree", "add", "-b", "feat/task", expected_path]
+
+    def test_create_worktree_invalid_base_branch_raises_error(
+        self, tmp_path, mocker, mock_git_version_check
+    ):
+        """Raises WorktreeError when base branch doesn't exist (detected via rev-parse --verify)."""
+        from teambot.worktree.errors import WorktreeError
+
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        # rev-parse --verify fails, indicating branch doesn't exist
+        mock_run.return_value = MagicMock(
+            returncode=128,
+            stdout="",
+            stderr="fatal: Needed a single revision",
+        )
+
+        with pytest.raises(WorktreeError) as exc_info:
+            WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch="nonexistent")
+
+        error_msg = str(exc_info.value)
+        assert "nonexistent" in error_msg
+        assert "Base branch not found" in error_msg
+
+    def test_create_worktree_invalid_base_branch_no_stderr_raises_error(
+        self, tmp_path, mocker, mock_git_version_check
+    ):
+        """Raises WorktreeError with fallback message when rev-parse --verify returns no stderr."""
+        from teambot.worktree.errors import WorktreeError
+
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        mock_run.return_value = MagicMock(returncode=128, stdout="", stderr="")
+
+        with pytest.raises(WorktreeError) as exc_info:
+            WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch="nonexistent")
+
+        error_msg = str(exc_info.value)
+        assert "nonexistent" in error_msg
+        assert "is not a valid ref" in error_msg
+
+    def test_create_worktree_base_branch_none_invalid_ref_error_is_generic(
+        self, tmp_path, mocker, mock_git_version_check
+    ):
+        """When base_branch is None, 'invalid reference' git errors surface as generic
+        WorktreeError."""
+        from teambot.worktree.errors import WorktreeError
+
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        mock_run.return_value = MagicMock(
+            returncode=128, stdout="", stderr="fatal: invalid reference: HEAD"
+        )
+
+        with pytest.raises(WorktreeError) as exc_info:
+            WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch=None)
+
+        error_msg = str(exc_info.value)
+        assert "Failed to create worktree" in error_msg
+        assert "None" not in error_msg
+
 
 class TestDetectWorktreeContext:
     """Tests for worktree context detection."""
