@@ -1,0 +1,54 @@
+{
+  "specFile": ".teambot/worktree-workflow-enhancement/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-24T00:36:00Z",
+  "currentPhase": "specification-complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "success-metrics",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries",
+    "constraints"
+  ],
+  "answeredQuestions": {
+    "product-name": "Worktree Workflow Enhancement",
+    "target-users": "TeamBot developers using worktree workflows",
+    "core-problem": "Objective files are not copied to worktrees after creation, causing execution failures",
+    "success-metrics": "Automatic file copy, base branch option, 80%+ test coverage",
+    "technical-stack": "Python 3.11+ / Click CLI",
+    "testing-approach": "TDD - Write tests first, then implement",
+    "scope-boundaries": "Single objective file handling, local branches only",
+    "constraints": "Cross-platform, backward compatible, Windows path limits"
+  },
+  "referencesProcessed": [
+    {
+      "file": ".teambot/worktree-workflow-enhancement/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Root cause identified: objective file validation before worktree creation, no migration after chdir",
+      "integratedSections": ["problem-definition", "goals", "scope", "user-stories"]
+    },
+    {
+      "file": "src/teambot/cli.py",
+      "status": "analyzed",
+      "keyFindings": "Lines 599-666 handle worktree creation, objective validation at 627-630"
+    },
+    {
+      "file": "src/teambot/worktree/manager.py",
+      "status": "analyzed",
+      "keyFindings": "WorktreeContext dataclass, create_worktree(), detect_worktree_context()"
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-complete",
+    "acceptance-tests-defined"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "testing-approach": "TDD"
+  }
+}

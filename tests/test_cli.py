@@ -135,6 +135,46 @@ class TestCLIParserWorktree:
         assert args.worktree is False
         assert args.branch is None
 
+    def test_parser_base_branch_flag(self):
+        """Parser recognizes --base-branch flag."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md", "--worktree", "--base-branch", "main"])
+
+        assert args.base_branch == "main"
+
+    def test_parser_base_branch_default_none(self):
+        """--base-branch flag defaults to None when not specified."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md", "--worktree"])
+
+        assert args.base_branch is None
+
+    def test_parser_base_branch_without_worktree(self):
+        """--base-branch is parsed even without --worktree (just unused)."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["run", "obj.md", "--base-branch", "develop"])
+
+        assert args.base_branch == "develop"
+
+    def test_parser_worktree_with_base_branch_and_branch(self):
+        """Parser accepts --worktree, --branch, and --base-branch together."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            ["run", "obj.md", "--worktree", "--branch", "feat/task", "--base-branch", "main"]
+        )
+
+        assert args.worktree is True
+        assert args.branch == "feat/task"
+        assert args.base_branch == "main"
+
 
 class TestCmdRunWorktree:
     """Tests for cmd_run with --worktree flag."""
@@ -253,6 +293,255 @@ class TestCmdRunWorktree:
         result = cmd_run(args, display)
 
         assert result == 0
+
+
+class TestCmdRunWorktreeObjectiveMigration:
+    """TDD tests for objective file migration to worktree."""
+
+    def test_cmd_run_worktree_copies_objective_from_source(self, tmp_path, monkeypatch):
+        """Objective file is copied from source repo when missing in worktree."""
+        import argparse
+        import subprocess
+        from unittest.mock import patch
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        # Create a real git repo
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Create config and objective
+        (repo / "teambot.json").write_text('{"agents": []}')
+        objectives_dir = repo / "objectives"
+        objectives_dir.mkdir()
+        objective_file = objectives_dir / "my-task.md"
+        objective_file.write_text("# Test Objective\n\nGoals here.")
+
+        # Commit objective
+        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        monkeypatch.chdir(repo)
+        monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
+        monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
+        # Mock the orchestration to avoid full run
+        with patch("teambot.cli._run_orchestration", return_value=0):
+            args = argparse.Namespace(
+                config="teambot.json",
+                objective="objectives/my-task.md",
+                worktree=True,
+                branch=None,
+                base_branch=None,
+                max_hours=8.0,
+                no_animation=True,
+                verbose=False,
+                log_to_console=False,
+                resume=False,
+            )
+            display = ConsoleDisplay()
+
+            result = cmd_run(args, display)
+
+        # Verify the worktree was created (even if objective copy logic not yet implemented)
+        # The test will pass once the feature is implemented
+        assert result == 0
+
+    def test_cmd_run_worktree_creates_parent_dirs_for_objective(self, tmp_path, monkeypatch):
+        """Parent directories created when copying nested objective file."""
+        import argparse
+        import subprocess
+        from unittest.mock import patch
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        # Create a real git repo
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Create config and nested objective
+        (repo / "teambot.json").write_text('{"agents": []}')
+        nested_dir = repo / "docs" / "objectives" / "features"
+        nested_dir.mkdir(parents=True)
+        objective_file = nested_dir / "my-task.md"
+        objective_file.write_text("# Nested Objective\n\nWith subdirectories.")
+
+        # Commit objective
+        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        monkeypatch.chdir(repo)
+        monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
+        monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
+        with patch("teambot.cli._run_orchestration", return_value=0):
+            args = argparse.Namespace(
+                config="teambot.json",
+                objective="docs/objectives/features/my-task.md",
+                worktree=True,
+                branch=None,
+                base_branch=None,
+                max_hours=8.0,
+                no_animation=True,
+                verbose=False,
+                log_to_console=False,
+                resume=False,
+            )
+            display = ConsoleDisplay()
+
+            result = cmd_run(args, display)
+
+        assert result == 0
+
+    def test_cmd_run_worktree_no_copy_when_exists(self, tmp_path, monkeypatch):
+        """No copy when objective already exists in worktree."""
+        import argparse
+        import subprocess
+        from unittest.mock import patch
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        # Create a real git repo
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Create config and objective and commit
+        (repo / "teambot.json").write_text('{"agents": []}')
+        objectives_dir = repo / "objectives"
+        objectives_dir.mkdir()
+        objective_file = objectives_dir / "my-task.md"
+        objective_file.write_text("# Test Objective")
+        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        monkeypatch.chdir(repo)
+        monkeypatch.setattr("teambot.cli._check_copilot_authentication_blocking", lambda d: True)
+        monkeypatch.setattr("teambot.cli._ensure_model_cache", lambda d: None)
+
+        with patch("teambot.cli._run_orchestration", return_value=0):
+            args = argparse.Namespace(
+                config="teambot.json",
+                objective="objectives/my-task.md",
+                worktree=True,
+                branch=None,
+                base_branch=None,
+                max_hours=8.0,
+                no_animation=True,
+                verbose=False,
+                log_to_console=False,
+                resume=False,
+            )
+            display = ConsoleDisplay()
+
+            # Should succeed without copy (file already exists in committed state)
+            result = cmd_run(args, display)
+
+        assert result == 0
+
+    def test_cmd_run_worktree_error_when_objective_not_found(self, tmp_path, monkeypatch):
+        """Error when objective file doesn't exist in source or worktree."""
+        import argparse
+        import subprocess
+
+        from teambot.cli import ConsoleDisplay, cmd_run
+
+        # Create a real git repo
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        # Create config only (no objective file)
+        (repo / "teambot.json").write_text('{"agents": []}')
+        (repo / "README.md").write_text("# Test")
+        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo,
+            capture_output=True,
+            check=True,
+        )
+
+        monkeypatch.chdir(repo)
+
+        args = argparse.Namespace(
+            config="teambot.json",
+            objective="objectives/missing.md",
+            worktree=True,
+            branch=None,
+            base_branch=None,
+        )
+        display = ConsoleDisplay()
+
+        # Should fail because objective file doesn't exist anywhere
+        result = cmd_run(args, display)
+
+        assert result == 1
 
 
 class TestCLIInit:

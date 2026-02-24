@@ -158,6 +158,7 @@ class WorktreeManager:
         repo_root: Path,
         branch_name: str,
         base_dir: str = WORKTREE_BASE_DIR,
+        base_branch: str | None = None,
     ) -> WorktreeContext:
         """Create a Git worktree with a new branch.
 
@@ -165,6 +166,7 @@ class WorktreeManager:
             repo_root: Repository root directory
             branch_name: Name of branch to create (e.g., "feat/foo")
             base_dir: Base directory for worktrees (default: .teambot-worktrees)
+            base_branch: Branch to base the worktree on (default: current HEAD)
 
         Returns:
             WorktreeContext with paths and branch info
@@ -196,8 +198,13 @@ class WorktreeManager:
         # Ensure base directory exists
         (repo_root / base_dir).mkdir(exist_ok=True)
 
+        # Build git worktree command
+        cmd = ["git", "worktree", "add", "-b", branch_name, str(worktree_path)]
+        if base_branch:
+            cmd.append(base_branch)
+
         result = subprocess.run(
-            ["git", "worktree", "add", "-b", branch_name, str(worktree_path)],
+            cmd,
             capture_output=True,
             text=True,
             cwd=repo_root,
@@ -207,6 +214,8 @@ class WorktreeManager:
             stderr = result.stderr.strip()
             if "already exists" in stderr:
                 raise BranchExistsError(branch_name)
+            if "invalid reference" in stderr or "not a valid ref" in stderr:
+                raise WorktreeError(f"Base branch not found: {base_branch}")
             raise WorktreeError(f"Failed to create worktree: {stderr}")
 
         return WorktreeContext(

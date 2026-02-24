@@ -138,6 +138,54 @@ class TestCreateWorktree:
             cwd=tmp_path,
         )
 
+    def test_create_worktree_with_base_branch(self, tmp_path, mocker, mock_git_version_check):
+        """Creates worktree from specified base branch."""
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch="main")
+
+        expected_path = str(tmp_path / ".teambot-worktrees" / "feat-task")
+        mock_run.assert_called_once_with(
+            ["git", "worktree", "add", "-b", "feat/task", expected_path, "main"],
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+        )
+
+    def test_create_worktree_base_branch_none_preserves_behavior(
+        self, tmp_path, mocker, mock_git_version_check
+    ):
+        """When base_branch is None, git command unchanged (backward compatible)."""
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+
+        WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch=None)
+
+        expected_path = str(tmp_path / ".teambot-worktrees" / "feat-task")
+        call_args = mock_run.call_args[0][0]
+        # Should NOT include base branch at the end
+        assert call_args == ["git", "worktree", "add", "-b", "feat/task", expected_path]
+
+    def test_create_worktree_invalid_base_branch_raises_error(
+        self, tmp_path, mocker, mock_git_version_check
+    ):
+        """Raises WorktreeError when base branch doesn't exist."""
+        from teambot.worktree.errors import WorktreeError
+
+        mocker.patch("teambot.worktree.manager.shutil.which", return_value="/usr/bin/git")
+        mock_run = mocker.patch("teambot.worktree.manager.subprocess.run")
+        mock_run.return_value = MagicMock(
+            returncode=128, stdout="", stderr="fatal: invalid reference: nonexistent"
+        )
+
+        with pytest.raises(WorktreeError) as exc_info:
+            WorktreeManager.create_worktree(tmp_path, "feat/task", base_branch="nonexistent")
+
+        assert "nonexistent" in str(exc_info.value) or "invalid" in str(exc_info.value).lower()
+
 
 class TestDetectWorktreeContext:
     """Tests for worktree context detection."""
