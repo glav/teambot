@@ -62,8 +62,9 @@ class TestMissingArtifactError:
         )
         message = str(error)
 
-        # Must include the artifact path
-        assert ".teambot/user-auth/artifacts/implementation_plan.md" in message
+        # Must include the artifact path (check key parts, platform-agnostic)
+        assert "implementation_plan.md" in message
+        assert "user-auth" in message
         # Must include the stage name
         assert "PLAN" in message
         # Must include recovery steps
@@ -112,7 +113,8 @@ class TestMissingArtifactError:
             recovery_steps=["Do something"],
         )
         assert isinstance(error.artifact_path, Path)
-        assert str(error.artifact_path) == "/absolute/path/to/file.md"
+        # Use as_posix() for cross-platform comparison
+        assert error.artifact_path.as_posix() == "/absolute/path/to/file.md"
 
 
 class TestArtifactValidator:
@@ -415,7 +417,7 @@ class TestArtifactPathResolution:
 
         result = validator.find_artifact("feature_spec.md")
         assert result is not None
-        assert "docs/feature-specs" in str(result)
+        assert "docs/feature-specs" in result.as_posix()
 
     def test_finds_research_in_agent_tracking(
         self, tmp_path: Path, stages_config: StagesConfiguration
@@ -439,7 +441,7 @@ class TestArtifactPathResolution:
 
         result = validator.find_artifact("research.md")
         assert result is not None
-        assert ".agent-tracking/research" in str(result)
+        assert ".agent-tracking/research" in result.as_posix()
 
     def test_prioritizes_feature_dir_over_fallback(
         self, tmp_path: Path, stages_config: StagesConfiguration
@@ -470,7 +472,7 @@ class TestArtifactPathResolution:
         result = validator.find_artifact("implementation_plan.md")
         assert result is not None
         # Should find primary location first
-        assert "my-feature/artifacts" in str(result)
+        assert "my-feature/artifacts" in result.as_posix()
 
     def test_handles_implementation_plan_locations(
         self, tmp_path: Path, stages_config: StagesConfiguration
@@ -494,7 +496,7 @@ class TestArtifactPathResolution:
 
         result = validator.find_artifact("implementation_plan.md")
         assert result is not None
-        assert ".agent-tracking/plans" in str(result)
+        assert ".agent-tracking/plans" in result.as_posix()
 
     def test_handles_test_strategy_locations(
         self, tmp_path: Path, stages_config: StagesConfiguration
@@ -518,7 +520,7 @@ class TestArtifactPathResolution:
 
         result = validator.find_artifact("test_strategy.md")
         assert result is not None
-        assert ".agent-tracking/test-strategies" in str(result)
+        assert ".agent-tracking/test-strategies" in result.as_posix()
 
     def test_returns_none_when_artifact_not_found(
         self, tmp_path: Path, stages_config: StagesConfiguration
