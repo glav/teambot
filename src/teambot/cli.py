@@ -11,10 +11,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dotenv import load_dotenv
-
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
+from teambot.env_loader import extract_env_args, load_environment
 from teambot.notifications.config import create_event_bus_from_config
 from teambot.visualization.animation import play_startup_animation
 from teambot.visualization.console import ConsoleDisplay
@@ -527,6 +526,20 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--no-animation", action="store_true", help="Disable startup animation")
+
+    # Environment file arguments (mutually exclusive)
+    env_group = parser.add_mutually_exclusive_group()
+    env_group.add_argument(
+        "--env-file",
+        type=Path,
+        metavar="PATH",
+        help="Load environment from specific .env file (disables auto-discovery)",
+    )
+    env_group.add_argument(
+        "--no-env",
+        action="store_true",
+        help="Disable all .env file loading",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -1285,8 +1298,23 @@ def cmd_status(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
 def main() -> int:
     """Main CLI entry point."""
-    # Load environment variables from .env file if it exists
-    load_dotenv()
+    # Extract env args BEFORE argparse (they affect env loading)
+    env_args, cleaned_argv = extract_env_args()
+
+    # Validate mutual exclusivity (belt-and-suspenders - argparse also checks)
+    if env_args.env_file and env_args.no_env:
+        sys.stderr.write("Error: --env-file and --no-env are mutually exclusive\n")
+        return 2
+
+    # Load environment variables from .env files
+    try:
+        load_environment(env_args.env_file, env_args.no_env)
+    except FileNotFoundError as e:
+        sys.stderr.write(f"Error: {e}\n")
+        return 1
+
+    # Update sys.argv for argparse (env args already consumed)
+    sys.argv = cleaned_argv
 
     parser = create_parser()
     args = parser.parse_args()

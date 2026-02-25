@@ -92,6 +92,23 @@ teambot run objectives/my-feature.md --worktree --branch feat/custom-name
 
 See [Worktree Isolation Guide](docs/guides/worktree-isolation.md) for detailed usage.
 
+## Environment Configuration
+
+TeamBot automatically loads environment variables from `.env` files with hierarchical discovery:
+
+```bash
+# Default: loads .env from current directory + parent directories
+teambot run objectives/my-task.md
+
+# Load from specific file only (disables auto-discovery)
+teambot --env-file /path/to/.env run objectives/my-task.md
+
+# Disable .env loading (useful for CI)
+teambot --no-env run objectives/my-task.md
+```
+
+**Precedence**: When multiple `.env` files exist, values are merged with the current directory taking precedence over parent directories.
+
 ### What `teambot init` Creates
 
 The init command sets up your project with:
