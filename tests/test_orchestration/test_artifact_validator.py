@@ -130,13 +130,17 @@ class TestArtifactValidator:
                     description="Create implementation plan",
                     work_agent="pm",
                     review_agent="reviewer",
-                    artifacts=["implementation_plan.md"],
+                    # prerequisite_artifacts = inputs required before the stage runs
+                    prerequisite_artifacts=["implementation_plan.md"],
+                    # artifacts = outputs produced by the stage (not used for pre-stage checks)
+                    artifacts=[],
                 ),
                 WorkflowStage.IMPLEMENTATION: StageConfig(
                     name="Implementation",
                     description="Execute the plan",
                     work_agent="builder-1",
                     review_agent="reviewer",
+                    prerequisite_artifacts=[],
                     artifacts=[],
                 ),
                 WorkflowStage.RESEARCH: StageConfig(
@@ -144,6 +148,8 @@ class TestArtifactValidator:
                     description="Research technical approach",
                     work_agent="builder-1",
                     review_agent=None,
+                    # No prerequisites for research; it produces research.md as output
+                    prerequisite_artifacts=[],
                     artifacts=["research.md"],
                 ),
             },
@@ -248,7 +254,7 @@ class TestArtifactValidator:
     def test_get_required_artifacts_for_stage(
         self, tmp_path: Path, stages_config: StagesConfiguration
     ) -> None:
-        """Returns list of artifacts required for a stage from config."""
+        """Returns list of prerequisite artifacts required before a stage from config."""
         from teambot.orchestration.artifact_validator import ArtifactValidator
 
         validator = ArtifactValidator(
@@ -260,7 +266,7 @@ class TestArtifactValidator:
         artifacts = validator.get_required_artifacts(WorkflowStage.PLAN)
         assert artifacts == ["implementation_plan.md"]
 
-        # Stage with no artifacts
+        # Stage with no prerequisite artifacts
         artifacts = validator.get_required_artifacts(WorkflowStage.IMPLEMENTATION)
         assert artifacts == []
 

@@ -1,7 +1,11 @@
 """Artifact validation for file-based orchestration.
 
-Validates that required artifacts exist before stage execution,
+Validates that prerequisite artifacts exist before stage execution,
 checking multiple possible locations for artifact files.
+
+Note: The 'artifacts' field on StageConfig lists outputs produced by a stage.
+      The 'prerequisite_artifacts' field lists inputs required before a stage runs.
+      This module validates prerequisite_artifacts (pre-stage checks only).
 """
 
 from __future__ import annotations
@@ -14,10 +18,13 @@ from teambot.workflow.stages import WorkflowStage
 
 
 class ArtifactValidator:
-    """Validates required artifacts exist before stage execution.
+    """Validates prerequisite artifacts exist before stage execution.
 
     Checks multiple locations for artifacts to handle path mismatches
     between where agents write and where stages expect to find files.
+
+    Only validates 'prerequisite_artifacts' (inputs required before a stage runs),
+    not 'artifacts' (outputs produced by a stage).
 
     Search order:
     1. .teambot/{feature}/artifacts/{artifact_name}
@@ -51,18 +58,21 @@ class ArtifactValidator:
         self._agent_tracking_dir = self.teambot_dir.parent / ".agent-tracking"
 
     def get_required_artifacts(self, stage: WorkflowStage) -> list[str]:
-        """Get list of required artifact filenames for a stage.
+        """Get list of prerequisite artifact filenames required before a stage runs.
+
+        These are artifacts that must exist before the stage can execute (inputs),
+        distinct from the 'artifacts' field which lists outputs produced by the stage.
 
         Args:
             stage: The workflow stage to check
 
         Returns:
-            List of artifact filenames required by the stage
+            List of artifact filenames required before the stage can run
         """
         stage_config = self.stages_config.stages.get(stage)
         if not stage_config:
             return []
-        return stage_config.artifacts
+        return stage_config.prerequisite_artifacts
 
     def find_artifact(self, artifact_name: str) -> Path | None:
         """Find artifact in possible locations.
@@ -145,7 +155,7 @@ class ArtifactValidator:
         return artifact_path
 
     def validate_all_for_stage(self, stage: WorkflowStage) -> dict[str, Path]:
-        """Validate all required artifacts for a stage.
+        """Validate all prerequisite artifacts exist before a stage runs.
 
         Args:
             stage: The workflow stage to validate
@@ -154,7 +164,7 @@ class ArtifactValidator:
             Dict mapping artifact names to their found paths
 
         Raises:
-            MissingArtifactError: If any required artifact is missing
+            MissingArtifactError: If any prerequisite artifact is missing
         """
         required = self.get_required_artifacts(stage)
         found: dict[str, Path] = {}
