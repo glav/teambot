@@ -1577,8 +1577,9 @@ This feature implements user authentication functionality.
 
         # Should halt with critical failure at PLAN_REVIEW
         failure_events = [c for c in progress_calls if c[0] == "critical_failure"]
-        if failure_events:
-            assert result == ExecutionResult.CRITICAL_FAILURE
+        assert len(failure_events) == 1
+        assert result == ExecutionResult.CRITICAL_FAILURE
+        assert loop.current_stage == WorkflowStage.PLAN_REVIEW
 
     @pytest.mark.asyncio
     async def test_continues_when_artifacts_exist(self, tmp_path: Path) -> None:
