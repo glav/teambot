@@ -1412,15 +1412,15 @@ This feature implements user authentication functionality.
 
     @pytest.fixture
     def stages_config_with_plan_artifact(self):
-        """Create stages config that requires plan artifact for IMPLEMENTATION."""
+        """Create stages config that requires plan prerequisite for IMPLEMENTATION."""
         from teambot.orchestration.stage_config import load_stages_config
 
         config = load_stages_config()
-        # Clear all artifact requirements first
+        # Clear all prerequisite requirements first
         for stage_config in config.stages.values():
-            stage_config.artifacts = []
-        # Then add plan artifact requirement to IMPLEMENTATION stage only
-        config.stages[WorkflowStage.IMPLEMENTATION].artifacts = ["plan.md"]
+            stage_config.prerequisites = []
+        # Then add plan prerequisite requirement to IMPLEMENTATION stage only
+        config.stages[WorkflowStage.IMPLEMENTATION].prerequisites = ["plan.md"]
         return config
 
     @pytest.fixture
@@ -1554,9 +1554,9 @@ This feature implements user authentication functionality.
         obj_path = tmp_path / "objective.md"
         obj_path.write_text(obj_content, encoding="utf-8")
 
-        # Configure PLAN_REVIEW to require plan artifact
+        # Configure PLAN_REVIEW to require plan prerequisite
         config = load_stages_config()
-        config.stages[WorkflowStage.PLAN_REVIEW].artifacts = ["plan.md"]
+        config.stages[WorkflowStage.PLAN_REVIEW].prerequisites = ["plan.md"]
 
         loop = ExecutionLoop(
             objective_path=obj_path,
@@ -1611,10 +1611,10 @@ This feature implements user authentication functionality.
         obj_path = tmp_path / "objective.md"
         obj_path.write_text(obj_content, encoding="utf-8")
 
-        # Clear all artifact requirements so workflow can complete
+        # Clear all prerequisite requirements so workflow can complete
         config = load_stages_config()
         for stage_config in config.stages.values():
-            stage_config.artifacts = []
+            stage_config.prerequisites = []
 
         loop = ExecutionLoop(
             objective_path=obj_path,

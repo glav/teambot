@@ -20,8 +20,9 @@ from teambot.workflow.stages import WorkflowStage
 class ArtifactValidator:
     """Validates prerequisite artifacts exist before stage execution.
 
-    Checks multiple locations for artifacts to handle path mismatches
-    between where agents write and where stages expect to find files.
+    Checks that files listed in StageConfig.prerequisites are present
+    before a stage begins. These are distinct from StageConfig.artifacts,
+    which are files *produced by* the stage (outputs).
 
     Only validates 'prerequisite_artifacts' (inputs required before a stage runs),
     not 'artifacts' (outputs produced by a stage).

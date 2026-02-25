@@ -23,6 +23,7 @@ class StageConfig:
     work_agent: str | None
     review_agent: str | None
     allowed_personas: list[str] = field(default_factory=list)
+    prerequisites: list[str] = field(default_factory=list)
     artifacts: list[str] = field(default_factory=list)
     prerequisite_artifacts: list[str] = field(default_factory=list)
     exit_criteria: list[str] = field(default_factory=list)
@@ -143,6 +144,7 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             work_agent=stage_data.get("work_agent"),
             review_agent=stage_data.get("review_agent"),
             allowed_personas=stage_data.get("allowed_personas", []),
+            prerequisites=stage_data.get("prerequisites", []),
             artifacts=stage_data.get("artifacts", []),
             prerequisite_artifacts=stage_data.get("prerequisite_artifacts", []),
             exit_criteria=stage_data.get("exit_criteria", []),
@@ -286,6 +288,8 @@ def _get_default_configuration() -> StagesConfiguration:
             work_agent=work_agent,
             review_agent=review_agent,
             allowed_personas=metadata.allowed_personas,
+            # Empty by default; prerequisites validated before stage execution
+            prerequisites=[],
             # Empty by default; artifacts only validated when explicitly configured
             artifacts=[],
             exit_criteria=[],  # Not defined in old metadata
