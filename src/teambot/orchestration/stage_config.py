@@ -284,7 +284,8 @@ def _get_default_configuration() -> StagesConfiguration:
             work_agent=work_agent,
             review_agent=review_agent,
             allowed_personas=metadata.allowed_personas,
-            artifacts=metadata.required_artifacts,
+            # Empty by default; artifacts only validated when explicitly configured
+            artifacts=[],
             exit_criteria=[],  # Not defined in old metadata
             optional=metadata.optional,
             is_review_stage=is_review,

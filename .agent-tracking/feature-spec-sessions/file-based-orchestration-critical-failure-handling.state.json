@@ -1,0 +1,66 @@
+{
+  "specFile": ".teambot/file-based-orchestration/artifacts/feature_spec.md",
+  "lastAccessed": "2026-02-25T06:44:00Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "success-metrics",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries",
+    "notification-integration",
+    "state-persistence"
+  ],
+  "answeredQuestions": {
+    "product-name": "File-Based Orchestration Critical Failure Handling",
+    "target-users": "TeamBot users running multi-agent workflows",
+    "core-problem": "Silent continuation when critical artifacts are missing",
+    "success-metrics": "Zero workflows proceed with missing critical artifacts; 100% actionable errors",
+    "technical-stack": "Python, existing notification system (Telegram)",
+    "testing-approach": "TDD - critical safety mechanisms require thorough testing before implementation",
+    "scope-boundaries": "Pre-execution validation, error messaging, notification events, path resolution",
+    "notification-integration": "New critical_failure event via existing EventBus.emit_sync",
+    "state-persistence": "Extend orchestration_state.json with failure_reason field"
+  },
+  "referencesProcessed": [
+    {
+      "file": "src/teambot/orchestration/execution_loop.py",
+      "status": "analyzed",
+      "keyFindings": "Artifact lookup returns None on missing; no pre-execution validation",
+      "integratedSections": ["problem-definition", "functional-requirements"]
+    },
+    {
+      "file": "stages.yaml",
+      "status": "analyzed",
+      "keyFindings": "Artifacts field exists per stage; can serve as source of truth",
+      "integratedSections": ["scope", "dependencies"]
+    },
+    {
+      "file": "src/teambot/notifications/templates.py",
+      "status": "analyzed",
+      "keyFindings": "Template-based notification rendering; need new critical_failure template",
+      "integratedSections": ["functional-requirements"]
+    },
+    {
+      "file": ".teambot/file-based-orchestration/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "keyFindings": "Problem definition, goals, success criteria, risks",
+      "integratedSections": ["executive-summary", "problem-definition", "risks"]
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "functional-requirements-complete",
+    "nfr-complete",
+    "acceptance-tests-defined",
+    "risks-documented"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "testing-approach": "TDD"
+  }
+}
