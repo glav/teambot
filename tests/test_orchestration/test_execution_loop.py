@@ -1416,11 +1416,11 @@ This feature implements user authentication functionality.
         from teambot.orchestration.stage_config import load_stages_config
 
         config = load_stages_config()
-        # Clear all prerequisite requirements first
+        # Clear all prerequisite_artifacts requirements first
         for stage_config in config.stages.values():
-            stage_config.prerequisites = []
-        # Then add plan prerequisite requirement to IMPLEMENTATION stage only
-        config.stages[WorkflowStage.IMPLEMENTATION].prerequisites = ["plan.md"]
+            stage_config.prerequisite_artifacts = []
+        # Then add plan prerequisite_artifacts requirement to IMPLEMENTATION stage only
+        config.stages[WorkflowStage.IMPLEMENTATION].prerequisite_artifacts = ["plan.md"]
         return config
 
     @pytest.fixture
@@ -1554,9 +1554,9 @@ This feature implements user authentication functionality.
         obj_path = tmp_path / "objective.md"
         obj_path.write_text(obj_content, encoding="utf-8")
 
-        # Configure PLAN_REVIEW to require plan prerequisite
+        # Configure PLAN_REVIEW to require plan prerequisite_artifacts
         config = load_stages_config()
-        config.stages[WorkflowStage.PLAN_REVIEW].prerequisites = ["plan.md"]
+        config.stages[WorkflowStage.PLAN_REVIEW].prerequisite_artifacts = ["plan.md"]
 
         loop = ExecutionLoop(
             objective_path=obj_path,
