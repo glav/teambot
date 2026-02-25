@@ -20,6 +20,7 @@
 #   allowed_personas  - Personas allowed at this stage; enforced via is_persona_allowed()
 #                       in state_machine.py (default: [])
 #   artifacts         - Files produced (see ARTIFACT STORAGE below) (default: [])
+#   prerequisites     - Files that must exist BEFORE the stage runs (default: [])
 #   exit_criteria     - Completion conditions (informational) (default: [])
 #   optional          - Whether stage can be skipped (default: false)
 #   is_review_stage   - Triggers review iteration loop (default: false)

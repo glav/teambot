@@ -14,10 +14,11 @@ from teambot.workflow.stages import WorkflowStage
 
 
 class ArtifactValidator:
-    """Validates required artifacts exist before stage execution.
+    """Validates prerequisite artifacts exist before stage execution.
 
-    Checks multiple locations for artifacts to handle path mismatches
-    between where agents write and where stages expect to find files.
+    Checks that files listed in StageConfig.prerequisites are present
+    before a stage begins. These are distinct from StageConfig.artifacts,
+    which are files *produced by* the stage (outputs).
 
     Search order:
     1. .teambot/{feature}/artifacts/{artifact_name}
@@ -51,18 +52,21 @@ class ArtifactValidator:
         self._agent_tracking_dir = self.teambot_dir.parent / ".agent-tracking"
 
     def get_required_artifacts(self, stage: WorkflowStage) -> list[str]:
-        """Get list of required artifact filenames for a stage.
+        """Get list of prerequisite artifact filenames for a stage.
+
+        These are files that must exist *before* the stage runs.
+        Use StageConfig.artifacts for files *produced by* the stage.
 
         Args:
             stage: The workflow stage to check
 
         Returns:
-            List of artifact filenames required by the stage
+            List of prerequisite artifact filenames required before the stage runs
         """
         stage_config = self.stages_config.stages.get(stage)
         if not stage_config:
             return []
-        return stage_config.artifacts
+        return stage_config.prerequisites
 
     def find_artifact(self, artifact_name: str) -> Path | None:
         """Find artifact in possible locations.
