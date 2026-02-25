@@ -28,9 +28,12 @@ def _mock_load_stages_config():
         # Use the real implementation
         config = real_load_config(config_path)
 
-        # Clear artifact requirements to prevent test failures
-        for stage_config in config.stages.values():
-            stage_config.artifacts = []
+        # Only clear artifact requirements when using the default (repo root)
+        # stages.yaml. Tests that explicitly provide a config_path get the
+        # real artifacts so they can test custom configurations.
+        if config_path is None:
+            for stage_config in config.stages.values():
+                stage_config.artifacts = []
 
         return config
 
