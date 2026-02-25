@@ -8,6 +8,8 @@ from teambot.orchestration.acceptance_test_executor import (
     generate_acceptance_test_report,
     parse_acceptance_tests,
 )
+from teambot.orchestration.artifact_validator import ArtifactValidator
+from teambot.orchestration.exceptions import MissingArtifactError
 from teambot.orchestration.execution_loop import ExecutionLoop, ExecutionResult
 from teambot.orchestration.objective_parser import (
     ParsedObjective,
@@ -29,6 +31,8 @@ from teambot.orchestration.stage_config import (
 from teambot.orchestration.time_manager import TimeManager
 
 __all__ = [
+    "ArtifactValidator",
+    "MissingArtifactError",
     "ParsedObjective",
     "SuccessCriterion",
     "parse_objective_file",

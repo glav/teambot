@@ -62,13 +62,16 @@ class TestExecutionLoopRun:
         return client
 
     @pytest.fixture
-    def loop(self, objective_file: Path, teambot_dir_with_spec: Path) -> ExecutionLoop:
+    def loop(
+        self, objective_file: Path, teambot_dir_with_spec: Path, test_stages_config
+    ) -> ExecutionLoop:
         """Create ExecutionLoop instance with feature spec."""
         return ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir_with_spec,
             max_hours=8.0,
+            stages_config=test_stages_config,
         )
 
     @pytest.mark.asyncio
@@ -1205,13 +1208,16 @@ class TestOrchestrationLifecycleEvents:
         return client
 
     @pytest.fixture
-    def loop(self, objective_file: Path, teambot_dir_with_spec: Path) -> ExecutionLoop:
+    def loop(
+        self, objective_file: Path, teambot_dir_with_spec: Path, test_stages_config
+    ) -> ExecutionLoop:
         """Create ExecutionLoop instance with feature spec."""
         return ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir_with_spec,
             max_hours=8.0,
+            stages_config=test_stages_config,
         )
 
     @pytest.mark.asyncio
@@ -1372,3 +1378,258 @@ class TestOrchestrationLifecycleEvents:
         assert started_idx < completed_idx
         # Started should be first event
         assert started_idx == 0
+
+
+class TestExecutionLoopArtifactValidation:
+    """Tests for artifact validation in ExecutionLoop (TDD Phase 3)."""
+
+    @pytest.fixture
+    def sample_feature_spec_content(self) -> str:
+        """Sample feature spec content."""
+        return """# Feature Specification: User Authentication
+
+## Overview
+This feature implements user authentication functionality.
+
+## Requirements
+- REQ-001: Users can log in with email and password
+"""
+
+    @pytest.fixture
+    def teambot_dir_missing_plan(self, tmp_path: Path, sample_feature_spec_content: str) -> Path:
+        """Create teambot dir with spec but missing plan artifact."""
+        dir_path = tmp_path / ".teambot"
+        dir_path.mkdir()
+        feature_dir = dir_path / "user-authentication"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text(
+            sample_feature_spec_content, encoding="utf-8"
+        )
+        # Note: No plan.md artifact - this is intentional
+        return dir_path
+
+    @pytest.fixture
+    def stages_config_with_plan_artifact(self):
+        """Create stages config that requires plan prerequisite for IMPLEMENTATION."""
+        from teambot.orchestration.stage_config import load_stages_config
+
+        config = load_stages_config()
+        # Clear all prerequisite_artifacts requirements first
+        for stage_config in config.stages.values():
+            stage_config.prerequisite_artifacts = []
+        # Then add plan prerequisite_artifacts requirement to IMPLEMENTATION stage only
+        config.stages[WorkflowStage.IMPLEMENTATION].prerequisite_artifacts = ["plan.md"]
+        return config
+
+    @pytest.fixture
+    def objective_file(self, tmp_path: Path) -> Path:
+        """Create sample objective file."""
+        content = """# Objective: Implement User Authentication
+
+## Goals
+1. Add login/logout functionality
+
+## Success Criteria
+- [ ] Login validates credentials
+"""
+        path = tmp_path / "objective.md"
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    @pytest.fixture
+    def loop_missing_plan(
+        self,
+        objective_file: Path,
+        teambot_dir_missing_plan: Path,
+        stages_config_with_plan_artifact,
+    ) -> ExecutionLoop:
+        """Create ExecutionLoop that will fail at IMPLEMENTATION due to missing plan."""
+        return ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir_missing_plan,
+            max_hours=8.0,
+            stages_config=stages_config_with_plan_artifact,
+        )
+
+    @pytest.fixture
+    def mock_sdk_client_approving(self) -> AsyncMock:
+        """Create mock SDK client that approves all reviews."""
+        client = AsyncMock()
+        client.execute_streaming.return_value = "VERIFIED_APPROVED: Work completed."
+        return client
+
+    @pytest.mark.asyncio
+    async def test_halts_on_missing_required_artifact(
+        self, loop_missing_plan: ExecutionLoop, mock_sdk_client_approving: AsyncMock
+    ) -> None:
+        """Workflow halts when required artifact is missing for stage."""
+        result = await loop_missing_plan.run(mock_sdk_client_approving)
+
+        assert result == ExecutionResult.CRITICAL_FAILURE
+        # Should not have reached COMPLETE
+        assert loop_missing_plan.current_stage != WorkflowStage.COMPLETE
+
+    @pytest.mark.asyncio
+    async def test_emits_critical_failure_event(
+        self, loop_missing_plan: ExecutionLoop, mock_sdk_client_approving: AsyncMock
+    ) -> None:
+        """Emits critical_failure event on missing artifact."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop_missing_plan.run(
+            mock_sdk_client_approving,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        failure_events = [c for c in progress_calls if c[0] == "critical_failure"]
+        assert len(failure_events) == 1
+        assert "artifact" in failure_events[0][1]
+        assert "stage" in failure_events[0][1]
+
+    @pytest.mark.asyncio
+    async def test_saves_state_on_critical_failure(
+        self, loop_missing_plan: ExecutionLoop, mock_sdk_client_approving: AsyncMock
+    ) -> None:
+        """Saves state with CRITICAL_FAILURE result."""
+        await loop_missing_plan.run(mock_sdk_client_approving)
+
+        # Check state file was saved
+        state_file = loop_missing_plan.teambot_dir / "orchestration_state.json"
+        assert state_file.exists()
+
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        assert state.get("status") == "critical_failure"
+
+    @pytest.mark.asyncio
+    async def test_error_message_includes_recovery_steps(
+        self, loop_missing_plan: ExecutionLoop, mock_sdk_client_approving: AsyncMock
+    ) -> None:
+        """Error includes actionable recovery steps."""
+        progress_calls: list[tuple[str, dict]] = []
+
+        await loop_missing_plan.run(
+            mock_sdk_client_approving,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        failure_events = [c for c in progress_calls if c[0] == "critical_failure"]
+        assert len(failure_events) == 1
+        event_data = failure_events[0][1]
+        assert "recovery_steps" in event_data
+        assert len(event_data["recovery_steps"]) > 0
+        # Should suggest running the appropriate SDD step
+        assert any("sdd" in step.lower() for step in event_data["recovery_steps"])
+
+    @pytest.mark.asyncio
+    async def test_review_stage_validates_prerequisite_artifacts(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Review stages validate prerequisite artifacts from previous work stage."""
+        from teambot.orchestration.stage_config import load_stages_config
+
+        # Setup: teambot dir with spec but missing plan (needed for PLAN_REVIEW)
+        dir_path = tmp_path / ".teambot"
+        dir_path.mkdir()
+        feature_dir = dir_path / "user-authentication"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Feature Spec\n\n## Overview\nTest feature.", encoding="utf-8"
+        )
+
+        # Create objective
+        obj_content = """# Objective: Implement User Authentication
+
+## Goals
+1. Add login
+
+## Success Criteria
+- [ ] Done
+"""
+        obj_path = tmp_path / "objective.md"
+        obj_path.write_text(obj_content, encoding="utf-8")
+
+        # Configure PLAN_REVIEW to require plan prerequisite_artifacts
+        config = load_stages_config()
+        config.stages[WorkflowStage.PLAN_REVIEW].prerequisite_artifacts = ["plan.md"]
+
+        loop = ExecutionLoop(
+            objective_path=obj_path,
+            config={},
+            teambot_dir=dir_path,
+            max_hours=8.0,
+            stages_config=config,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
+
+        progress_calls: list[tuple[str, dict]] = []
+        result = await loop.run(
+            mock_client,
+            on_progress=lambda e, d: progress_calls.append((e, d)),
+        )
+
+        # Should halt with critical failure at PLAN_REVIEW
+        failure_events = [c for c in progress_calls if c[0] == "critical_failure"]
+        assert len(failure_events) == 1
+        assert result == ExecutionResult.CRITICAL_FAILURE
+        assert loop.current_stage == WorkflowStage.PLAN_REVIEW
+
+    @pytest.mark.asyncio
+    async def test_continues_when_artifacts_exist(self, tmp_path: Path) -> None:
+        """Workflow continues normally when all required artifacts exist."""
+        from teambot.orchestration.stage_config import load_stages_config
+
+        # Setup: teambot dir with all required artifacts
+        dir_path = tmp_path / ".teambot"
+        dir_path.mkdir()
+        feature_dir = dir_path / "user-authentication"
+        feature_dir.mkdir()
+        artifacts_dir = feature_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "feature_spec.md").write_text(
+            "# Feature Spec\n\n## Overview\nTest.", encoding="utf-8"
+        )
+        (artifacts_dir / "plan.md").write_text(
+            "# Implementation Plan\n\n## Tasks\n1. Task 1", encoding="utf-8"
+        )
+
+        # Create objective
+        obj_content = """# Objective: Implement User Authentication
+
+## Goals
+1. Add login
+
+## Success Criteria
+- [ ] Done
+"""
+        obj_path = tmp_path / "objective.md"
+        obj_path.write_text(obj_content, encoding="utf-8")
+
+        # Clear all prerequisite requirements so workflow can complete
+        config = load_stages_config()
+        for stage_config in config.stages.values():
+            stage_config.prerequisites = []
+
+        loop = ExecutionLoop(
+            objective_path=obj_path,
+            config={},
+            teambot_dir=dir_path,
+            max_hours=8.0,
+            stages_config=config,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Done."
+
+        result = await loop.run(mock_client)
+
+        # Should complete successfully
+        assert result == ExecutionResult.COMPLETE
+        assert loop.current_stage == WorkflowStage.COMPLETE

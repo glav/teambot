@@ -425,3 +425,65 @@ class TestCustomMessageTemplate:
         )
         result = templates.render(event)
         assert "This is a test notification with multiple words" in result
+
+    def test_render_critical_failure(self, templates: MessageTemplates) -> None:
+        """Render critical_failure event with recovery steps."""
+        event = NotificationEvent(
+            event_type="critical_failure",
+            data={
+                "artifact": "/path/to/plan.md",
+                "stage": "IMPLEMENTATION",
+                "recovery_steps": [
+                    "Run /sdd:5-task-planner-for-feature to create the plan",
+                    "Or manually create the file at: /path/to/plan.md",
+                ],
+            },
+            feature_name="user-auth",
+        )
+
+        result = templates.render(event)
+
+        assert "CRITICAL FAILURE" in result
+        assert "user-auth" in result
+        assert "IMPLEMENTATION" in result
+        assert "plan.md" in result
+        assert "sdd:5-task-planner" in result
+        assert "1." in result  # Numbered list
+        assert "2." in result
+
+    def test_render_critical_failure_escapes_html(self, templates: MessageTemplates) -> None:
+        """Render critical_failure escapes HTML in recovery steps."""
+        event = NotificationEvent(
+            event_type="critical_failure",
+            data={
+                "artifact": "<script>alert('xss')</script>",
+                "stage": "TEST",
+                "recovery_steps": ["<b>Do not trust</b> this input"],
+            },
+            feature_name="xss-test",
+        )
+
+        result = templates.render(event)
+
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result
+        assert "<b>Do not trust</b>" not in result
+
+    def test_render_critical_failure_empty_recovery_steps(
+        self, templates: MessageTemplates
+    ) -> None:
+        """Render critical_failure with no recovery steps."""
+        event = NotificationEvent(
+            event_type="critical_failure",
+            data={
+                "artifact": "missing.md",
+                "stage": "PLAN",
+                "recovery_steps": [],
+            },
+            feature_name="test",
+        )
+
+        result = templates.render(event)
+
+        assert "CRITICAL FAILURE" in result
+        assert "No recovery steps" in result

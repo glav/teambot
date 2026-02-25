@@ -12,6 +12,8 @@ from teambot.orchestration.acceptance_test_executor import (
     AcceptanceTestResult,
     generate_acceptance_test_report,
 )
+from teambot.orchestration.artifact_validator import ArtifactValidator
+from teambot.orchestration.exceptions import MissingArtifactError
 from teambot.orchestration.objective_parser import parse_objective_file
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewStatus
 from teambot.orchestration.stage_config import (
@@ -32,6 +34,7 @@ class ExecutionResult(Enum):
     REVIEW_FAILED = "review_failed"
     ACCEPTANCE_TEST_FAILED = "acceptance_test_failed"
     ERROR = "error"
+    CRITICAL_FAILURE = "critical_failure"
 
 
 # Legacy constants for backward compatibility - prefer using StagesConfiguration
@@ -131,6 +134,13 @@ class ExecutionLoop:
         # Will be set during run()
         self.sdk_client: Any = None
         self.review_iterator: ReviewIterator | None = None
+
+        # Artifact validator for pre-stage checks
+        self.artifact_validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=self.stages_config,
+            feature_name=self.feature_name,
+        )
 
     async def run(
         self,
@@ -241,6 +251,12 @@ class ExecutionLoop:
             self._emit_completed_event(on_progress, "complete")
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
+
+        except MissingArtifactError:
+            # Critical failure - missing required artifact
+            self._emit_completed_event(on_progress, "critical_failure")
+            self._save_state(ExecutionResult.CRITICAL_FAILURE)
+            return ExecutionResult.CRITICAL_FAILURE
 
         except Exception:
             self._emit_completed_event(on_progress, "error")
@@ -791,12 +807,41 @@ class ExecutionLoop:
 
         return None
 
+    def _validate_required_artifacts(
+        self,
+        stage: WorkflowStage,
+        on_progress: Callable[[str, Any], None] | None,
+    ) -> None:
+        """Validate that all required artifacts exist for a stage.
+
+        Raises MissingArtifactError if any required artifact is missing.
+        """
+        try:
+            self.artifact_validator.validate_all_for_stage(stage)
+        except MissingArtifactError as e:
+            # Emit critical failure event
+            if on_progress:
+                on_progress(
+                    "critical_failure",
+                    {
+                        "artifact": str(e.artifact_path),
+                        "stage": e.stage,
+                        "recovery_steps": e.recovery_steps,
+                        "message": str(e),
+                    },
+                )
+            # Re-raise to halt workflow
+            raise
+
     async def _execute_work_stage(
         self,
         stage: WorkflowStage,
         on_progress: Callable[[str, Any], None] | None,
     ) -> str:
         """Execute a non-review work stage."""
+        # Validate required artifacts before execution
+        self._validate_required_artifacts(stage, on_progress)
+
         agents = self.stages_config.get_stage_agents(stage)
         work_agent = agents.get("work")
 
@@ -826,6 +871,9 @@ class ExecutionLoop:
         on_progress: Callable[[str, Any], None] | None,
     ) -> ReviewStatus:
         """Execute a review stage with iteration."""
+        # Validate required artifacts before review
+        self._validate_required_artifacts(stage, on_progress)
+
         agents = self.stages_config.get_stage_agents(stage)
         work_agent = agents.get("work") or "builder-1"
         review_agent = agents.get("review") or "reviewer"
