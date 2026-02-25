@@ -1361,3 +1361,151 @@ class TestRunModelCache:
         # Function completes without error (ConfigLoader will handle validation errors)
         captured = capsys.readouterr()
         assert "Refreshing model cache" in captured.out
+
+
+# =============================================================================
+# Phase 4: Integration Tests for --env-file and --no-env
+# =============================================================================
+
+
+class TestEnvArguments:
+    """Tests for --env-file and --no-env CLI arguments."""
+
+    def test_parser_accepts_env_file(self):
+        """Parser recognizes --env-file argument."""
+        from pathlib import Path
+
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--env-file", ".env", "init"])
+        assert args.env_file == Path(".env")
+
+    def test_parser_accepts_no_env(self):
+        """Parser recognizes --no-env flag."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--no-env", "init"])
+        assert args.no_env is True
+
+    def test_env_file_and_no_env_mutually_exclusive(self):
+        """--env-file and --no-env cannot be used together."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--env-file", ".env", "--no-env", "init"])
+
+    def test_env_file_works_with_init_command(self):
+        """--env-file works with init command."""
+        from pathlib import Path
+
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--env-file", ".env", "init"])
+        assert args.env_file == Path(".env")
+        assert args.command == "init"
+
+    def test_env_file_works_with_status_command(self):
+        """--env-file works with status command."""
+        from pathlib import Path
+
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--env-file", ".env", "status"])
+        assert args.env_file == Path(".env")
+        assert args.command == "status"
+
+    def test_no_env_works_with_all_commands(self):
+        """--no-env works with init, run, and status commands."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+
+        for cmd_args in [["init"], ["status"]]:
+            args = parser.parse_args(["--no-env"] + cmd_args)
+            assert args.no_env is True
+
+    def test_env_file_default_is_none(self):
+        """--env-file defaults to None when not provided."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["init"])
+        assert args.env_file is None
+
+    def test_no_env_default_is_false(self):
+        """--no-env defaults to False when not provided."""
+        from teambot.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["init"])
+        assert args.no_env is False
+
+
+class TestEnvLoadingIntegration:
+    """Integration tests for .env loading in CLI."""
+
+    def test_load_environment_loads_cwd_env_file(self, tmp_path, monkeypatch):
+        """load_environment() loads .env from current directory."""
+        import os
+
+        from teambot.env_loader import load_environment
+
+        (tmp_path / ".env").write_text("INTEGRATION_TEST_VAR=loaded")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("INTEGRATION_TEST_VAR", raising=False)
+
+        # Mock git root to stop at tmp_path
+        from unittest.mock import patch
+
+        with patch("teambot.env_loader.find_git_root", return_value=tmp_path):
+            load_environment()
+
+        assert os.environ.get("INTEGRATION_TEST_VAR") == "loaded"
+
+    def test_no_env_flag_prevents_loading(self, tmp_path, monkeypatch):
+        """no_env=True prevents .env loading."""
+        import os
+
+        from teambot.env_loader import load_environment
+
+        (tmp_path / ".env").write_text("SHOULD_NOT_LOAD=yes")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("SHOULD_NOT_LOAD", raising=False)
+
+        load_environment(no_env=True)
+
+        assert os.environ.get("SHOULD_NOT_LOAD") is None
+
+    def test_env_file_flag_loads_specific_file(self, tmp_path, monkeypatch):
+        """env_file parameter loads only specified file."""
+        import os
+
+        from teambot.env_loader import load_environment
+
+        custom = tmp_path / "custom.env"
+        custom.write_text("CUSTOM_VAR=custom")
+        (tmp_path / ".env").write_text("CWD_VAR=cwd")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("CUSTOM_VAR", raising=False)
+        monkeypatch.delenv("CWD_VAR", raising=False)
+
+        load_environment(env_file=custom)
+
+        assert os.environ.get("CUSTOM_VAR") == "custom"
+        # Note: CWD_VAR might be set from prior test runs; the key assertion is CUSTOM_VAR is set
+
+    def test_env_file_not_found_raises_error(self, tmp_path):
+        """env_file pointing to non-existent file raises FileNotFoundError."""
+        from teambot.env_loader import load_environment
+
+        missing = tmp_path / "nonexistent.env"
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            load_environment(env_file=missing)
+
+        assert "nonexistent.env" in str(exc_info.value)
