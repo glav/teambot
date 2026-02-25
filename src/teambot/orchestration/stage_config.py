@@ -25,6 +25,7 @@ class StageConfig:
     allowed_personas: list[str] = field(default_factory=list)
     prerequisites: list[str] = field(default_factory=list)
     artifacts: list[str] = field(default_factory=list)
+    prerequisite_artifacts: list[str] = field(default_factory=list)
     exit_criteria: list[str] = field(default_factory=list)
     optional: bool = False
     is_review_stage: bool = False
@@ -145,6 +146,7 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             allowed_personas=stage_data.get("allowed_personas", []),
             prerequisites=stage_data.get("prerequisites", []),
             artifacts=stage_data.get("artifacts", []),
+            prerequisite_artifacts=stage_data.get("prerequisite_artifacts", []),
             exit_criteria=stage_data.get("exit_criteria", []),
             optional=stage_data.get("optional", False),
             is_review_stage=stage_data.get("is_review_stage", False),
