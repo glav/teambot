@@ -1,0 +1,73 @@
+{
+  "specFile": ".teambot/sdd-prompt-sync/artifacts/feature_spec.md",
+  "lastAccessed": "2026-03-02T21:55:00Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "primary-language",
+    "testing-approach",
+    "key-constraints",
+    "success-metrics"
+  ],
+  "answeredQuestions": {
+    "product-name": "SDD Prompt Sync",
+    "target-users": "TeamBot users with customized prompt files, TeamBot maintainers shipping new stages",
+    "core-problem": "stages.yaml and SDD prompt files can drift out of sync after TeamBot upgrades, causing workflow failures",
+    "primary-language": "Python 3.11+",
+    "testing-approach": "TDD (test-driven development)",
+    "key-constraints": "Preserve existing scaffold behavior, no new dependencies, backward compatible",
+    "success-metrics": "95% of upgrades require no manual intervention, 100% of errors include fix command"
+  },
+  "referencesProcessed": [
+    {
+      "file": ".teambot/sdd-prompt-sync/artifacts/problem_statement.md",
+      "status": "analyzed",
+      "timestamp": "2026-03-02T21:54:00Z",
+      "keyFindings": "5 business goals, 6 success criteria, 4 scenarios, 3 open questions resolved",
+      "integratedSections": ["goals", "problem-definition", "scope", "risks"],
+      "conflicts": [],
+      "pendingActions": []
+    },
+    {
+      "file": "src/teambot/scaffolds.py",
+      "status": "analyzed",
+      "timestamp": "2026-03-02T21:53:00Z",
+      "keyFindings": "Current copy_scaffold_directory() treats .agent as atomic unit, CopyResult pattern for return values",
+      "integratedSections": ["technical-notes", "functional-requirements"],
+      "conflicts": [],
+      "pendingActions": []
+    },
+    {
+      "file": "stages.yaml",
+      "status": "analyzed",
+      "timestamp": "2026-03-02T21:53:00Z",
+      "keyFindings": "14 stages, 10 with prompt_template field, pattern is sdd.N-description.prompt.md",
+      "integratedSections": ["data-inputs", "acceptance-tests"],
+      "conflicts": [],
+      "pendingActions": []
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "functional-requirements-complete",
+    "non-functional-requirements-complete",
+    "acceptance-tests-defined",
+    "risks-identified",
+    "no-orphan-todos"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  },
+  "validationStatus": {
+    "placeholders": 0,
+    "sectionsComplete": "17/17",
+    "technicalStack": "DEFINED",
+    "testingApproach": "DEFINED",
+    "acceptanceTests": "6 scenarios defined"
+  }
+}
