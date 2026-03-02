@@ -121,7 +121,7 @@ The IMPLEMENTATION_REVIEW stage was designed to support iteration (`is_review_st
 1. **YAML Frontmatter**
    - description: "Implementation review - verifies task completion before code review"
    - agent: agent
-   - tools: ['read/readFile', 'search']
+   - tools: ['read/readFile', 'search', 'edit/editFiles']
 
 2. **Quick Reference Table**
    - Purpose: Verify implementation completeness before code review
