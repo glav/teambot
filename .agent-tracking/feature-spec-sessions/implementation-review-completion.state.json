@@ -1,0 +1,49 @@
+{
+  "specFile": ".teambot/implementation-review-completion/artifacts/feature_spec.md",
+  "lastAccessed": "2026-03-02T04:14:15Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "core-problem",
+    "solution-approach",
+    "target-users",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries",
+    "acceptance-criteria"
+  ],
+  "answeredQuestions": {
+    "product-name": "Implementation Review Completion Check",
+    "core-problem": "IMPLEMENTATION_REVIEW stage lacks prompt template to verify task completion before code review",
+    "solution-approach": "Create sdd.7b-implementation-review.prompt.md with blocking pre-check for task completion",
+    "target-users": "Reviewer agent, Builder agents",
+    "technical-stack": "Prompt/Markdown only - no code changes",
+    "testing-approach": "Manual validation via workflow run",
+    "scope-boundaries": "Prompt-only solution, no changes to ReviewIterator or other stages",
+    "acceptance-criteria": "Prompt verifies all plan tasks [x], rejects incomplete with specific task list"
+  },
+  "referencesProcessed": [
+    {
+      "file": "stages.yaml",
+      "status": "analyzed",
+      "keyFindings": "IMPLEMENTATION_REVIEW has is_review_stage: true but prompt_template: null at line 326"
+    },
+    {
+      "file": "docs/feature-specs/implementation-review-completion-check.md",
+      "status": "analyzed",
+      "keyFindings": "Original specification with requirements and prompt content specification"
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-complete",
+    "acceptance-tests-defined",
+    "technical-stack-documented"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}
