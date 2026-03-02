@@ -1,12 +1,7 @@
-"""Acceptance Validation Tests - Implementation Review Completion Check Feature.
+"""Acceptance tests for Implementation Review Completion Check feature.
 
-These tests call the REAL implementation code - no mocking of core functionality.
-Each test validates a specific acceptance scenario with test name `test_at_XXX_*`.
-
-Feature: IMPLEMENTATION_REVIEW stage now has a prompt template that:
-1. Verifies all plan tasks are marked [x] before code review
-2. Rejects with specific task list if incomplete tasks found
-3. Proceeds to code quality review only after pre-check passes
+These tests validate the prompt template file and stages.yaml configuration
+against the feature acceptance criteria.
 """
 
 import re
