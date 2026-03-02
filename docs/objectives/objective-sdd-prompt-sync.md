@@ -11,7 +11,7 @@
 *Part A - Incremental Sync:*
 - [ ] `teambot init` copies missing SDD prompt files to existing `.agent/commands/sdd/` directories
 - [ ] Existing user-modified SDD prompt files are preserved (not overwritten)
-- [ ] `sync_sdd_prompts()` returns `List[CopyResult]` consistent with `copy_all_scaffolds()` pattern
+- [ ] `sync_sdd_prompts()` returns `List[SyncResult]` with reasons `'copied'` / `'skipped_exists'` / `'source_missing'`, consistent with `CopyResult` vocabulary from `scaffolds.py`
 - [ ] Sync results are displayed to user (files added vs skipped)
 
 *Part B - Runtime Validation:*
@@ -36,7 +36,7 @@
 
 **Target Codebase**: `/workspaces/teambot/src/teambot/`
 
-**Primary Language/Framework**: Python 3.11+ / Click CLI
+**Primary Language/Framework**: Python 3.11+ / argparse CLI
 
 **Testing Preference**: TDD
 
@@ -66,7 +66,7 @@ The `copy_scaffold_directory()` function in `scaffolds.py` uses `shutil.copytree
 4. Report which files were added vs skipped
 5. Return appropriate `CopyResult` for new files
 
-Implementation location: `src/teambot/scaffolds.py` - new function `sync_sdd_prompts()`
+Implementation location: `src/teambot/prompt_sync.py` - function `sync_sdd_prompts()`
 
 **Part B: Runtime Validation (in `teambot run`)**
 
@@ -79,7 +79,7 @@ Implementation location: `src/teambot/scaffolds.py` - new function `sync_sdd_pro
    - Suggest running `teambot init` to sync missing prompts
    - Exit with non-zero status (exit code 1)
 
-Implementation location: `src/teambot/workflow/` - new validation function
+Implementation location: `src/teambot/prompt_sync.py` - validation functions `validate_prompt_files()` and `detect_orphaned_prompts()`
 
 ### Error Message Format
 
@@ -95,12 +95,11 @@ Run 'teambot init' to sync missing SDD prompt files.
 
 | File | Changes |
 |------|---------|
-| `src/teambot/scaffolds.py` | Add `sync_sdd_prompts()` function |
-| `src/teambot/cli.py` | Call sync after scaffold copy in `cmd_init()` |
-| `src/teambot/workflow/validation.py` | Add prompt file validation (new or existing) |
-| `src/teambot/cli.py` | Call validation in `cmd_run()` before workflow starts |
-| `tests/test_scaffolds.py` | Tests for incremental sync |
-| `tests/test_workflow/test_validation.py` | Tests for runtime validation |
+| `src/teambot/prompt_sync.py` | `sync_sdd_prompts()`, `validate_prompt_files()`, `detect_orphaned_prompts()` |
+| `src/teambot/cli.py` | Call sync in `cmd_init()`; call validation in `cmd_run()` before workflow starts |
+| `tests/test_prompt_sync.py` | Unit tests for sync and validation |
+| `tests/test_prompt_sync_acceptance.py` | Acceptance tests for sync scenarios |
+| `tests/test_prompt_sync_acceptance_validation.py` | Acceptance tests for validation/orphan detection |
 
 ### Edge Cases to Handle
 
@@ -117,7 +116,7 @@ Run 'teambot init' to sync missing SDD prompt files.
 
 ### Implementation Notes
 
-- `sync_sdd_prompts()` should return `List[CopyResult]` to maintain consistency with `copy_all_scaffolds()` pattern
+- `sync_sdd_prompts()` returns `List[SyncResult]` (defined in `prompt_sync.py`) using the same reason vocabulary as `CopyResult` from `scaffolds.py`
 - Part A and Part B are separate deliverables with independent success criteria
 - Consider whether existing `prerequisite_artifacts` mechanism in `stages.yaml` could be leveraged for validation
 

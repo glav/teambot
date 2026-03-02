@@ -172,7 +172,7 @@ work_to_review_mapping: {}
         # Verify file was overwritten
         assert len(results) == 1
         assert results[0].copied is True
-        assert results[0].reason == "added"
+        assert results[0].reason == "copied"
 
         # Verify content was replaced
         assert target_file.read_text() == default_content

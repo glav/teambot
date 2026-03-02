@@ -20,13 +20,13 @@ class TestSyncResult:
             filename="sdd.0-initialize.prompt.md",
             target=Path("/tmp/test"),
             copied=True,
-            reason="added",
+            reason="copied",
         )
 
         assert result.filename == "sdd.0-initialize.prompt.md"
         assert result.target == Path("/tmp/test")
         assert result.copied is True
-        assert result.reason == "added"
+        assert result.reason == "copied"
 
     def test_sync_result_skipped_exists_reason(self):
         """SyncResult supports skipped_exists reason."""
@@ -41,14 +41,14 @@ class TestSyncResult:
         """SyncResult is a NamedTuple with expected field order."""
         from teambot.prompt_sync import SyncResult
 
-        result = SyncResult("file.md", Path("/tmp/target"), True, "added")
+        result = SyncResult("file.md", Path("/tmp/target"), True, "copied")
 
         # Verify can be unpacked like a tuple
         filename, target, copied, reason = result
         assert filename == "file.md"
         assert target == Path("/tmp/target")
         assert copied is True
-        assert reason == "added"
+        assert reason == "copied"
 
 
 class TestSyncSddPrompts:
@@ -112,7 +112,7 @@ class TestSyncSddPrompts:
 
         assert len(results) == 1
         assert results[0].copied is True
-        assert results[0].reason == "added"
+        assert results[0].reason == "copied"
         assert results[0].filename == "sdd.0-initialize.prompt.md"
 
         # Verify file was actually copied
@@ -175,7 +175,7 @@ class TestSyncSddPrompts:
 
         assert len(results) == 1
         assert results[0].copied is True
-        assert results[0].reason == "added"
+        assert results[0].reason == "copied"
 
         # Verify content was overwritten
         assert existing_file.read_text() == scaffold_content
