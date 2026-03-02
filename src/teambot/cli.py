@@ -585,6 +585,11 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="BRANCH",
         help="Branch to base the worktree on (default: current HEAD)",
     )
+    run_parser.add_argument(
+        "--skip-prompt-validation",
+        action="store_true",
+        help="Skip validation of prompt file references in stages.yaml",
+    )
 
     # status command
     subparsers.add_parser("status", help="Show TeamBot status")
@@ -735,6 +740,28 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
 
     # Update AGENTS.md with .agent directory reference if applicable
     _update_agents_md_with_agent_directory_reference(results, Path.cwd(), display)
+
+    # Sync SDD prompt files incrementally
+    from teambot.prompt_sync import sync_sdd_prompts
+
+    display.print_success("")
+    display.print_success("=== Syncing SDD Prompt Files ===")
+
+    sync_results = sync_sdd_prompts(Path.cwd(), force=force)
+
+    if sync_results:
+        added = [r for r in sync_results if r.copied]
+        skipped = [r for r in sync_results if not r.copied]
+
+        for result in sync_results:
+            if result.copied:
+                display.print_success(f"  Added: {result.filename}")
+            else:
+                display.print_warning(f"  Skipped (exists): {result.filename}")
+
+        display.print_info(f"  Summary: {len(added)} added, {len(skipped)} skipped")
+    else:
+        display.print_warning("  No SDD prompt files to sync")
 
     display.print_success("")
 
@@ -923,6 +950,28 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         force_console=getattr(args, "log_to_console", False),
         verbose=getattr(args, "verbose", False),
     )
+
+    # Validate prompt files (unless skipped) - only for orchestration mode
+    if args.objective and not getattr(args, "skip_prompt_validation", False):
+        from teambot.prompt_sync import (
+            PromptValidationError,
+            detect_orphaned_prompts,
+            validate_prompt_files,
+        )
+
+        try:
+            validate_prompt_files(Path.cwd())
+        except PromptValidationError as e:
+            display.print_error("Validation failed:")
+            display.print_error(str(e))
+            return 1
+
+        # Warn about orphaned files (non-blocking)
+        orphaned = detect_orphaned_prompts(Path.cwd())
+        if orphaned:
+            display.print_warning("Orphaned prompt files (not referenced by any stage):")
+            for path in orphaned:
+                display.print_warning(f"  ⚠ {path}")
 
     # Resume mode
     if getattr(args, "resume", False):
