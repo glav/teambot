@@ -951,23 +951,33 @@ def cmd_run(args: argparse.Namespace, display: ConsoleDisplay) -> int:
         verbose=getattr(args, "verbose", False),
     )
 
-    # Validate prompt files (unless skipped) - only for orchestration mode
-    if args.objective and not getattr(args, "skip_prompt_validation", False):
+    # Validate prompt files (unless skipped) - for both objective mode and resume mode
+    if (args.objective or getattr(args, "resume", False)) and not getattr(
+        args, "skip_prompt_validation", False
+    ):
         from teambot.prompt_sync import (
             PromptValidationError,
             detect_orphaned_prompts,
             validate_prompt_files,
         )
 
+        # Load stages config once for both validation and orphan detection
+        _stages_config = None
+        _stages_yaml = Path.cwd() / "stages.yaml"
+        if _stages_yaml.exists():
+            from teambot.orchestration.stage_config import load_stages_config
+
+            _stages_config = load_stages_config(_stages_yaml)
+
         try:
-            validate_prompt_files(Path.cwd())
+            validate_prompt_files(Path.cwd(), _stages_config)
         except PromptValidationError as e:
             display.print_error("Validation failed:")
             display.print_error(str(e))
             return 1
 
-        # Warn about orphaned files (non-blocking)
-        orphaned = detect_orphaned_prompts(Path.cwd())
+        # Warn about orphaned files (non-blocking) - reuse already-loaded stages_config
+        orphaned = detect_orphaned_prompts(Path.cwd(), _stages_config)
         if orphaned:
             display.print_warning("Orphaned prompt files (not referenced by any stage):")
             for path in orphaned:

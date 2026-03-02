@@ -286,7 +286,7 @@ work_to_review_mapping: {}
         # Verify file was overwritten
         assert len(results) == 1
         assert results[0].copied is True, "File should have been copied"
-        assert results[0].reason == "added", f"Reason should be 'added', got {results[0].reason}"
+        assert results[0].reason == "copied", f"Reason should be 'copied', got {results[0].reason}"
 
         # Verification: MD5 equivalent - content matches scaffold
         assert target_file.read_text() == default_content, (

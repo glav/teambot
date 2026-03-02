@@ -26,7 +26,7 @@ class SyncResult(NamedTuple):
         filename: Name of the prompt file (e.g., 'sdd.0-initialize.prompt.md')
         target: Full path to target file location
         copied: True if file was copied, False if skipped
-        reason: Explanation - 'added', 'skipped_exists', or 'source_missing'
+        reason: Explanation - 'copied', 'skipped_exists', or 'source_missing'
     """
 
     filename: str
@@ -56,16 +56,28 @@ class PromptValidationError(Exception):
     Contains actionable error message with remediation steps.
     """
 
-    def __init__(self, missing: list[tuple[str, str]]):
+    def __init__(
+        self,
+        missing: list[tuple[str, str]],
+        invalid: list[tuple[str, str]] | None = None,
+    ):
         self.missing = missing
+        self.invalid = invalid or []
         super().__init__(self._format_message())
 
     def _format_message(self) -> str:
-        lines = ["Missing prompt file(s) referenced in stages.yaml:"]
-        for path, stage in self.missing:
-            lines.append(f"  - {path} (stage: {stage})")
-        lines.append("")
-        lines.append("Run 'teambot init' to sync missing SDD prompt files.")
+        lines = []
+        if self.invalid:
+            lines.append("Invalid prompt_template configuration in stages.yaml:")
+            for description, stage in self.invalid:
+                lines.append(f"  - {description} (stage: {stage})")
+            lines.append("")
+        if self.missing:
+            lines.append("Missing prompt file(s) referenced in stages.yaml:")
+            for path, stage in self.missing:
+                lines.append(f"  - {path} (stage: {stage})")
+            lines.append("")
+            lines.append("Run 'teambot init' to sync missing SDD prompt files.")
         return "\n".join(lines)
 
 
@@ -110,7 +122,7 @@ def sync_sdd_prompts(
             results.append(SyncResult(scaffold_file.name, target_file, False, "skipped_exists"))
         else:
             shutil.copy2(scaffold_file, target_file)
-            results.append(SyncResult(scaffold_file.name, target_file, True, "added"))
+            results.append(SyncResult(scaffold_file.name, target_file, True, "copied"))
 
     return results
 
@@ -141,15 +153,30 @@ def validate_prompt_files(
         stages_config = load_stages_config(stages_yaml)
 
     missing: list[tuple[str, str]] = []
+    invalid: list[tuple[str, str]] = []
 
     for stage, config in stages_config.stages.items():
         if config.prompt_template:
-            template_path = project_root / config.prompt_template
+            if not isinstance(config.prompt_template, str):
+                type_name = type(config.prompt_template).__name__
+                invalid.append(
+                    (f"Invalid prompt_template type '{type_name}' (expected str)", stage.name)
+                )
+                continue
+            template_path = (project_root / config.prompt_template).resolve()
+            # Reject paths that escape the project root (path traversal protection)
+            try:
+                template_path.relative_to(project_root.resolve())
+            except ValueError:
+                invalid.append(
+                    (f"Path escapes project root: '{config.prompt_template}'", stage.name)
+                )
+                continue
             if not template_path.exists():
                 missing.append((config.prompt_template, stage.name))
 
-    if missing:
-        raise PromptValidationError(missing)
+    if invalid or missing:
+        raise PromptValidationError(missing, invalid)
 
     return ValidationResult(valid=True, missing=[], orphaned=[])
 
@@ -176,9 +203,11 @@ def detect_orphaned_prompts(
     if stages_config is None:
         stages_config = load_stages_config(stages_yaml)
 
-    # Get all referenced prompts
+    # Get all referenced prompts (normalized to forward-slash, no leading ./)
     referenced = {
-        config.prompt_template for config in stages_config.stages.values() if config.prompt_template
+        Path(config.prompt_template).as_posix()
+        for config in stages_config.stages.values()
+        if config.prompt_template and isinstance(config.prompt_template, str)
     }
 
     # Get all SDD prompt files
@@ -188,8 +217,8 @@ def detect_orphaned_prompts(
 
     orphaned = []
     for prompt_file in sdd_dir.glob("sdd.*.prompt.md"):
-        relative_path = f".agent/commands/sdd/{prompt_file.name}"
-        if relative_path not in referenced:
-            orphaned.append(relative_path)
+        relative_path = Path(".agent/commands/sdd") / prompt_file.name
+        if relative_path.as_posix() not in referenced:
+            orphaned.append(relative_path.as_posix())
 
     return sorted(orphaned)
