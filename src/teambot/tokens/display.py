@@ -32,7 +32,7 @@ def render_token_summary(
 
     # Total line
     total_str = f"[bold]Total Tokens:[/bold] {total.total_tokens:,}"
-    if total.input_tokens and total.output_tokens:
+    if total.input_tokens is not None and total.output_tokens is not None:
         total_str += f" (prompt: {total.input_tokens:,} | completion: {total.output_tokens:,})"
     lines.append(total_str)
     lines.append("")
@@ -72,6 +72,6 @@ def render_session_summary(total: TokenUsage) -> str:
         return "Session Token Usage: n/a"
 
     result = f"Session Token Usage: {total.total_tokens:,} tokens"
-    if total.input_tokens and total.output_tokens:
+    if total.input_tokens is not None and total.output_tokens is not None:
         result += f" (prompt: {total.input_tokens:,} | completion: {total.output_tokens:,})"
     return result
