@@ -53,7 +53,18 @@ uv run teambot run --resume
 
 # Custom time limit
 uv run teambot run objectives/task.md --max-hours 4
+
+# Run in isolated Git worktree (parallel feature development)
+uv run teambot run objectives/my-feature.md --worktree
+
+# Worktree with custom branch name
+uv run teambot run objectives/my-feature.md --worktree --branch feat/custom-name
+
+# Worktree based on a specific branch
+uv run teambot run objectives/my-feature.md --worktree --base-branch develop
 ```
+
+See the [Worktree Isolation Guide](worktree-isolation.md) for full worktree usage details.
 
 ### `teambot status`
 
@@ -115,3 +126,4 @@ The `@notify` agent returns a confirmation message that downstream agents can re
 - [Getting Started](getting-started.md) - Installation and first run
 - [Interactive Mode](interactive-mode.md) - REPL details
 - [Configuration](configuration.md) - Configuration options
+- [Worktree Isolation](worktree-isolation.md) - Parallel feature development with Git worktrees
