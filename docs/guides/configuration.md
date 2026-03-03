@@ -265,6 +265,85 @@ TeamBot supports real-time notifications via external channels (e.g., Telegram).
 
 See the [Notifications Guide](notifications.md) for full setup instructions.
 
+## Logging and Debugging
+
+TeamBot provides configurable logging that adapts to your execution mode.
+
+### Default Behavior
+
+| Mode | Console Output | File Output |
+|------|---------------|-------------|
+| Interactive (`teambot run`) | ❌ Disabled | ✅ Enabled |
+| Orchestration (`teambot run objective.md`) | ✅ Enabled | ✅ Enabled |
+
+This ensures a clean interactive UI experience while preserving full logs for debugging.
+
+### Configuration Options
+
+```json
+{
+  "logging": {
+    "console_output": null,
+    "file_output": true,
+    "log_file": ".teambot/logs/teambot.log",
+    "level": "INFO"
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `console_output` | `boolean \| null` | `null` | `null` = auto (mode-dependent), `true` = always on, `false` = always off |
+| `file_output` | `boolean` | `true` | Enable file logging |
+| `log_file` | `string` | `.teambot/logs/teambot.log` | Log file path |
+| `level` | `string` | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
+
+### CLI Override
+
+Force console output in interactive mode for debugging:
+
+```bash
+teambot run --log-to-console
+```
+
+Enable verbose (DEBUG level) logging:
+
+```bash
+teambot run -v
+# or
+teambot run --verbose
+```
+
+### Examples
+
+**Disable all file logging:**
+```json
+{
+  "logging": {
+    "file_output": false
+  }
+}
+```
+
+**Always show console output (even in interactive mode):**
+```json
+{
+  "logging": {
+    "console_output": true
+  }
+}
+```
+
+**Custom log file location:**
+```json
+{
+  "logging": {
+    "log_file": "logs/teambot-debug.log",
+    "level": "DEBUG"
+  }
+}
+```
+
 ---
 
 ## Next Steps

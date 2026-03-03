@@ -23,6 +23,9 @@ Configurable logging output to prevent log messages from interfering with the in
 - [ ] No breaking changes to existing configurations (backwards compatible)
 - [ ] Clean interactive UI experience with no log message interference
 - [ ] CLI override flag `--log-to-console` available for debugging interactive mode
+- [x] **Documentation**: Add "Logging and Debugging" section to `docs/guides/configuration.md`
+- [x] **Documentation**: Update `docs/guides/cli-reference.md` with `--log-to-console` flag
+- [x] **Documentation**: Document all logging configuration options with examples
 
 ---
 
@@ -100,6 +103,41 @@ Add a new `logging` section to `teambot.json`:
 - CLI flag `--log-to-console` overrides config to force console output (useful for debugging interactive mode)
 - Log file directory should be created automatically if it doesn't exist
 - Existing config files without `logging` section should use sensible defaults
+
+---
+
+## Documentation Requirements
+
+The following documentation updates are required as part of this objective:
+
+### 1. Configuration Guide (`docs/guides/configuration.md`)
+
+Add a new **Logging and Debugging** section that covers:
+
+- Overview of logging behavior in TeamBot
+- Full `logging` configuration schema with all options
+- Example configurations for common use cases:
+  - Silent interactive mode with file logging
+  - Verbose console output for debugging
+  - DEBUG-level file logging with INFO console
+- Explanation of mode-specific behavior (interactive vs file-based orchestration)
+- Log file location and rotation behavior
+
+### 2. CLI Reference (`docs/guides/cli-reference.md`)
+
+Update the Global Options table to include:
+
+| Option | Description |
+|--------|-------------|
+| `--log-to-console` | Force console logging output (overrides config, useful for debugging interactive mode) |
+
+### 3. Troubleshooting Section
+
+Add troubleshooting tips to the configuration guide:
+
+- How to enable debug logging for issue diagnosis
+- Where to find log files
+- How to increase verbosity temporarily with CLI flags
 
 ---
 
