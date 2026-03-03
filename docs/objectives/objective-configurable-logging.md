@@ -23,9 +23,9 @@ Configurable logging output to prevent log messages from interfering with the in
 - [ ] No breaking changes to existing configurations (backwards compatible)
 - [ ] Clean interactive UI experience with no log message interference
 - [ ] CLI override flag `--log-to-console` available for debugging interactive mode
-- [ ] **Documentation**: Add "Logging and Debugging" section to `docs/guides/configuration.md`
-- [ ] **Documentation**: Update `docs/guides/cli-reference.md` with `--log-to-console` flag
-- [ ] **Documentation**: Document all logging configuration options with examples
+- [x] **Documentation**: Add "Logging and Debugging" section to `docs/guides/configuration.md`
+- [x] **Documentation**: Update `docs/guides/cli-reference.md` with `--log-to-console` flag
+- [x] **Documentation**: Document all logging configuration options with examples
 
 ---
 
