@@ -717,7 +717,7 @@ class TestCopilotSDKClientSessionRetry:
             client = CopilotSDKClient()
             await client.start()
 
-            result = await client.execute_streaming("pm", "Create a plan")
+            result, token_usage = await client.execute_streaming("pm", "Create a plan")
             assert result == "Retry success"
             assert mock_client.create_session.call_count == 2
 
@@ -795,7 +795,7 @@ class TestCopilotSDKClientSessionRetry:
             client = CopilotSDKClient()
             await client.start()
 
-            result = await client.execute_streaming("pm", "Do something")
+            result, token_usage = await client.execute_streaming("pm", "Do something")
             assert result == "Fixed"
 
     @pytest.mark.asyncio

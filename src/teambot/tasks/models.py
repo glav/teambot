@@ -1,8 +1,14 @@
 """Task models for parallel execution."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from teambot.tokens.models import TokenUsage
 
 
 class TaskStatus(Enum):
@@ -40,6 +46,7 @@ class TaskResult:
         success: Whether the task succeeded.
         error: Error message if failed.
         completed_at: When the task completed.
+        token_usage: Token usage from this task (may be None if unavailable).
     """
 
     task_id: str
@@ -47,6 +54,57 @@ class TaskResult:
     success: bool
     error: str | None = None
     completed_at: datetime = field(default_factory=datetime.now)
+    token_usage: TokenUsage | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert TaskResult to dictionary for serialization.
+
+        Returns:
+            Dictionary representation of this TaskResult.
+        """
+        result: dict[str, Any] = {
+            "task_id": self.task_id,
+            "output": self.output,
+            "success": self.success,
+            "error": self.error,
+            "completed_at": self.completed_at.isoformat(),
+        }
+        if self.token_usage is not None:
+            result["token_usage"] = self.token_usage.to_dict()
+        else:
+            result["token_usage"] = None
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> TaskResult:
+        """Create TaskResult from dictionary.
+
+        Args:
+            data: Dictionary with TaskResult fields.
+
+        Returns:
+            TaskResult instance.
+        """
+        from teambot.tokens.models import TokenUsage
+
+        token_usage = None
+        if "token_usage" in data and data["token_usage"] is not None:
+            token_usage = TokenUsage.from_dict(data["token_usage"])
+
+        completed_at = data.get("completed_at")
+        if isinstance(completed_at, str):
+            completed_at = datetime.fromisoformat(completed_at)
+        elif completed_at is None:
+            completed_at = datetime.now()
+
+        return cls(
+            task_id=data["task_id"],
+            output=data["output"],
+            success=data["success"],
+            error=data.get("error"),
+            completed_at=completed_at,
+            token_usage=token_usage,
+        )
 
 
 @dataclass

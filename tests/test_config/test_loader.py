@@ -865,3 +865,69 @@ class TestLoggingConfigValidation:
         assert config["notifications"]["enabled"] is False
         # Logging defaults applied
         assert "logging" in config
+
+
+class TestTokenTrackingConfigValidation:
+    """Tests for token_tracking configuration validation."""
+
+    def test_token_tracking_defaults_enabled(self, tmp_path):
+        """Token tracking defaults to enabled."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert "token_tracking" in config
+        assert config["token_tracking"]["enabled"] is True
+
+    def test_token_tracking_can_be_disabled(self, tmp_path):
+        """Token tracking can be disabled via config."""
+        from teambot.config.loader import ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "token_tracking": {"enabled": False},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        config = loader.load(config_file)
+
+        assert config["token_tracking"]["enabled"] is False
+
+    def test_token_tracking_not_object_raises(self, tmp_path):
+        """Token tracking must be an object."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "token_tracking": "invalid",
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'token_tracking' must be an object"):
+            loader.load(config_file)
+
+    def test_token_tracking_enabled_not_bool_raises(self, tmp_path):
+        """Token tracking enabled must be a boolean."""
+        from teambot.config.loader import ConfigError, ConfigLoader
+
+        config_data = {
+            "agents": [{"id": "pm", "persona": "project_manager"}],
+            "token_tracking": {"enabled": "yes"},
+        }
+        config_file = tmp_path / "teambot.json"
+        config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+        loader = ConfigLoader()
+        with pytest.raises(ConfigError, match="'token_tracking.enabled' must be a boolean"):
+            loader.load(config_file)

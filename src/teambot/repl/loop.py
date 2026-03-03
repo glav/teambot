@@ -3,8 +3,11 @@
 Provides the main read-eval-print loop for interactive commands.
 """
 
+from __future__ import annotations
+
 import asyncio
 import signal
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
@@ -25,6 +28,9 @@ from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor, is_pseudo_agent
 from teambot.tasks.models import Task, TaskResult
 from teambot.ui.agent_state import AgentStatusManager
+
+if TYPE_CHECKING:
+    from teambot.tokens.tracker import TokenTracker
 
 
 class REPLLoop:
@@ -71,6 +77,15 @@ class REPLLoop:
         # Task executor for parallel execution
         self._executor: TaskExecutor | None = None
 
+        # Token tracking for session
+        self._token_tracker: TokenTracker | None = None
+        if config:
+            token_tracking_config = config.get("token_tracking", {})
+            if token_tracking_config.get("enabled", True):
+                from teambot.tokens.tracker import TokenTracker
+
+                self._token_tracker = TokenTracker()
+
         # Wire up handlers
         self._router.register_agent_handler(self._handle_agent_command)
         self._router.register_system_handler(self._commands.dispatch)
@@ -95,7 +110,23 @@ class REPLLoop:
             return "[red]SDK not connected. Please rebuild the devcontainer.[/red]"
 
         try:
-            response = await self._sdk_client.execute(agent_id, content)
+            result = await self._sdk_client.execute_streaming(agent_id, content, None)
+
+            # Handle both old (string) and new (tuple) return types
+            if isinstance(result, tuple):
+                response, token_usage = result
+            else:
+                response = result
+                token_usage = None
+
+            # Record token usage if tracking enabled
+            if self._token_tracker and token_usage:
+                self._token_tracker.record(
+                    token_usage,
+                    agent_id=agent_id,
+                    stage="INTERACTIVE",
+                )
+
             return response
         except SDKClientError as e:
             error_msg = str(e)
@@ -396,6 +427,14 @@ class REPLLoop:
     async def _cleanup(self) -> None:
         """Clean up resources."""
         self._restore_signal_handlers()
+
+        # Display token usage summary if tracking enabled
+        if self._token_tracker:
+            from teambot.tokens.display import render_session_summary
+
+            total = self._token_tracker.get_total()
+            summary = render_session_summary(total)
+            self._console.print(f"\n[dim]{summary}[/dim]")
 
         if self._sdk_client:
             try:

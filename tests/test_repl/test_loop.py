@@ -58,9 +58,9 @@ class TestREPLHandlers:
 
     @pytest.mark.asyncio
     async def test_agent_handler_calls_sdk(self):
-        """Test agent handler calls SDK execute with raw content."""
+        """Test agent handler calls SDK execute_streaming with raw content."""
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(return_value="Response")
+        mock_sdk.execute_streaming = AsyncMock(return_value=("Response", None))
         mock_console = MagicMock()
 
         repl = REPLLoop(console=mock_console, sdk_client=mock_sdk)
@@ -68,7 +68,7 @@ class TestREPLHandlers:
         result = await repl._handle_agent_command("pm", "Create plan")
 
         # SDK called with raw content - custom agents handle persona
-        mock_sdk.execute.assert_called_once_with("pm", "Create plan")
+        mock_sdk.execute_streaming.assert_called_once_with("pm", "Create plan", None)
         assert result == "Response"
 
     @pytest.mark.asyncio
@@ -77,7 +77,7 @@ class TestREPLHandlers:
         from teambot.copilot.sdk_client import SDKClientError
 
         mock_sdk = AsyncMock()
-        mock_sdk.execute = AsyncMock(side_effect=SDKClientError("Connection failed"))
+        mock_sdk.execute_streaming = AsyncMock(side_effect=SDKClientError("Connection failed"))
         mock_console = MagicMock()
 
         repl = REPLLoop(console=mock_console, sdk_client=mock_sdk)

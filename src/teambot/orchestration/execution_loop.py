@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from teambot.orchestration.acceptance_test_executor import (
     AcceptanceTestExecutor,
@@ -23,6 +23,9 @@ from teambot.orchestration.stage_config import (
 )
 from teambot.orchestration.time_manager import TimeManager
 from teambot.workflow.stages import STAGE_METADATA, WorkflowStage
+
+if TYPE_CHECKING:
+    from teambot.tokens.tracker import TokenTracker
 
 
 class ExecutionResult(Enum):
@@ -142,6 +145,14 @@ class ExecutionLoop:
             feature_name=self.feature_name,
         )
 
+        # Token tracking (initialize if enabled in config)
+        self._token_tracker: TokenTracker | None = None
+        token_tracking_config = config.get("token_tracking", {})
+        if token_tracking_config.get("enabled", True):
+            from teambot.tokens.tracker import TokenTracker
+
+            self._token_tracker = TokenTracker()
+
     async def run(
         self,
         sdk_client: Any,
@@ -180,12 +191,14 @@ class ExecutionLoop:
                 # Check cancellation
                 if self.cancelled:
                     self._emit_completed_event(on_progress, "cancelled")
+                    self._display_token_summary()
                     self._save_state(ExecutionResult.CANCELLED)
                     return ExecutionResult.CANCELLED
 
                 # Check timeout
                 if self.time_manager.is_expired():
                     self._emit_completed_event(on_progress, "timeout")
+                    self._display_token_summary()
                     self._save_state(ExecutionResult.TIMEOUT)
                     return ExecutionResult.TIMEOUT
 
@@ -231,12 +244,14 @@ class ExecutionLoop:
                             "acceptance tests have not been executed or did not pass."
                         )
                         self._emit_completed_event(on_progress, "acceptance_test_failed")
+                        self._display_token_summary()
                         self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
                         return ExecutionResult.ACCEPTANCE_TEST_FAILED
 
                     result = await self._execute_review_stage(stage, on_progress)
                     if result == ReviewStatus.FAILED:
                         self._emit_completed_event(on_progress, "review_failed")
+                        self._display_token_summary()
                         self._save_state(ExecutionResult.REVIEW_FAILED)
                         return ExecutionResult.REVIEW_FAILED
                 else:
@@ -249,17 +264,20 @@ class ExecutionLoop:
                 self._save_state()
 
             self._emit_completed_event(on_progress, "complete")
+            self._display_token_summary()
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
         except MissingArtifactError:
             # Critical failure - missing required artifact
             self._emit_completed_event(on_progress, "critical_failure")
+            self._display_token_summary()
             self._save_state(ExecutionResult.CRITICAL_FAILURE)
             return ExecutionResult.CRITICAL_FAILURE
 
         except Exception:
             self._emit_completed_event(on_progress, "error")
+            self._display_token_summary()
             self._save_state(ExecutionResult.ERROR)
             raise
 
@@ -288,6 +306,24 @@ class ExecutionLoop:
                     "duration_seconds": self.time_manager.elapsed_seconds,
                 },
             )
+
+    def _display_token_summary(self) -> None:
+        """Display token usage summary at end of run."""
+        if not self._token_tracker:
+            return
+
+        from rich.console import Console
+
+        from teambot.tokens.display import render_token_summary
+
+        console = Console()
+        panel = render_token_summary(
+            self._token_tracker.get_total(),
+            self._token_tracker.get_by_agent(),
+            self._token_tracker.get_by_stage(),
+        )
+        console.print()  # Add blank line before summary
+        console.print(panel)
 
     def _get_parallel_group_for_stage(self, stage: WorkflowStage) -> ParallelGroupConfig | None:
         """Find parallel group that starts with this stage.
@@ -775,7 +811,22 @@ class ExecutionLoop:
         if on_progress:
             on_progress("agent_running", {"agent_id": fix_agent, "task": "fix_acceptance_tests"})
 
-        output = await self.sdk_client.execute_streaming(fix_agent, context, None)
+        result = await self.sdk_client.execute_streaming(fix_agent, context, None)
+
+        # Handle both old (string) and new (tuple) return types for test compatibility
+        if isinstance(result, tuple):
+            output, token_usage = result
+        else:
+            output = result
+            token_usage = None
+
+        # Record token usage if tracker enabled
+        if self._token_tracker and token_usage:
+            self._token_tracker.record(
+                token_usage,
+                agent_id=fix_agent,
+                stage="ACCEPTANCE_TEST",
+            )
 
         if on_progress:
             on_progress("agent_complete", {"agent_id": fix_agent})
@@ -854,8 +905,23 @@ class ExecutionLoop:
         # Build context from objective, persona, and prior stage outputs
         context = self._build_stage_context(stage, work_agent)
 
-        # Execute the agent
-        output = await self.sdk_client.execute_streaming(work_agent, context, None)
+        # Execute the agent (returns tuple with token usage in real SDK)
+        result = await self.sdk_client.execute_streaming(work_agent, context, None)
+
+        # Handle both old (string) and new (tuple) return types for test compatibility
+        if isinstance(result, tuple):
+            output, token_usage = result
+        else:
+            output = result
+            token_usage = None
+
+        # Record token usage if tracker enabled
+        if self._token_tracker and token_usage:
+            self._token_tracker.record(
+                token_usage,
+                agent_id=work_agent,
+                stage=stage.name,
+            )
 
         # Store output for later stages
         self.stage_outputs[stage] = output
@@ -1097,7 +1163,7 @@ class ExecutionLoop:
         else:
             status = "in_progress"
 
-        state = {
+        state: dict[str, Any] = {
             "objective_file": str(self.objective_path),
             "current_stage": self.current_stage.name,
             "elapsed_seconds": self.time_manager.elapsed_seconds,
@@ -1114,6 +1180,10 @@ class ExecutionLoop:
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
             "parallel_group_status": self.parallel_group_status,
         }
+
+        # Add token tracking data if tracker enabled
+        if self._token_tracker:
+            state["token_tracking"] = self._token_tracker.to_dict()
 
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 

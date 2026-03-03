@@ -1,13 +1,18 @@
 """Copilot SDK client wrapper for TeamBot interactive mode."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from teambot.copilot.agent_loader import get_agent_loader
+
+if TYPE_CHECKING:
+    from teambot.tokens.models import TokenUsage
 
 
 @dataclass
@@ -394,14 +399,17 @@ User request: {user_prompt}"""
                 raise SDKClientError(f"SDK error: {e}") from e
 
         # Use streaming (default) - persona injection happens in execute_streaming
-        return await self.execute_streaming(agent_id, prompt, on_chunk=lambda _: None)
+        result, _token_usage = await self.execute_streaming(
+            agent_id, prompt, on_chunk=lambda _: None
+        )
+        return result
 
     async def execute_streaming(
         self,
         agent_id: str,
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
-    ) -> str:
+    ) -> tuple[str, TokenUsage | None]:
         """Execute a prompt with streaming output.
 
         Sends prompt and streams response chunks via callback.
@@ -415,11 +423,13 @@ User request: {user_prompt}"""
             on_chunk: Optional callback invoked for each streaming chunk.
 
         Returns:
-            Complete accumulated response content.
+            Tuple of (response_text, token_usage). token_usage may be None.
 
         Raises:
             SDKClientError: If client is not started or error occurs.
         """
+        # Import here to avoid circular import at module load
+
         if not self._started:
             raise SDKClientError("Client not started - call start() first")
 
@@ -437,8 +447,15 @@ User request: {user_prompt}"""
         agent_id: str,
         prompt: str,
         on_chunk: Callable[[str], None] | None = None,
-    ) -> str:
-        """Execute a single streaming attempt (no retry)."""
+    ) -> tuple[str, TokenUsage | None]:
+        """Execute a single streaming attempt (no retry).
+
+        Returns:
+            Tuple of (response_text, token_usage). token_usage may be None if unavailable.
+        """
+        # Import here to avoid circular import
+        from teambot.tokens.extraction import extract_tokens_from_event_data
+
         session = await self.get_or_create_session(agent_id)
 
         # Inject agent persona into the prompt
@@ -447,6 +464,7 @@ User request: {user_prompt}"""
         accumulated: list[str] = []
         done = asyncio.Event()
         error_holder: list[Exception | None] = [None]
+        usage_holder: list[TokenUsage | None] = [None]
 
         def on_event(event):
             """Handle streaming events from SDK."""
@@ -478,6 +496,11 @@ User request: {user_prompt}"""
                     if on_chunk:
                         on_chunk(delta_content)
                     logger.debug(f"Chunk received: {delta_content[:50]}...")
+
+            # Capture token usage from ASSISTANT_USAGE event
+            elif "ASSISTANT_USAGE" in event_type_upper:
+                usage_holder[0] = extract_tokens_from_event_data(event.data)
+                logger.debug(f"Token usage captured: {usage_holder[0]}")
 
             # Check for completion events
             elif "SESSION_IDLE" in event_type_upper:
@@ -524,7 +547,7 @@ User request: {user_prompt}"""
             if error_holder[0]:
                 raise error_holder[0]
 
-            return "".join(accumulated)
+            return "".join(accumulated), usage_holder[0]
 
         finally:
             # Always unsubscribe to prevent memory leaks

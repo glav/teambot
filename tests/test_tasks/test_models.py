@@ -167,6 +167,113 @@ class TestTaskResult:
         assert isinstance(result.completed_at, datetime)
 
 
+class TestTaskResultTokenUsage:
+    """Tests for TaskResult token_usage field."""
+
+    def test_task_result_with_token_usage(self):
+        """TaskResult can be created with TokenUsage."""
+        from teambot.tokens.models import TokenUsage
+
+        token_usage = TokenUsage(input_tokens=100, output_tokens=200)
+        result = TaskResult(
+            task_id="t1",
+            output="Response",
+            success=True,
+            token_usage=token_usage,
+        )
+
+        assert result.token_usage is not None
+        assert result.token_usage.input_tokens == 100
+        assert result.token_usage.output_tokens == 200
+        assert result.token_usage.total_tokens == 300
+
+    def test_task_result_without_token_usage(self):
+        """TaskResult with no token_usage defaults to None."""
+        result = TaskResult(task_id="t1", output="Response", success=True)
+
+        assert result.token_usage is None
+
+    def test_task_result_backward_compat(self):
+        """Existing TaskResult instantiation unchanged."""
+        # Original positional/keyword args should work
+        result = TaskResult(
+            task_id="t1",
+            output="Response",
+            success=True,
+            error=None,
+        )
+
+        assert result.task_id == "t1"
+        assert result.output == "Response"
+        assert result.success is True
+        assert result.error is None
+        # New field should have default
+        assert result.token_usage is None
+
+    def test_task_result_serialization_with_tokens(self):
+        """TaskResult serializes token_usage to dict."""
+        from teambot.tokens.models import TokenUsage
+
+        token_usage = TokenUsage(
+            input_tokens=100,
+            output_tokens=200,
+            cache_read_tokens=50,
+            cache_write_tokens=25,
+        )
+        result = TaskResult(
+            task_id="t1",
+            output="Response",
+            success=True,
+            token_usage=token_usage,
+        )
+
+        # Verify to_dict method works with token_usage
+        result_dict = result.to_dict()
+        assert "token_usage" in result_dict
+        assert result_dict["token_usage"]["input_tokens"] == 100
+        assert result_dict["token_usage"]["output_tokens"] == 200
+        assert result_dict["token_usage"]["cache_read_tokens"] == 50
+        assert result_dict["token_usage"]["cache_write_tokens"] == 25
+
+    def test_task_result_deserialization_missing_tokens(self):
+        """TaskResult from_dict handles missing token_usage (old data)."""
+        # Simulate old JSON data without token_usage
+        old_data = {
+            "task_id": "t1",
+            "output": "Response",
+            "success": True,
+            "error": None,
+            "completed_at": "2025-01-01T00:00:00",
+        }
+
+        result = TaskResult.from_dict(old_data)
+        assert result.task_id == "t1"
+        assert result.output == "Response"
+        assert result.token_usage is None
+
+    def test_task_result_deserialization_with_tokens(self):
+        """TaskResult from_dict loads token_usage correctly."""
+        data = {
+            "task_id": "t1",
+            "output": "Response",
+            "success": True,
+            "error": None,
+            "completed_at": "2025-01-01T00:00:00",
+            "token_usage": {
+                "input_tokens": 150,
+                "output_tokens": 250,
+                "cache_read_tokens": None,
+                "cache_write_tokens": None,
+            },
+        }
+
+        result = TaskResult.from_dict(data)
+        assert result.token_usage is not None
+        assert result.token_usage.input_tokens == 150
+        assert result.token_usage.output_tokens == 250
+        assert result.token_usage.total_tokens == 400
+
+
 class TestTaskModel:
     """Tests for model field in Task."""
 
