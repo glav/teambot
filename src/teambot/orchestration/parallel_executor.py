@@ -67,8 +67,11 @@ class ParallelExecutor:
                                 "agent_streaming", {"agent_id": task.agent_id, "chunk": chunk}
                             )
 
-                    output = await self.sdk_client.execute_streaming(
+                    _result = await self.sdk_client.execute_streaming(
                         task.agent_id, task.prompt, on_chunk
+                    )
+                    output, _token_usage = (
+                        _result if isinstance(_result, tuple) else (_result, None)
                     )
 
                     if on_progress:
