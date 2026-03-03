@@ -1,94 +1,111 @@
 <!-- markdownlint-disable-file -->
-# Task Research Document: Configurable Logging Output
+# Task Research Document: Configurable Logging for TeamBot
 
-This research analyzes the implementation approach for configurable logging output control in TeamBot. The goal is to prevent logging messages (`INFO:`, `DEBUG:`, etc.) from interfering with the Rich/Textual interactive terminal UI while preserving all logging capabilities for debugging and file-based orchestration mode.
+This research investigates the implementation requirements for configurable logging in TeamBot to prevent log messages from interfering with the Rich/Textual interactive UI. The feature enables mode-aware logging: file-only in interactive mode (clean UI) and console+file in orchestration mode (debugging visibility).
+
+## 🎉 Critical Finding: Feature Already Implemented
+
+**All code changes for configurable logging are 100% complete.** The only remaining work is **documentation updates**.
 
 ## Task Implementation Requests
 
-* **Task 1**: Add `logging` configuration section to `teambot.json` schema with `console_output`, `file_output`, `log_file`, and `level` settings
-* **Task 2**: Create logging configuration module (`src/teambot/config/logging_config.py`) to parse and apply logging settings
-* **Task 3**: Update `setup_logging()` in `cli.py` to use configuration-based logging with mode detection
-* **Task 4**: Add `--log-to-console` CLI override flag for debugging interactive mode
-* **Task 5**: Add default log file location (`.teambot/logs/teambot.log`) with rotation support
-* **Task 6**: Update `ConfigLoader` to validate new logging configuration options
-* **Task 7**: Write unit tests for logging configuration loading and application
+* ✅ ~~Add `logging` configuration section to `teambot.json` schema~~ **DONE**
+* ✅ ~~Create logging configuration module~~ **DONE** (`src/teambot/config/logging_config.py`)
+* ✅ ~~Update `setup_logging()` with mode detection~~ **DONE**
+* ✅ ~~Add `--log-to-console` CLI override flag~~ **DONE** (`cli.py` line 565)
+* ✅ ~~Add default log file location~~ **DONE** (`.teambot/logs/teambot.log`)
+* ✅ ~~Update `ConfigLoader` validation~~ **DONE** (`loader.py` lines 269-339)
+* ✅ ~~Write unit tests~~ **DONE** (18 tests in `test_logging_config.py`)
+* 📄 **Documentation task**: Add "Logging and Debugging" section to `docs/guides/configuration.md`
+* 📄 **Documentation task**: Update `docs/guides/cli-reference.md` with `--log-to-console` flag
+* 📄 **Documentation task**: Document all logging configuration options with examples
 
 ## Scope and Success Criteria
 
-* **Scope**: Logging output configuration for interactive UI mode and file-based orchestration mode
+* **Scope**: Verify existing implementation meets all requirements, identify documentation gaps
 * **Exclusions**: Log aggregation, remote logging, structured logging formats (JSON)
 * **Assumptions**:
-  1. Existing `teambot.json` files without `logging` section should work (backwards compatible)
+  1. Existing `teambot.json` files without `logging` section work (backwards compatible) ✅
   2. Interactive mode = Textual/Rich split-pane UI (`TeamBotApp`)
   3. File-based mode = orchestration via `teambot run objectives/file.md`
 
 * **Success Criteria**:
-  * ✅ Interactive UI shows no `INFO:`, `DEBUG:` console output pollution
-  * ✅ File-based orchestration defaults to console logging
-  * ✅ Log file always available at configurable path
-  * ✅ Existing configs without `logging` key continue to work
-  * ✅ `--log-to-console` flag overrides file-only in interactive mode
+  * ✅ Logging output configuration added to `teambot.json` schema
+  * ✅ Interactive UI mode defaults to file-only logging (no console output)
+  * ✅ File-based orchestration mode defaults to console logging
+  * ✅ Both modes support file logging (always available for debugging)
+  * ✅ Configuration is overridable per mode
+  * ✅ No breaking changes to existing configurations (backwards compatible)
+  * ✅ Clean interactive UI experience with no log message interference
+  * ✅ CLI override flag `--log-to-console` available for debugging interactive mode
+  * ⚠️ **Documentation**: Add "Logging and Debugging" section to `docs/guides/configuration.md` - **NOT DONE**
+  * ⚠️ **Documentation**: Update `docs/guides/cli-reference.md` with `--log-to-console` flag - **NOT DONE**
+  * ⚠️ **Documentation**: Document all logging configuration options with examples - **NOT DONE**
 
 ## Outline
 
-1. Entry Point Analysis
-2. Testing Infrastructure Research
-3. Current Logging Implementation Analysis
-4. Key Discoveries
-5. Technical Scenarios
-   - Logging Configuration Schema
-   - Mode Detection and Application
-   - CLI Override Implementation
+1. Entry Point Analysis - How logging configuration flows through the system
+2. Implementation Verification - Confirming existing code meets requirements
+3. Configuration Schema - JSON schema and validation (verified complete)
+4. Test Coverage - Existing test suite (18 tests)
+5. Documentation Gap Analysis - What documentation is missing
 
 ### Potential Next Research
 
-* **Log rotation strategy**
-  * **Reasoning**: Long-running orchestration (up to 8 hours) may produce large log files
-  * **Reference**: Feature spec mentions `.teambot/logs/` as default location
-
-* **Structured logging (JSON)**
-  * **Reasoning**: Could enable log aggregation and analysis in future
-  * **Reference**: Not in scope for MVP but worth considering architecture
+* None - all code implementation research is complete
+* Only documentation tasks remain
 
 ## Research Executed
 
 ### Entry Point Analysis
 
-| Entry Point | Code Path | Logging Configured? | Implementation Required? |
-|-------------|-----------|---------------------|--------------------------|
-| `teambot init` | `cli.py:main()` → `setup_logging()` → `cmd_init()` | YES (L247) | YES |
-| `teambot run objective.md` | `cli.py:main()` → `setup_logging()` → `cmd_run()` → `_run_orchestration()` | YES (L247) | YES |
-| `teambot run` (no objective) | `cli.py:main()` → `setup_logging()` → `cmd_run()` → `run_interactive_mode()` | YES (L247) | YES - **critical** |
-| `teambot status` | `cli.py:main()` → `setup_logging()` → `cmd_status()` | YES (L247) | YES |
-
-**Critical Finding**: All execution modes share a single `setup_logging()` call in `main()` at line 247. This is the **sole configuration point** for logging behavior.
+| Entry Point | Code Path | Feature Implemented? | Notes |
+|-------------|-----------|---------------------|-------|
+| `teambot run` (no objective) | `cli.py:main()` → `cmd_run()` → `is_interactive_mode()` → `setup_mode_logging()` | ✅ YES | Interactive mode, console disabled by default |
+| `teambot run objectives/task.md` | `cli.py:main()` → `cmd_run()` → `is_interactive_mode()` → `setup_mode_logging()` | ✅ YES | Orchestration mode, console enabled by default |
+| `teambot run --log-to-console` | `cli.py:main()` → `cmd_run()` → `setup_mode_logging(force_console=True)` | ✅ YES | Force console in any mode |
+| `teambot run -v` / `--verbose` | `cli.py:main()` → `setup_logging(verbose=True)` + `setup_mode_logging(verbose=True)` | ✅ YES | Sets DEBUG level |
+| `teambot.json` logging config | `ConfigLoader.load()` → `_validate_logging()` → `_apply_defaults()` | ✅ YES | All config options validated |
 
 #### Code Path Trace
 
-**Entry Point: Interactive Mode (`teambot run` without objective)**
-1. User runs: `teambot run` (no objective file)
-2. Handled by: `cli.py:main()` (Lines 835-870)
-3. Logging configured: `setup_logging(verbose=args.verbose)` (Line 855)
-4. Routes to: `cmd_run()` (Lines 455-534)
-5. Since no objective: calls `run_interactive_mode()` (Line 530)
-6. Reaches: `TeamBotApp` via `ui/app.py` or `REPLLoop` via `repl/loop.py`
-7. **Problem**: `logging.basicConfig()` outputs to `sys.stderr` → interferes with Textual UI
+**Entry Point 1: Interactive Mode (`teambot run`)**
+1. User runs: `teambot run`
+2. Handled by: `cli.py:main()` (line 1300)
+3. Routes to: `cli.py:cmd_run()` (line 1332)
+4. Loads config: `ConfigLoader().load(config_path)` (line 910)
+5. Validates logging: `_validate_logging()` (line 165-166)
+6. Applies defaults: `_apply_defaults()` (lines 329-339)
+7. Checks mode: `is_interactive_mode(has_objective=False)` → returns `True` (line 919)
+8. Configures logging: `setup_mode_logging(is_interactive=True)` (lines 920-925)
+9. Result: Console handler NOT added, file handler added ✅
 
-**Entry Point: File-Based Orchestration (`teambot run objective.md`)**
+**Entry Point 2: Orchestration Mode (`teambot run objectives/task.md`)**
 1. User runs: `teambot run objectives/task.md`
-2. Handled by: `cli.py:main()` (Lines 835-870)
-3. Logging configured: `setup_logging(verbose=args.verbose)` (Line 855)
-4. Routes to: `cmd_run()` → `_run_orchestration()` (Lines 561-670)
-5. Reaches: `ExecutionLoop.run()` with progress display
-6. **Expectation**: Console logging is appropriate here (no split-pane UI)
+2. Handled by: `cli.py:main()` (line 1300)
+3. Routes to: `cli.py:cmd_run()` (line 1332)
+4. Checks mode: `is_interactive_mode(has_objective=True)` → returns `False` (line 919)
+5. Configures logging: `setup_mode_logging(is_interactive=False)` (lines 920-925)
+6. Result: Console handler added, file handler added ✅
+
+**Entry Point 3: Debug Override (`--log-to-console`)**
+1. User runs: `teambot run --log-to-console`
+2. Parser captures: `args.log_to_console = True` (line 565)
+3. Configures logging: `setup_mode_logging(force_console=True)` (line 923)
+4. Result: Console handler added regardless of mode ✅
 
 ### Coverage Gaps
 
 | Gap | Impact | Required Fix |
 |-----|--------|--------------|
-| Single `setup_logging()` for all modes | Interactive UI polluted with log messages | Mode-aware logging configuration |
-| No file logging capability | Debug info lost in interactive mode | Add FileHandler to logging config |
-| No CLI override | Cannot debug interactive mode issues | Add `--log-to-console` flag |
+| None | N/A | All code paths implemented |
+
+### Implementation Scope Verification
+
+- [x] All entry points from acceptance test scenarios are traced
+- [x] All code paths that should trigger feature are identified
+- [x] No coverage gaps found
+- [x] **Result: Feature is fully implemented**
 
 ### Testing Infrastructure Research
 
@@ -96,333 +113,120 @@ This research analyzes the implementation approach for configurable logging outp
   * Location: `tests/` directory (mirrors `src/` structure)
   * Naming: `test_*.py` pattern, class `Test*`, function `test_*`
   * Runner: `uv run pytest` (from `pyproject.toml`)
-  * Coverage: `--cov=src/teambot --cov-report=term-missing` (default 80% target)
+  * Coverage: `--cov=src/teambot --cov-report=term-missing`
 
 ### Test Patterns Found
 
-* **File**: `tests/test_notification_acceptance.py` (Lines 98-135)
-  * Uses `caplog` fixture for logging assertions
-  * `caplog.set_level(logging.ERROR)` to filter log level
-  * Asserts on `caplog.text` for log content verification
-  * Pattern: `assert "expected message" in caplog.text.lower()`
+* **File**: `tests/test_config/test_logging_config.py` (Lines 1-377)
+  * **18 comprehensive tests** covering all logging scenarios
+  * `TestIsInteractiveMode`: 4 tests for mode detection
+  * `TestSetupLogging`: 14 tests for handler configuration
+  * Uses `monkeypatch` for environment variable mocking
+  * Uses `tmp_path` fixture for temporary log file creation
+  * Tests both positive and negative cases (permission errors, OS errors)
+  * Clear arrange-act-assert structure with descriptive docstrings
 
-* **File**: `tests/test_cli.py` (Lines 1-50)
-  * Uses `tmp_path` fixture for temp directories
-  * Mocks with `unittest.mock` (MagicMock, AsyncMock)
-  * Pattern: Test class per feature area
-
-* **File**: `tests/conftest.py` (Lines 1-185)
-  * Shared fixtures: `temp_teambot_dir`, `sample_agent_config`, `mock_sdk_client`
-  * Mock streaming session patterns for async tests
+* **File**: `tests/test_config/test_loader.py` (Lines 672-780)
+  * Logging validation tests for ConfigLoader
+  * Tests schema validation for all logging fields
+  * Tests default application for missing fields
 
 ### Coverage Standards
 
-* **Unit Tests**: 80% minimum (per `pyproject.toml` addopts)
-* **Acceptance Tests**: Marked with `@pytest.mark.acceptance`
-* **Critical Paths**: Config loading, mode detection must have 100% coverage
+* **Unit Tests**: Comprehensive coverage of logging_config.py
+* **Integration Tests**: CLI integration covered via test_loader.py
+* **Critical Paths**: All error paths tested (permission denied, OS errors)
 
 ### Testing Approach Recommendation
 
-* **Logging config schema**: TDD (well-defined requirements, critical for backwards compatibility)
-* **Mode detection logic**: TDD (clear behavior rules, testable in isolation)
-* **CLI flag handling**: Code-First (straightforward argparse addition)
-* **Integration with Textual**: Manual verification (complex UI interactions)
+* **Documentation changes**: No automated testing required
+* **If future code changes needed**: Code-First (existing patterns are well-established)
 
-**Rationale**: The config loading and mode detection have clear, testable requirements. TDD ensures backwards compatibility is verified before implementation.
+**Rationale**: The logging feature is already fully implemented with comprehensive test coverage. Only documentation updates are needed.
 
-### File Analysis
-
-* `src/teambot/cli.py` (Lines 244-250) - Current `setup_logging()` implementation:
-  ```python
-  def setup_logging(verbose: bool = False) -> None:
-      """Configure logging for TeamBot."""
-      level = logging.DEBUG if verbose else logging.INFO
-      logging.basicConfig(
-          level=level,
-          format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-      )
-  ```
-  **Finding**: Uses `basicConfig()` which defaults to `StreamHandler(sys.stderr)` - this is the source of UI pollution.
-
-* `src/teambot/config/loader.py` (Lines 107-290) - Config validation patterns:
-  * Uses `ConfigError` for validation failures
-  * `_validate_notifications()` pattern for nested config validation
-  * `_apply_defaults()` for backwards compatibility
-
-* `src/teambot/ui/app.py` (Lines 1-100) - Textual app:
-  * `TeamBotApp` extends Textual `App`
-  * Uses `should_use_split_pane()` to detect mode
-  * Checks `TEAMBOT_LEGACY_MODE` env var
-
-* `src/teambot/repl/loop.py` (Lines 397-450) - Mode selection:
-  * `run_interactive_mode()` chooses between `TeamBotApp` and `REPLLoop`
-  * Environment variable `TEAMBOT_SPLIT_PANE` for explicit mode
-
-### Code Search Results
-
-* `import logging` - 12 files use logging module:
-  * `cli.py`, `orchestrator.py`, `agent_runner.py`, `schema.py`, `model_cache.py`
-  * `client.py`, `sdk_client.py`, `agent_loader.py`, `executor.py`, `event_bus.py`, `telegram.py`, `state_machine.py`
-
-* `logger.` usage patterns:
-  * `logger.info()` - Status updates, task completion
-  * `logger.debug()` - Verbose details, cache loading
-  * `logger.warning()` - Degraded operation, cache expiry
-  * `logger.error()` - Operation failures
-
-### External Research (Evidence Log)
-
-* **Python logging documentation**: Standard library patterns
-  * FileHandler, StreamHandler, RotatingFileHandler are appropriate handlers
-  * `logging.basicConfig()` only configures root logger once - subsequent calls are no-ops
-  * Source: [Python logging docs](https://docs.python.org/3/library/logging.html)
-
-* **Textual documentation**: Terminal handling
-  * Textual captures stdout/stderr for its own rendering
-  * Logging to stderr interferes with Textual's display
-  * Source: [Textual documentation](https://textual.textualize.io/)
-
-### Project Conventions
-
-* **Standards referenced**:
-  * Config validation uses `ConfigError` exception (loader.py pattern)
-  * Defaults applied via `_apply_defaults()` method
-  * Environment variables follow `TEAMBOT_*` prefix pattern
-
-* **Instructions followed**:
-  * Clean commits: `uv run ruff format -- .` and `uv run ruff check . --fix`
-  * Testing: `uv run pytest` with coverage
+---
 
 ## Key Discoveries
+
+### 🎉 Critical Finding: Feature is Complete
+
+The configurable logging feature is **100% implemented** in the codebase:
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Logging Config Module | `src/teambot/config/logging_config.py` (111 lines) | ✅ Complete |
+| Config Validation | `src/teambot/config/loader.py` (lines 269-339) | ✅ Complete |
+| CLI Integration | `src/teambot/cli.py` (lines 565-568, 915-925) | ✅ Complete |
+| Unit Tests | `tests/test_config/test_logging_config.py` (377 lines, 18 tests) | ✅ Complete |
 
 ### Project Structure
 
 ```
 src/teambot/
-├── cli.py                    # Main entry point, setup_logging() at L244-250
 ├── config/
-│   ├── loader.py             # Config validation, add logging validation here
-│   ├── schema.py             # Model validation (pattern to follow)
-│   └── logging_config.py     # NEW: Logging configuration module
-├── ui/
-│   └── app.py                # Textual app, check for mode
-└── repl/
-    └── loop.py               # run_interactive_mode() mode selection
+│   ├── loader.py           # Config validation (_validate_logging, _apply_defaults)
+│   └── logging_config.py   # Mode-aware logging setup (is_interactive_mode, setup_logging)
+├── cli.py                  # --log-to-console flag (L565), setup integration (L915-925)
+└── ...
+
+tests/test_config/
+├── test_loader.py          # Logging validation tests (lines 672-780)
+└── test_logging_config.py  # Comprehensive logging tests (18 tests)
 ```
 
-### Implementation Patterns
+### Implementation Patterns (Verified in Codebase)
 
-**Config Validation Pattern** (from `loader.py`):
+**Mode Detection** (`logging_config.py` Lines 16-37):
 ```python
-def _validate_logging(self, logging: dict[str, Any]) -> None:
-    """Validate logging configuration."""
-    if not isinstance(logging, dict):
-        raise ConfigError("'logging' must be an object")
-    
-    # Validate each field...
+def is_interactive_mode(has_objective: bool) -> bool:
+    """Determine if running in interactive UI mode."""
+    # File orchestration mode if objective provided
+    if has_objective:
+        return False
+    # Legacy mode flag forces non-interactive
+    if os.environ.get("TEAMBOT_LEGACY_MODE", "").lower() == "true":
+        return False
+    # Check if stdout is a TTY (required for interactive)
+    if not sys.stdout.isatty():
+        return False
+    return True
 ```
 
-**Defaults Application Pattern** (from `loader.py`):
+**Console Handler Logic** (`logging_config.py` Lines 96-110):
 ```python
-def _apply_defaults(self, config: dict[str, Any]) -> None:
-    # Apply logging defaults
-    if "logging" not in config:
-        config["logging"] = {}
-    logging_config = config["logging"]
-    if "file_output" not in logging_config:
-        logging_config["file_output"] = True  # Always log to file
+# Console handler (mode-dependent)
+console_enabled = logging_config.get("console_output")
+if console_enabled is None:
+    # Default: console for file-orchestration, no console for interactive
+    console_enabled = not is_interactive
+
+# Always enable console if file handler setup failed (graceful degradation)
+if not file_handler_added and logging_config.get("file_output", True):
+    console_enabled = True
+
+if force_console or console_enabled:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(level)
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
 ```
 
-### Complete Examples
+### Configuration Schema (Verified in Codebase)
 
-**Example: Mode-aware logging setup**
-```python
-# src/teambot/config/logging_config.py
-import logging
-from pathlib import Path
-from typing import Any
-
-def setup_logging(
-    config: dict[str, Any],
-    is_interactive: bool,
-    force_console: bool = False,
-    verbose: bool = False,
-) -> None:
-    """Configure logging based on execution mode and config.
-    
-    Args:
-        config: TeamBot configuration dict.
-        is_interactive: True if running in interactive UI mode.
-        force_console: Override to enable console output (--log-to-console).
-        verbose: Enable DEBUG level logging.
-    """
-    logging_config = config.get("logging", {})
-    
-    # Determine log level
-    level = logging.DEBUG if verbose else logging.INFO
-    level_str = logging_config.get("level", "INFO").upper()
-    if level_str in ("DEBUG", "INFO", "WARNING", "ERROR"):
-        level = getattr(logging, level_str)
-    
-    # Clear any existing handlers
-    root_logger = logging.getLogger()
-    root_logger.handlers.clear()
-    root_logger.setLevel(level)
-    
-    # File handler (always enabled unless explicitly disabled)
-    if logging_config.get("file_output", True):
-        log_file = logging_config.get("log_file", ".teambot/logs/teambot.log")
-        log_path = Path(log_file)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setLevel(level)
-        file_handler.setFormatter(logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        ))
-        root_logger.addHandler(file_handler)
-    
-    # Console handler (mode-dependent)
-    console_enabled = logging_config.get("console_output")
-    if console_enabled is None:
-        # Default: console for file-orchestration, no console for interactive
-        console_enabled = not is_interactive
-    
-    if force_console or console_enabled:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        console_handler.setFormatter(logging.Formatter(
-            "%(name)s - %(levelname)s - %(message)s"
-        ))
-        root_logger.addHandler(console_handler)
-```
-
-### API and Schema Documentation
-
-**Proposed `teambot.json` logging schema:**
-
+**JSON Schema** (from `loader.py` lines 269-299):
 ```json
 {
   "logging": {
-    "console_output": true | false | null,
-    "file_output": true | false,
-    "log_file": ".teambot/logs/teambot.log",
-    "level": "DEBUG" | "INFO" | "WARNING" | "ERROR"
+    "console_output": true | false | null,  // null = mode-dependent
+    "file_output": true | false,            // default: true
+    "log_file": "string",                   // default: ".teambot/logs/teambot.log"
+    "level": "DEBUG" | "INFO" | "WARNING" | "ERROR"  // default: "INFO"
   }
 }
 ```
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `console_output` | `boolean \| null` | `null` (auto) | `true` = always console, `false` = never, `null` = mode-dependent |
-| `file_output` | `boolean` | `true` | Enable/disable file logging |
-| `log_file` | `string` | `.teambot/logs/teambot.log` | Path to log file |
-| `level` | `string` | `"INFO"` | Minimum log level |
-
-### Configuration Examples
-
-**Minimal config (uses all defaults):**
-```json
-{
-  "agents": [...],
-  "workflow": {...}
-}
-```
-*Behavior*: Interactive mode = file-only logging, file orchestration = console + file
-
-**Explicit silent interactive mode:**
-```json
-{
-  "agents": [...],
-  "logging": {
-    "console_output": false,
-    "file_output": true,
-    "log_file": ".teambot/logs/teambot.log"
-  }
-}
-```
-
-**Debug mode with console:**
-```json
-{
-  "agents": [...],
-  "logging": {
-    "console_output": true,
-    "level": "DEBUG"
-  }
-}
-```
-
-## Technical Scenarios
-
-### 1. Logging Configuration Schema
-
-Define the JSON schema and validation for the new `logging` configuration section.
-
-**Requirements:**
-* Schema must be optional (backwards compatible)
-* Support `console_output`, `file_output`, `log_file`, `level` fields
-* Validate field types and enum values
-* Apply sensible defaults
-
-**Preferred Approach:**
-* Add validation method `_validate_logging()` to `ConfigLoader`
-* Add defaults in `_apply_defaults()` method
-* Follow existing pattern from `_validate_notifications()`
-
-```text
-src/teambot/config/
-├── loader.py           # Add _validate_logging() and update _apply_defaults()
-└── logging_config.py   # NEW: Logging setup logic
-```
-
-```mermaid
-flowchart TD
-    A[ConfigLoader.load] --> B[_validate]
-    B --> C{logging key exists?}
-    C -->|Yes| D[_validate_logging]
-    C -->|No| E[Skip validation]
-    D --> F[_apply_defaults]
-    E --> F
-    F --> G[Return config with logging defaults]
-```
-
-**Implementation Details:**
-
+**Default Application** (from `loader.py` lines 329-339):
 ```python
-# src/teambot/config/loader.py additions
-
-VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR"}
-
-def _validate_logging(self, logging: dict[str, Any]) -> None:
-    """Validate logging configuration."""
-    if not isinstance(logging, dict):
-        raise ConfigError("'logging' must be an object")
-    
-    if "console_output" in logging:
-        val = logging["console_output"]
-        if val is not None and not isinstance(val, bool):
-            raise ConfigError("'logging.console_output' must be a boolean or null")
-    
-    if "file_output" in logging:
-        if not isinstance(logging["file_output"], bool):
-            raise ConfigError("'logging.file_output' must be a boolean")
-    
-    if "log_file" in logging:
-        if not isinstance(logging["log_file"], str):
-            raise ConfigError("'logging.log_file' must be a string")
-    
-    if "level" in logging:
-        level = logging["level"]
-        if not isinstance(level, str) or level.upper() not in VALID_LOG_LEVELS:
-            raise ConfigError(
-                f"'logging.level' must be one of: {', '.join(VALID_LOG_LEVELS)}"
-            )
-```
-
-```python
-# Additions to _apply_defaults() in loader.py
-
 # Apply logging defaults
 if "logging" not in config:
     config["logging"] = {}
@@ -433,204 +237,156 @@ if "log_file" not in logging_cfg:
     logging_cfg["log_file"] = ".teambot/logs/teambot.log"
 if "level" not in logging_cfg:
     logging_cfg["level"] = "INFO"
+# Note: console_output defaults to None (mode-dependent)
 ```
 
-#### Considered Alternatives (Removed After Selection)
+### API and Schema Documentation
 
-**Alternative: Environment variables only**
-* Simpler but less flexible and harder to version control
-* Rejected: Config file approach is more consistent with existing patterns
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `console_output` | `boolean \| null` | `null` | `null` = auto (off for interactive, on for orchestration). `true` = always on. `false` = always off. |
+| `file_output` | `boolean` | `true` | Enable/disable file logging |
+| `log_file` | `string` | `.teambot/logs/teambot.log` | Path to log file |
+| `level` | `string` | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
+
+### CLI Flags (Verified in Codebase)
+
+| Flag | Location | Description |
+|------|----------|-------------|
+| `--log-to-console` | `cli.py` line 565-568 | Force console output in any mode |
+| `-v, --verbose` | `cli.py` line 527 | Sets log level to DEBUG |
 
 ---
 
-### 2. Mode Detection and Application
+## Technical Scenarios
 
-Detect execution mode (interactive vs file-orchestration) and apply appropriate logging configuration.
+### 1. Documentation Updates Required (Only Remaining Task)
+
+The code is complete. Only documentation needs to be added.
 
 **Requirements:**
-* Detect if running in Textual/Rich interactive mode
-* Detect if running in file-based orchestration mode
-* Apply mode-specific logging defaults
-* Support explicit config overrides
+* Add "Logging and Debugging" section to `docs/guides/configuration.md`
+* Update `docs/guides/cli-reference.md` with `--log-to-console` flag
+* Document all logging configuration options with examples
 
 **Preferred Approach:**
-* Create `is_interactive_mode()` detection function
-* Modify `setup_logging()` to accept config and mode flags
-* Call updated `setup_logging()` after config is loaded in `cmd_run()`
+* Add comprehensive documentation following existing guide patterns
 
 ```text
-src/teambot/
-├── cli.py               # Update setup_logging() call location and signature
-└── config/
-    └── logging_config.py  # is_interactive_mode() and setup_logging()
-```
-
-```mermaid
-flowchart TD
-    A[main] --> B[parse args]
-    B --> C[basic logging for startup]
-    C --> D{command}
-    D -->|run| E[cmd_run]
-    E --> F[load config]
-    F --> G{has objective?}
-    G -->|Yes| H[file-based mode]
-    G -->|No| I[interactive mode]
-    H --> J[setup_logging<br>is_interactive=False]
-    I --> K[setup_logging<br>is_interactive=True]
-    J --> L[console + file logging]
-    K --> M[file-only logging]
+docs/guides/
+├── configuration.md     # Add "Logging and Debugging" section after line 266 (after Notifications)
+└── cli-reference.md     # Add --log-to-console to run command options table (around line 30)
 ```
 
 **Implementation Details:**
 
-```python
-# src/teambot/config/logging_config.py
+#### Documentation for `configuration.md`
 
-import logging
-import sys
-from pathlib import Path
-from typing import Any
+Add after the Notifications section (line 266):
 
+```markdown
+## Logging and Debugging
 
-def is_interactive_mode(has_objective: bool) -> bool:
-    """Determine if running in interactive UI mode.
-    
-    Args:
-        has_objective: True if an objective file was provided.
-    
-    Returns:
-        True if interactive mode (Textual/Rich UI), False if file orchestration.
-    """
-    import os
-    
-    # File orchestration mode if objective provided
-    if has_objective:
-        return False
-    
-    # Legacy mode flag forces non-interactive
-    if os.environ.get("TEAMBOT_LEGACY_MODE", "").lower() == "true":
-        return False
-    
-    # Check if stdout is a TTY (required for interactive)
-    if not sys.stdout.isatty():
-        return False
-    
-    return True
+TeamBot provides configurable logging that adapts to your execution mode.
 
+### Default Behavior
 
-def setup_logging(
-    config: dict[str, Any],
-    is_interactive: bool,
-    force_console: bool = False,
-    verbose: bool = False,
-) -> None:
-    """Configure logging based on execution mode and config."""
-    # Implementation as shown in Key Discoveries section
-    ...
+| Mode | Console Output | File Output |
+|------|---------------|-------------|
+| Interactive (`teambot run`) | ❌ Disabled | ✅ Enabled |
+| Orchestration (`teambot run objective.md`) | ✅ Enabled | ✅ Enabled |
+
+This ensures a clean interactive UI experience while preserving full logs for debugging.
+
+### Configuration Options
+
+\`\`\`json
+{
+  "logging": {
+    "console_output": null,
+    "file_output": true,
+    "log_file": ".teambot/logs/teambot.log",
+    "level": "INFO"
+  }
+}
+\`\`\`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `console_output` | `boolean \| null` | `null` | `null` = auto (mode-dependent), `true` = always on, `false` = always off |
+| `file_output` | `boolean` | `true` | Enable file logging |
+| `log_file` | `string` | `.teambot/logs/teambot.log` | Log file path |
+| `level` | `string` | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
+
+### CLI Override
+
+Force console output in interactive mode for debugging:
+
+\`\`\`bash
+teambot run --log-to-console
+\`\`\`
+
+Enable verbose (DEBUG level) logging:
+
+\`\`\`bash
+teambot run -v
+# or
+teambot run --verbose
+\`\`\`
+
+### Examples
+
+**Disable all file logging:**
+\`\`\`json
+{
+  "logging": {
+    "file_output": false
+  }
+}
+\`\`\`
+
+**Always show console output (even in interactive mode):**
+\`\`\`json
+{
+  "logging": {
+    "console_output": true
+  }
+}
+\`\`\`
+
+**Custom log file location:**
+\`\`\`json
+{
+  "logging": {
+    "log_file": "logs/teambot-debug.log",
+    "level": "DEBUG"
+  }
+}
+\`\`\`
 ```
 
-**CLI Integration (cli.py changes):**
+#### Documentation for `cli-reference.md`
 
-```python
-# In cmd_run(), after config is loaded:
+Update the `teambot run` options table (around line 30) to include:
 
-from teambot.config.logging_config import is_interactive_mode, setup_logging
-
-# Determine mode
-interactive = is_interactive_mode(has_objective=bool(args.objective))
-
-# Configure logging with mode awareness
-setup_logging(
-    config=config,
-    is_interactive=interactive,
-    force_console=getattr(args, "log_to_console", False),
-    verbose=getattr(args, "verbose", False),
-)
+```markdown
+| `--log-to-console` | Enable console logging output (useful for debugging interactive mode) |
 ```
 
 #### Considered Alternatives (Removed After Selection)
 
-**Alternative: Detect Textual at runtime**
-* Check if Textual app is running via import/instance check
-* Rejected: Mode should be determined before app starts, not during
+None - documentation approach follows existing patterns.
 
 ---
 
-### 3. CLI Override Implementation
+## Validation Summary
 
-Add `--log-to-console` flag to enable console logging in interactive mode for debugging.
-
-**Requirements:**
-* Add `--log-to-console` flag to `run` subcommand
-* Flag overrides config/mode-based console setting
-* Useful for debugging interactive mode issues
-
-**Preferred Approach:**
-* Add argument to `run_parser` in `create_parser()`
-* Pass flag value to `setup_logging()` as `force_console`
-
-```text
-src/teambot/cli.py  # Add argument and pass to setup_logging
 ```
-
-**Implementation Details:**
-
-```python
-# In create_parser(), add to run_parser:
-
-run_parser.add_argument(
-    "--log-to-console",
-    action="store_true",
-    help="Enable console logging output (useful for debugging interactive mode)",
-)
+RESEARCH_VALIDATION: PASS
+- Document: CREATED ✅
+- Placeholders: 0 remaining ✅
+- Technical Approach: DOCUMENTED (feature already implemented) ✅
+- Entry Points: 5 traced, 5 covered ✅
+- Test Infrastructure: RESEARCHED (18 tests, comprehensive coverage) ✅
+- Implementation Ready: YES (documentation only) ✅
 ```
-
-```python
-# In cmd_run(), use the flag:
-
-setup_logging(
-    config=config,
-    is_interactive=interactive,
-    force_console=getattr(args, "log_to_console", False),
-    verbose=getattr(args, "verbose", False),
-)
-```
-
-#### Considered Alternatives (Removed After Selection)
-
-**Alternative: Environment variable `TEAMBOT_LOG_CONSOLE=true`**
-* Works but less discoverable than CLI flag
-* Rejected: CLI flag is more user-friendly and self-documenting
-
-## Implementation Sequence
-
-1. **Phase 1: Config Schema** (TDD)
-   - Add `_validate_logging()` to `ConfigLoader`
-   - Add logging defaults to `_apply_defaults()`
-   - Write tests for validation and defaults
-
-2. **Phase 2: Logging Module** (TDD)
-   - Create `src/teambot/config/logging_config.py`
-   - Implement `is_interactive_mode()` and `setup_logging()`
-   - Write tests for mode detection and handler configuration
-
-3. **Phase 3: CLI Integration** (Code-First)
-   - Add `--log-to-console` flag to argparse
-   - Move `setup_logging()` call to after config load
-   - Update `cmd_run()` to use new logging setup
-
-4. **Phase 4: Manual Verification**
-   - Test interactive mode has no console log pollution
-   - Test file orchestration has console output
-   - Test `--log-to-console` override works
-   - Verify log files are created correctly
-
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/teambot/config/logging_config.py` | **CREATE** | New module for logging configuration |
-| `src/teambot/config/loader.py` | MODIFY | Add `_validate_logging()`, update `_apply_defaults()` |
-| `src/teambot/cli.py` | MODIFY | Add `--log-to-console` flag, update logging setup |
-| `tests/test_config/test_logging_config.py` | **CREATE** | Tests for logging configuration |
-| `tests/test_config/test_loader.py` | MODIFY | Add tests for logging validation |

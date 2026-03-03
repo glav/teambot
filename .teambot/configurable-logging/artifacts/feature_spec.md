@@ -1,7 +1,7 @@
 <!-- markdownlint-disable-file -->
 <!-- markdown-table-prettify-ignore-start -->
 # Configurable Logging Output - Feature Specification Document
-Version 1.0 | Status Draft | Owner BA Agent | Team TeamBot Core | Target v0.2.0 | Lifecycle Development
+Version 1.1 | Status IMPLEMENTED (Docs Pending) | Owner BA Agent | Team TeamBot Core | Target v0.2.0 | Lifecycle Maintenance
 
 ## Progress Tracker
 | Phase | Done | Gaps | Updated |
@@ -12,8 +12,57 @@ Version 1.0 | Status Draft | Owner BA Agent | Team TeamBot Core | Target v0.2.0 
 | Requirements | ✅ | None | 2026-02-20 |
 | Metrics & Risks | ✅ | None | 2026-02-20 |
 | Operationalization | ✅ | None | 2026-02-20 |
-| Finalization | ⏳ | Pending review | 2026-02-20 |
+| Implementation | ✅ | None | 2026-03-02 |
+| Documentation | ⏳ | 3 docs pending | 2026-03-02 |
 Unresolved Critical Questions: 0 | TBDs: 0
+
+---
+
+## ⚠️ IMPLEMENTATION STATUS: COMPLETE
+
+**Analysis Date**: 2026-03-02
+
+This feature has been **fully implemented** in the codebase. Only documentation remains.
+
+### Implementation Evidence
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Logging config schema | ✅ Done | `src/teambot/config/loader.py:269-339` |
+| Mode-aware logging | ✅ Done | `src/teambot/config/logging_config.py` |
+| `--log-to-console` flag | ✅ Done | `src/teambot/cli.py:565-568` |
+| File logging | ✅ Done | Default: `.teambot/logs/teambot.log` |
+| Backwards compatibility | ✅ Done | Defaults applied when no logging section |
+
+### Implemented Configuration Schema
+
+```json
+{
+  "logging": {
+    "file_output": true,
+    "log_file": ".teambot/logs/teambot.log",
+    "level": "INFO",
+    "console_output": null
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `file_output` | boolean | `true` | Enable/disable file logging |
+| `log_file` | string | `.teambot/logs/teambot.log` | Path to log file |
+| `level` | string | `INFO` | Log level: DEBUG, INFO, WARNING, ERROR |
+| `console_output` | boolean \| null | `null` | `true`=always, `false`=never, `null`=mode-dependent |
+
+### Remaining Work: Documentation Only
+
+| Task | Target File | Status |
+|------|-------------|--------|
+| Add "Logging and Debugging" section | `docs/guides/configuration.md` | ⏳ Pending |
+| Document `--log-to-console` flag | `docs/guides/cli-reference.md` | ⏳ Pending |
+| Add configuration examples | `docs/guides/configuration.md` | ⏳ Pending |
+
+---
 
 ## 1. Executive Summary
 
@@ -308,6 +357,7 @@ Classification: **Internal** - No PII or secrets by design
 | Version | Date | Author | Summary | Type |
 |---------|------|-------|---------|------|
 | 1.0 | 2026-02-20 | BA Agent | Initial specification | Creation |
+| 1.1 | 2026-03-02 | BA Agent | Updated: Implementation complete, docs pending | Update |
 
 ## 16. References & Provenance
 

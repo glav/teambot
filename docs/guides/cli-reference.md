@@ -34,6 +34,10 @@ teambot run [objective] [-c CONFIG] [--resume] [--max-hours HOURS]
 | `-c, --config` | Configuration file path (default: `teambot.json`) |
 | `--resume` | Resume interrupted orchestration |
 | `--max-hours` | Maximum execution hours (default: 8) |
+| `--log-to-console` | Enable console logging output (useful for debugging interactive mode) |
+| `--worktree` | Run in isolated Git worktree with feature branch |
+| `--branch` | Branch name for worktree (default: feat/<objective-name>) |
+| `--base-branch` | Branch to base the worktree on (default: current HEAD) |
 
 **Examples**:
 

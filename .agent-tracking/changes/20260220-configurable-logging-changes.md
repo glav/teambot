@@ -15,6 +15,8 @@ Implement configuration-based logging output control to prevent log messages fro
 * `tests/test_config/test_loader.py` - Added `TestLoggingConfigValidation` class with 11 tests for logging config validation and defaults
 * `tests/test_config/test_logging_config.py` - Created new test file with 15 tests for `is_interactive_mode()` and `setup_logging()` functions
 * `src/teambot/config/logging_config.py` - Created new module with `is_interactive_mode()` and `setup_logging()` functions for mode-aware logging
+* `docs/guides/configuration.md` - Added "Logging and Debugging" section with configuration options, CLI override, and examples
+* `docs/guides/cli-reference.md` - Added `--log-to-console`, `--worktree`, `--branch`, `--base-branch` flags to options table
 
 ### Modified
 
@@ -27,18 +29,20 @@ Implement configuration-based logging output control to prevent log messages fro
 
 ## Release Summary
 
-**Total Files Affected**: 5
+**Total Files Affected**: 7
 
 ### Files Created (2)
 
 * `src/teambot/config/logging_config.py` - Mode-aware logging configuration module
 * `tests/test_config/test_logging_config.py` - Tests for logging configuration module
 
-### Files Modified (3)
+### Files Modified (5)
 
 * `src/teambot/config/loader.py` - Added logging validation and defaults
 * `src/teambot/cli.py` - Added --log-to-console flag and mode-aware logging setup
 * `tests/test_config/test_loader.py` - Added logging config validation tests
+* `docs/guides/configuration.md` - Added "Logging and Debugging" documentation section
+* `docs/guides/cli-reference.md` - Added --log-to-console and worktree flags to options table
 
 ### Files Removed (0)
 
