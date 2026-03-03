@@ -465,3 +465,133 @@ class TestLegacyNotifyCommandRemoved:
 
         assert result.success is True
         assert "@notify" in result.output
+
+
+class TestTokensCommand:
+    """Tests for /tokens command."""
+
+    def test_tokens_with_no_tracker_shows_disabled(self):
+        """Test /tokens with no tracker shows disabled message."""
+        from teambot.repl.commands import handle_tokens
+
+        result = handle_tokens([], None)
+
+        assert result.success is True
+        assert "disabled" in result.output.lower()
+
+    def test_tokens_with_empty_tracker_shows_no_usage(self):
+        """Test /tokens with empty tracker shows no usage message."""
+        from teambot.repl.commands import handle_tokens
+        from teambot.tokens.tracker import TokenTracker
+
+        tracker = TokenTracker()
+        result = handle_tokens([], tracker)
+
+        assert result.success is True
+        assert "No token usage recorded" in result.output
+
+    def test_tokens_with_data_shows_summary(self):
+        """Test /tokens with recorded usage shows summary."""
+        from teambot.repl.commands import handle_tokens
+        from teambot.tokens.models import TokenUsage
+        from teambot.tokens.tracker import TokenTracker
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+
+        result = handle_tokens([], tracker)
+
+        assert result.success is True
+        assert "300" in result.output  # total tokens
+        assert "100" in result.output  # prompt
+        assert "200" in result.output  # completion
+
+    def test_tokens_detailed_shows_per_agent(self):
+        """Test /tokens --detailed shows per-agent breakdown."""
+        from teambot.repl.commands import handle_tokens
+        from teambot.tokens.models import TokenUsage
+        from teambot.tokens.tracker import TokenTracker
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=50, output_tokens=100),
+            agent_id="builder-1",
+            stage="INTERACTIVE",
+        )
+
+        result = handle_tokens(["--detailed"], tracker)
+
+        assert result.success is True
+        assert "pm" in result.output
+        assert "builder-1" in result.output
+
+    def test_tokens_detailed_short_flag(self):
+        """Test /tokens -d works as alias for --detailed."""
+        from teambot.repl.commands import handle_tokens
+        from teambot.tokens.models import TokenUsage
+        from teambot.tokens.tracker import TokenTracker
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+
+        result = handle_tokens(["-d"], tracker)
+
+        assert result.success is True
+        assert "pm" in result.output
+
+    async def test_dispatch_tokens_command(self):
+        """Test dispatching /tokens command."""
+        from teambot.tokens.models import TokenUsage
+        from teambot.tokens.tracker import TokenTracker
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+
+        commands = SystemCommands(token_tracker=tracker)
+        result = await commands.dispatch("tokens", [])
+
+        assert result.success is True
+        assert "300" in result.output
+
+    async def test_dispatch_cost_alias(self):
+        """Test /cost works as alias for /tokens."""
+        from teambot.tokens.models import TokenUsage
+        from teambot.tokens.tracker import TokenTracker
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+
+        commands = SystemCommands(token_tracker=tracker)
+        result = await commands.dispatch("cost", [])
+
+        assert result.success is True
+        assert "300" in result.output
+
+    def test_help_includes_tokens_command(self):
+        """Test /help output includes /tokens command."""
+        result = handle_help([])
+
+        assert result.success is True
+        assert "/tokens" in result.output
+        assert "/cost" in result.output or "alias" in result.output.lower()

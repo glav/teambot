@@ -93,5 +93,8 @@
         "notification_mode": "stages_only"
       }
     ]
+  },
+  "token_tracking": {
+    "enabled": true
   }
 }

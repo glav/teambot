@@ -428,8 +428,6 @@ User request: {user_prompt}"""
         Raises:
             SDKClientError: If client is not started or error occurs.
         """
-        # Import here to avoid circular import at module load
-
         if not self._started:
             raise SDKClientError("Client not started - call start() first")
 

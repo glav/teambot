@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from teambot.tokens.models import TokenUsage
+
+logger = logging.getLogger(__name__)
 
 
 def extract_tokens_from_event_data(event_data: Any) -> TokenUsage:
@@ -27,9 +30,13 @@ def extract_tokens_from_event_data(event_data: Any) -> TokenUsage:
             return None
         return int(value)
 
-    return TokenUsage(
+    usage = TokenUsage(
         input_tokens=get_int("input_tokens"),
         output_tokens=get_int("output_tokens"),
         cache_read_tokens=get_int("cache_read_tokens"),
         cache_write_tokens=get_int("cache_write_tokens"),
     )
+
+    logger.debug(f"Extracted token usage: input={usage.input_tokens}, output={usage.output_tokens}")
+
+    return usage

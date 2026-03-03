@@ -15,6 +15,7 @@ from teambot.tasks.manager import TaskManager
 from teambot.tasks.models import Task, TaskResult, TaskStatus
 
 if TYPE_CHECKING:
+    from teambot.tokens.tracker import TokenTracker
     from teambot.ui.agent_state import AgentStatusManager
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,7 @@ class TaskExecutor:
         on_pipeline_complete: Callable | None = None,
         agent_status_manager: AgentStatusManager | None = None,
         config: dict | None = None,
+        token_tracker: TokenTracker | None = None,
     ):
         """Initialize executor.
 
@@ -115,6 +117,7 @@ class TaskExecutor:
             on_pipeline_complete: Callback when pipeline completes (clears progress).
             agent_status_manager: Optional manager for agent status updates.
             config: Optional configuration dict for notification settings.
+            token_tracker: Optional token tracker for recording usage.
         """
         self._sdk_client = sdk_client
         self._on_task_complete = on_task_complete
@@ -125,6 +128,7 @@ class TaskExecutor:
         self._on_pipeline_complete = on_pipeline_complete
         self._agent_status = agent_status_manager
         self._config = config
+        self._token_tracker = token_tracker
 
         # Create manager with our executor function
         self._manager = TaskManager(
@@ -148,6 +152,14 @@ class TaskExecutor:
             manager: AgentStatusManager instance.
         """
         self._agent_status = manager
+
+    def set_token_tracker(self, tracker: TokenTracker) -> None:
+        """Set the token tracker for recording usage.
+
+        Args:
+            tracker: TokenTracker instance.
+        """
+        self._token_tracker = tracker
 
     def _status_running(self, agent_id: str, task_desc: str) -> None:
         """Mark agent as running in status manager."""
@@ -242,20 +254,40 @@ class TaskExecutor:
         Returns:
             Output from agent.
         """
-        # Check if SDK client supports streaming
-        if hasattr(self._sdk_client, "execute_streaming") and self._on_streaming_chunk:
-            # Use streaming with callback
-            def on_chunk(chunk: str):
-                self._on_streaming_chunk(agent_id, chunk)
+        # First ensure session is created with the model
+        if model:
+            await self._sdk_client.get_or_create_session(agent_id, model=model)
 
-            # First ensure session is created with the model
-            if model:
-                await self._sdk_client.get_or_create_session(agent_id, model=model)
-            return await self._sdk_client.execute_streaming(agent_id, prompt, on_chunk)
+        # Use streaming when:
+        # 1. SDK has execute_streaming AND
+        # 2. Either we have a streaming callback OR token tracker wants tokens
+        use_streaming = hasattr(self._sdk_client, "execute_streaming") and (
+            self._on_streaming_chunk or self._token_tracker
+        )
+
+        if use_streaming:
+            # Set up chunk callback if available
+            on_chunk = None
+            if self._on_streaming_chunk:
+
+                def on_chunk(chunk: str):
+                    self._on_streaming_chunk(agent_id, chunk)
+
+            result = await self._sdk_client.execute_streaming(agent_id, prompt, on_chunk)
+
+            # Handle tuple return (response, token_usage)
+            if isinstance(result, tuple):
+                response, token_usage = result
+                if self._token_tracker and token_usage:
+                    self._token_tracker.record(
+                        token_usage,
+                        agent_id=agent_id,
+                        stage="INTERACTIVE",
+                    )
+                return response
+            return result
         else:
-            # Fall back to regular execute
-            if model:
-                await self._sdk_client.get_or_create_session(agent_id, model=model)
+            # Fall back to regular execute (no streaming callback or token tracker)
             return await self._sdk_client.execute(agent_id, prompt)
 
     async def execute(self, command: Command) -> ExecutionResult:

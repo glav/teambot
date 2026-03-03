@@ -68,16 +68,10 @@ class REPLLoop:
         if config and "default_agent" in config:
             default_agent = config["default_agent"]
 
-        self._router = AgentRouter(default_agent=default_agent)
-        self._commands = SystemCommands(router=self._router, config=config)
-        self._running = False
-        self._interrupted = False
-        self._sdk_connected = False
-
         # Task executor for parallel execution
         self._executor: TaskExecutor | None = None
 
-        # Token tracking for session
+        # Token tracking for session (initialize before SystemCommands)
         self._token_tracker: TokenTracker | None = None
         if config:
             token_tracking_config = config.get("token_tracking", {})
@@ -85,6 +79,14 @@ class REPLLoop:
                 from teambot.tokens.tracker import TokenTracker
 
                 self._token_tracker = TokenTracker()
+
+        self._router = AgentRouter(default_agent=default_agent)
+        self._commands = SystemCommands(
+            router=self._router, config=config, token_tracker=self._token_tracker
+        )
+        self._running = False
+        self._interrupted = False
+        self._sdk_connected = False
 
         # Wire up handlers
         self._router.register_agent_handler(self._handle_agent_command)
@@ -303,6 +305,7 @@ class REPLLoop:
             on_pipeline_complete=self._on_pipeline_complete,
             agent_status_manager=self._agent_status,
             config=self._config,
+            token_tracker=self._token_tracker,
         )
         self._commands.set_executor(self._executor)
 

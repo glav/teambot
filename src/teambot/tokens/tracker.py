@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from teambot.tokens.models import TokenUsage
+
+logger = logging.getLogger(__name__)
 
 
 class TokenTracker:
@@ -41,7 +44,13 @@ class TokenTracker:
             stage: Optional workflow stage name.
         """
         if usage is None:
+            logger.debug(f"Token record called with None usage for agent={agent_id}")
             return
+
+        logger.debug(
+            f"Recording token usage for agent={agent_id}, stage={stage}: "
+            f"input={usage.input_tokens}, output={usage.output_tokens}"
+        )
 
         # Update agent aggregation
         if agent_id in self._by_agent:

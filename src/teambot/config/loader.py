@@ -103,6 +103,9 @@ def create_default_config() -> dict[str, Any]:
                 "post_review",
             ]
         },
+        "token_tracking": {
+            "enabled": True,
+        },
     }
 
 

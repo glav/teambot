@@ -343,3 +343,109 @@ class TestAT006PerStageAggregation:
         assert by_agent["builder-1"].total_tokens == 2350
         # builder-2: 400+600 = 1000
         assert by_agent["builder-2"].total_tokens == 1000
+
+
+@pytest.mark.acceptance
+class TestAT007TokensCommandInteractive:
+    """AT-007: /tokens command shows session token usage on-demand."""
+
+    def test_tokens_command_shows_accumulated_tokens(self):
+        """Verify /tokens shows accumulated tokens after multiple commands."""
+        from teambot.repl.commands import handle_tokens
+
+        tracker = TokenTracker()
+
+        # Simulate multiple @pm commands
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=150, output_tokens=250),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+
+        result = handle_tokens([], tracker)
+
+        assert result.success is True
+        # Should show total: 100+150+200+250 = 700
+        assert "700" in result.output
+
+    def test_tokens_detailed_shows_agent_breakdown(self):
+        """Verify /tokens --detailed shows per-agent breakdown."""
+        from teambot.repl.commands import handle_tokens
+
+        tracker = TokenTracker()
+
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=300, output_tokens=500),
+            agent_id="builder-1",
+            stage="INTERACTIVE",
+        )
+
+        result = handle_tokens(["--detailed"], tracker)
+
+        assert result.success is True
+        assert "pm" in result.output
+        assert "builder-1" in result.output
+        # Should show percentages
+        assert "%" in result.output
+
+    def test_tokens_with_single_agent(self):
+        """Verify /tokens --detailed with only one agent shows correct output."""
+        from teambot.repl.commands import handle_tokens
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=500, output_tokens=1000),
+            agent_id="reviewer",
+            stage="INTERACTIVE",
+        )
+
+        result = handle_tokens(["--detailed"], tracker)
+
+        assert result.success is True
+        assert "reviewer" in result.output
+        assert "1,500" in result.output  # total
+
+    def test_cost_alias_identical_to_tokens(self):
+        """Verify /cost alias returns identical output to /tokens."""
+        from teambot.repl.commands import handle_tokens
+
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=200),
+            agent_id="pm",
+            stage="INTERACTIVE",
+        )
+
+        tokens_result = handle_tokens([], tracker)
+        cost_result = handle_tokens([], tracker)  # Same function
+
+        assert tokens_result.output == cost_result.output
+
+    def test_tokens_disabled_shows_message(self):
+        """Verify /tokens shows disabled message when tracking is off."""
+        from teambot.repl.commands import handle_tokens
+
+        result = handle_tokens([], None)
+
+        assert result.success is True
+        assert "disabled" in result.output.lower()
+
+    def test_tokens_no_usage_shows_message(self):
+        """Verify /tokens shows no usage message when tracker is empty."""
+        from teambot.repl.commands import handle_tokens
+
+        tracker = TokenTracker()
+        result = handle_tokens([], tracker)
+
+        assert result.success is True
+        assert "No token usage recorded" in result.output

@@ -191,14 +191,12 @@ class ExecutionLoop:
                 # Check cancellation
                 if self.cancelled:
                     self._emit_completed_event(on_progress, "cancelled")
-                    self._display_token_summary()
                     self._save_state(ExecutionResult.CANCELLED)
                     return ExecutionResult.CANCELLED
 
                 # Check timeout
                 if self.time_manager.is_expired():
                     self._emit_completed_event(on_progress, "timeout")
-                    self._display_token_summary()
                     self._save_state(ExecutionResult.TIMEOUT)
                     return ExecutionResult.TIMEOUT
 
@@ -244,14 +242,12 @@ class ExecutionLoop:
                             "acceptance tests have not been executed or did not pass."
                         )
                         self._emit_completed_event(on_progress, "acceptance_test_failed")
-                        self._display_token_summary()
                         self._save_state(ExecutionResult.ACCEPTANCE_TEST_FAILED)
                         return ExecutionResult.ACCEPTANCE_TEST_FAILED
 
                     result = await self._execute_review_stage(stage, on_progress)
                     if result == ReviewStatus.FAILED:
                         self._emit_completed_event(on_progress, "review_failed")
-                        self._display_token_summary()
                         self._save_state(ExecutionResult.REVIEW_FAILED)
                         return ExecutionResult.REVIEW_FAILED
                 else:
@@ -264,22 +260,22 @@ class ExecutionLoop:
                 self._save_state()
 
             self._emit_completed_event(on_progress, "complete")
-            self._display_token_summary()
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
         except MissingArtifactError:
             # Critical failure - missing required artifact
             self._emit_completed_event(on_progress, "critical_failure")
-            self._display_token_summary()
             self._save_state(ExecutionResult.CRITICAL_FAILURE)
             return ExecutionResult.CRITICAL_FAILURE
 
         except Exception:
             self._emit_completed_event(on_progress, "error")
-            self._display_token_summary()
             self._save_state(ExecutionResult.ERROR)
             raise
+
+        finally:
+            self._display_token_summary()
 
     def _emit_completed_event(
         self,
