@@ -53,7 +53,7 @@ class TestExecuteStreaming:
 
             asyncio.create_task(fire_events())
 
-            result = await client.execute_streaming("pm", "Test prompt", on_chunk)
+            result, token_usage = await client.execute_streaming("pm", "Test prompt", on_chunk)
 
             assert chunks_received == ["Hello ", "World!"]
             assert result == "Hello World!"
@@ -86,7 +86,7 @@ class TestExecuteStreaming:
 
             asyncio.create_task(fire_events())
 
-            result = await client.execute_streaming("pm", "Test", lambda _: None)
+            result, token_usage = await client.execute_streaming("pm", "Test", lambda _: None)
 
             # Should complete and return accumulated content
             assert result == "Done"
@@ -157,7 +157,7 @@ class TestExecuteStreaming:
 
             asyncio.create_task(fire_events())
 
-            result = await client.execute_streaming("pm", "Test", lambda _: None)
+            result, token_usage = await client.execute_streaming("pm", "Test", lambda _: None)
 
             assert result == "ABC"
 
@@ -283,7 +283,7 @@ class TestExecuteStreaming:
 
             asyncio.create_task(fire_events())
 
-            result = await client.execute_streaming("pm", "Test", on_chunk)
+            result, token_usage = await client.execute_streaming("pm", "Test", on_chunk)
 
             # Only non-empty chunks should be received
             assert chunks_received == ["A", "B"]

@@ -105,6 +105,26 @@ teambot: /cancel 1
 | `/task <id>` | View task details | `/task 1` |
 | `/cancel <id>` | Cancel task | `/cancel 3` |
 | `/status` | Show agent status | |
+| `/tokens` | Show session token usage | `/tokens -d` |
+| `/cost` | Alias for `/tokens` | |
+
+## Token Usage Tracking
+
+Monitor token consumption during your session:
+
+```
+# Show session summary
+/tokens
+
+# Show detailed per-agent breakdown
+/tokens -d
+/tokens --detailed
+
+# Alias
+/cost
+```
+
+The summary shows total input/output tokens consumed. Use `-d` for a breakdown by agent.
 
 ## Shared Context References (`$agent`)
 

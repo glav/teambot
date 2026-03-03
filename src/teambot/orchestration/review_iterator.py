@@ -214,7 +214,9 @@ class ReviewIterator:
         history: list[IterationResult],
     ) -> str:
         """Execute work phase with agent."""
-        return await self.sdk_client.execute_streaming(agent_id, context, None)
+        _result = await self.sdk_client.execute_streaming(agent_id, context, None)
+        response_text, _token_usage = _result if isinstance(_result, tuple) else (_result, None)
+        return response_text
 
     async def _execute_review(
         self,
@@ -233,7 +235,8 @@ class ReviewIterator:
             Tuple of (review_output, approved, feedback)
         """
         review_prompt = self._build_strict_review_prompt(work_output, evidence)
-        review_output = await self.sdk_client.execute_streaming(agent_id, review_prompt, None)
+        _result = await self.sdk_client.execute_streaming(agent_id, review_prompt, None)
+        review_output, _token_usage = _result if isinstance(_result, tuple) else (_result, None)
 
         # Parse approval from review output (strict mode)
         approved = self._parse_approval_strict(review_output)

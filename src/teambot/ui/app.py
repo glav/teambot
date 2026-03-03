@@ -60,16 +60,30 @@ class TeamBotApp(App):
         self._router = router
         self._sdk_client = sdk_client
         self._config = config
-        self._commands = SystemCommands(executor=executor, router=router, config=config)
+
+        # Token tracking for session (initialize before SystemCommands)
+        self._token_tracker = None
+        if config:
+            token_tracking_config = config.get("token_tracking", {})
+            if token_tracking_config.get("enabled", True):
+                from teambot.tokens.tracker import TokenTracker
+
+                self._token_tracker = TokenTracker()
+
+        self._commands = SystemCommands(
+            executor=executor, router=router, config=config, token_tracker=self._token_tracker
+        )
         self._pending_tasks: set[asyncio.Task] = set()
         # Centralized agent status manager
         self._agent_status = AgentStatusManager()
         # Initialize default agent from router
         if self._router:
             self._agent_status.set_default_agent(self._router.get_default_agent())
-        # Wire status manager to executor if provided
+        # Wire status manager and token tracker to executor if provided
         if self._executor:
             self._executor.set_agent_status_manager(self._agent_status)
+            if self._token_tracker:
+                self._executor.set_token_tracker(self._token_tracker)
         # Legacy: Track which agents have running tasks (kept for backward compat)
         self._running_agents: dict[str, str] = {}
         # Initialize agent models from config
@@ -95,6 +109,30 @@ class TeamBotApp(App):
             model = agent.get("model") or default_model
             if model:
                 self._agent_status.set_model(agent_id, model)
+
+    def _handle_streaming_result(self, result, agent_id: str) -> str:
+        """Extract text from streaming result and record token usage.
+
+        Handles both old (string) and new (tuple) return types from
+        execute_streaming. Records token usage when tracker is available.
+
+        Args:
+            result: Either a string or tuple[str, TokenUsage | None].
+            agent_id: Agent ID for token tracking attribution.
+
+        Returns:
+            The text output from the streaming result.
+        """
+        if isinstance(result, tuple):
+            text, token_usage = result
+            if self._token_tracker and token_usage:
+                self._token_tracker.record(
+                    token_usage,
+                    agent_id=agent_id,
+                    stage="INTERACTIVE",
+                )
+            return text
+        return result
 
     def compose(self) -> ComposeResult:
         """Create the split-pane layout."""
@@ -231,9 +269,8 @@ class TeamBotApp(App):
                     output.write_streaming_chunk(agent_id, chunk)
 
                 try:
-                    result_text = await self._sdk_client.execute_streaming(
-                        agent_id, content, on_chunk
-                    )
+                    result = await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
+                    result_text = self._handle_streaming_result(result, agent_id)
                     task.mark_completed(result_text)
                     # Store result by agent_id for $ref lookups
                     self._executor._manager._agent_results[agent_id] = task.result
@@ -303,7 +340,8 @@ class TeamBotApp(App):
                 output.write_streaming_chunk(agent_id, chunk)
 
             try:
-                result_text = await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
+                result = await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
+                result_text = self._handle_streaming_result(result, agent_id)
                 task.mark_completed(result_text)
                 self._agent_status.set_completed(agent_id)
                 output.finish_streaming(agent_id, success=True)

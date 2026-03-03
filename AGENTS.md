@@ -36,7 +36,7 @@ TeamBot provides an objective template for defining development tasks:
 
 | File | Description |
 |------|-------------|
-| `docs/sdd-objective-template.md` | Template for creating TeamBot objectives. Copy this file and fill in the sections to define your development task. Run with `teambot run objectives/my-objective.md`. |
+| `docs/sdd-objective-template.md` | Template for creating TeamBot objectives. Copy this file and fill in the sections to define your development task. Run with `teambot run docs/objectives/my-objective.md`. |
 
 ## Setup
 
@@ -71,7 +71,7 @@ TeamBot requires the standalone GitHub Copilot CLI (`copilot` command):
 uv run teambot init
 
 # Run with an objective
-uv run teambot run objectives/my-task.md
+uv run teambot run docs/objectives/my-task.md
 
 # Check status
 uv run teambot status

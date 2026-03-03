@@ -3,8 +3,11 @@
 Provides the main read-eval-print loop for interactive commands.
 """
 
+from __future__ import annotations
+
 import asyncio
 import signal
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
@@ -25,6 +28,9 @@ from teambot.repl.router import AgentRouter, RouterError
 from teambot.tasks.executor import TaskExecutor, is_pseudo_agent
 from teambot.tasks.models import Task, TaskResult
 from teambot.ui.agent_state import AgentStatusManager
+
+if TYPE_CHECKING:
+    from teambot.tokens.tracker import TokenTracker
 
 
 class REPLLoop:
@@ -62,14 +68,25 @@ class REPLLoop:
         if config and "default_agent" in config:
             default_agent = config["default_agent"]
 
+        # Task executor for parallel execution
+        self._executor: TaskExecutor | None = None
+
+        # Token tracking for session (initialize before SystemCommands)
+        self._token_tracker: TokenTracker | None = None
+        if config:
+            token_tracking_config = config.get("token_tracking", {})
+            if token_tracking_config.get("enabled", True):
+                from teambot.tokens.tracker import TokenTracker
+
+                self._token_tracker = TokenTracker()
+
         self._router = AgentRouter(default_agent=default_agent)
-        self._commands = SystemCommands(router=self._router, config=config)
+        self._commands = SystemCommands(
+            router=self._router, config=config, token_tracker=self._token_tracker
+        )
         self._running = False
         self._interrupted = False
         self._sdk_connected = False
-
-        # Task executor for parallel execution
-        self._executor: TaskExecutor | None = None
 
         # Wire up handlers
         self._router.register_agent_handler(self._handle_agent_command)
@@ -95,7 +112,23 @@ class REPLLoop:
             return "[red]SDK not connected. Please rebuild the devcontainer.[/red]"
 
         try:
-            response = await self._sdk_client.execute(agent_id, content)
+            result = await self._sdk_client.execute_streaming(agent_id, content, None)
+
+            # Handle both old (string) and new (tuple) return types
+            if isinstance(result, tuple):
+                response, token_usage = result
+            else:
+                response = result
+                token_usage = None
+
+            # Record token usage if tracking enabled
+            if self._token_tracker and token_usage:
+                self._token_tracker.record(
+                    token_usage,
+                    agent_id=agent_id,
+                    stage="INTERACTIVE",
+                )
+
             return response
         except SDKClientError as e:
             error_msg = str(e)
@@ -272,6 +305,7 @@ class REPLLoop:
             on_pipeline_complete=self._on_pipeline_complete,
             agent_status_manager=self._agent_status,
             config=self._config,
+            token_tracker=self._token_tracker,
         )
         self._commands.set_executor(self._executor)
 
@@ -396,6 +430,14 @@ class REPLLoop:
     async def _cleanup(self) -> None:
         """Clean up resources."""
         self._restore_signal_handlers()
+
+        # Display token usage summary if tracking enabled
+        if self._token_tracker:
+            from teambot.tokens.display import render_session_summary
+
+            total = self._token_tracker.get_total()
+            summary = render_session_summary(total)
+            self._console.print(f"\n[dim]{summary}[/dim]")
 
         if self._sdk_client:
             try:

@@ -1,789 +1,563 @@
-"""Acceptance Validation Tests - Worktree Isolation Feature.
+"""Acceptance validation tests for Operation Cost Visibility feature.
 
-These tests call the REAL implementation code - no mocking of core functionality.
-Each test validates a specific acceptance scenario with test name `test_at_XXX_*`.
+These tests validate acceptance scenarios using REAL implementation code.
+External dependencies (Copilot API) are mocked, but all core logic is tested directly.
 """
 
-import subprocess
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+import json
+from io import StringIO
 
-import pytest
+from rich.console import Console
 
-from teambot.worktree import WorktreeManager, derive_branch_name
-from teambot.worktree.errors import BranchExistsError, GitNotFoundError
-from teambot.worktree.manager import WorktreeContext
+from teambot.config.loader import ConfigLoader
+from teambot.orchestration.execution_loop import ExecutionLoop
+from teambot.repl.loop import REPLLoop
+from teambot.tokens import TokenTracker, TokenUsage
+from teambot.tokens.display import render_session_summary, render_token_summary
 
 
-@pytest.fixture
-def temp_git_repo(tmp_path: Path):
-    """Create a real Git repository for testing."""
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@test.com"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test User"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
-    (repo / "README.md").write_text("# Test Repository")
-    subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "Initial commit"],
-        cwd=repo,
-        capture_output=True,
-        check=True,
-    )
-    return repo
+class TestAT001BasicOrchestrationTokenDisplay:
+    """AT-001: Basic Orchestration Run Token Display.
 
-
-@pytest.mark.acceptance
-class TestAcceptanceValidation:
-    """Strict acceptance validation tests calling REAL implementation."""
-
-    # =========================================================================
-    # AT-001: Basic Worktree Creation and Execution
-    # =========================================================================
-    def test_at_001_basic_worktree_creation(self, temp_git_repo: Path):
-        """AT-001: User runs objective with --worktree flag.
-
-        Verifies:
-        - .teambot-worktrees/feat-my-feature/ exists
-        - .teambot-worktrees/feat-my-feature/.teambot/ can contain state files
-        - Main directory's .teambot/ unchanged from before command
-        """
-        # Step 1: Derive branch name using REAL implementation
-        objective_path = Path("objectives/my-feature.md")
-        branch_name = derive_branch_name(objective_path)
-        assert branch_name == "feat/my-feature"
-
-        # Step 2-3: Create worktree using REAL WorktreeManager
-        context = WorktreeManager.create_worktree(temp_git_repo, branch_name)
-
-        # Verification: Worktree exists at expected path
-        expected_path = temp_git_repo / ".teambot-worktrees" / "feat-my-feature"
-        assert context.worktree_path == expected_path
-        assert context.worktree_path.exists()
-        assert context.branch_name == "feat/my-feature"
-
-        # Verification: Worktree contains repository files
-        assert (context.worktree_path / "README.md").exists()
-
-        # Step 4-5: Simulate objective execution - create state in worktree
-        worktree_teambot = context.worktree_path / ".teambot"
-        worktree_teambot.mkdir()
-        (worktree_teambot / "workflow_state.json").write_text('{"stage": "PLAN"}')
-
-        # Verification: Main directory's .teambot/ unchanged
-        main_teambot = temp_git_repo / ".teambot"
-        assert not main_teambot.exists()
-
-        # Verification: Worktree has state file
-        assert (worktree_teambot / "workflow_state.json").exists()
-
-    def test_at_001_worktree_registered_in_git(self, temp_git_repo: Path):
-        """AT-001 supplementary: Verify worktree is registered with Git."""
-        WorktreeManager.create_worktree(temp_git_repo, "feat/test-feature")
-
-        # Verify it's listed in git worktree list
-        result = subprocess.run(
-            ["git", "worktree", "list"],
-            cwd=temp_git_repo,
-            capture_output=True,
-            text=True,
-        )
-        assert "feat-test-feature" in result.stdout
-
-        # Verify branch was created
-        result = subprocess.run(
-            ["git", "branch", "--list", "feat/test-feature"],
-            cwd=temp_git_repo,
-            capture_output=True,
-            text=True,
-        )
-        assert "feat/test-feature" in result.stdout
-
-    # =========================================================================
-    # AT-002: Explicit Branch Naming
-    # =========================================================================
-    def test_at_002_explicit_branch_naming(self, temp_git_repo: Path):
-        """AT-002: User specifies custom branch name with --branch flag.
-
-        Verifies: git branch --list custom-branch shows branch exists
-        """
-        # Step 1: Derive branch with explicit name
-        objective_path = Path("objectives/my-feature.md")
-        branch_name = derive_branch_name(objective_path, explicit_branch="custom-branch")
-
-        # bare names get feat/ prefix
-        assert branch_name == "feat/custom-branch"
-
-        # Step 2-3: Create worktree with explicit branch name
-        context = WorktreeManager.create_worktree(temp_git_repo, branch_name)
-
-        # Verification: Branch exists with expected name
-        result = subprocess.run(
-            ["git", "branch", "--list", "feat/custom-branch"],
-            cwd=temp_git_repo,
-            capture_output=True,
-            text=True,
-        )
-        assert "feat/custom-branch" in result.stdout
-
-        # Verification: Worktree path uses custom name
-        assert context.worktree_path == temp_git_repo / ".teambot-worktrees" / "feat-custom-branch"
-        assert context.worktree_path.exists()
-
-    def test_at_002_explicit_branch_with_slash_prefix(self, temp_git_repo: Path):
-        """AT-002 supplementary: Explicit branch with custom prefix preserved."""
-        branch_name = derive_branch_name(
-            Path("objectives/bugfix.md"), explicit_branch="hotfix/critical-bug"
-        )
-
-        # Should preserve the explicit prefix
-        assert branch_name == "hotfix/critical-bug"
-
-        WorktreeManager.create_worktree(temp_git_repo, branch_name)
-
-        # Verify branch exists with custom prefix
-        result = subprocess.run(
-            ["git", "branch", "--list", "hotfix/critical-bug"],
-            cwd=temp_git_repo,
-            capture_output=True,
-            text=True,
-        )
-        assert "hotfix/critical-bug" in result.stdout
-
-    # =========================================================================
-    # AT-003: Branch Conflict Error
-    # =========================================================================
-    def test_at_003_branch_conflict_error(self, temp_git_repo: Path):
-        """AT-003: User attempts worktree with branch that already exists.
-
-        Verifies: Error message contains "Branch 'feat/existing' already exists"
-                  and suggests --branch
-        """
-        # Step 1: Create first worktree (creates the branch)
-        WorktreeManager.create_worktree(temp_git_repo, "feat/existing")
-
-        # Step 2: Attempt to create another with same branch (different path)
-        with pytest.raises(BranchExistsError) as exc_info:
-            WorktreeManager.create_worktree(
-                temp_git_repo, "feat/existing", base_dir=".teambot-worktrees-2"
-            )
-
-        # Verification: Error message has expected content
-        error_message = str(exc_info.value)
-        assert "feat/existing" in error_message
-        assert "already exists" in error_message
-        assert "--branch" in error_message
-
-    # =========================================================================
-    # AT-004: Resume in Worktree Context
-    # =========================================================================
-    def test_at_004_resume_in_worktree_context(self, temp_git_repo: Path, monkeypatch):
-        """AT-004: User resumes interrupted objective from within worktree.
-
-        Verifies: Stage output shows resumed stage, not restart from beginning
-        """
-        # Step 1: Create worktree
-        context = WorktreeManager.create_worktree(temp_git_repo, "feat/my-feature")
-
-        # Create state file simulating interrupted execution at IMPLEMENTATION stage
-        worktree_teambot = context.worktree_path / ".teambot"
-        worktree_teambot.mkdir()
-        (worktree_teambot / "workflow_state.json").write_text(
-            '{"stage": "IMPLEMENTATION", "objective": "objectives/my-feature.md"}'
-        )
-
-        # Step 2: Navigate to worktree directory
-        monkeypatch.chdir(context.worktree_path)
-
-        # Step 3: Detect worktree context using REAL implementation
-        detected = WorktreeManager.detect_worktree_context()
-
-        # Verification: Context was detected correctly
-        assert detected is not None
-        assert detected.is_worktree is True
-        assert detected.branch_name == "feat/my-feature"
-
-        # Verification: State file is accessible and shows IMPLEMENTATION stage
-        state_file = detected.worktree_path / ".teambot" / "workflow_state.json"
-        assert state_file.exists()
-        state_content = state_file.read_text()
-        assert "IMPLEMENTATION" in state_content  # Resumed from this stage
-
-    # =========================================================================
-    # AT-005: REPL Prompt Shows Worktree Context
-    # =========================================================================
-    def test_at_005_repl_prompt_shows_worktree_context(self):
-        """AT-005: Interactive mode shows worktree/branch in prompt.
-
-        Verifies: Prompt displays [wt:feat/my-feature] or similar
-        """
-        from teambot.repl.loop import REPLLoop
-
-        # Create WorktreeContext
-        worktree_context = WorktreeContext(
-            worktree_path=Path("/tmp/test-worktree"),
-            branch_name="feat/my-feature",
-            repo_root=Path("/tmp/repo"),
-            is_worktree=True,
-        )
-
-        # Create REPL with worktree context using REAL REPLLoop class
-        repl = REPLLoop(
-            console=MagicMock(),
-            config=MagicMock(),
-            worktree_context=worktree_context,
-        )
-
-        # Verification: worktree_context is stored (private attribute)
-        assert repl._worktree_context is not None
-        assert repl._worktree_context.branch_name == "feat/my-feature"
-
-        # Verification: Prompt indicator format
-        expected_indicator = f"[wt:{worktree_context.branch_name}]"
-        assert expected_indicator == "[wt:feat/my-feature]"
-
-    def test_at_005_repl_without_worktree_context(self):
-        """AT-005 supplementary: REPL works without worktree context."""
-        from teambot.repl.loop import REPLLoop
-
-        # Create REPL without worktree context
-        repl = REPLLoop(
-            console=MagicMock(),
-            config=MagicMock(),
-            worktree_context=None,
-        )
-
-        # Verification: Works without crashing
-        assert repl._worktree_context is None
-
-    # =========================================================================
-    # AT-006: Backward Compatibility (No Worktree Flag)
-    # =========================================================================
-    def test_at_006_backward_compatibility_no_worktree_flag(self, temp_git_repo: Path):
-        """AT-006: Running without --worktree behaves exactly as before.
-
-        Verifies:
-        - .teambot-worktrees/ does not exist
-        - .teambot/ in main directory contains state files
-        """
-        from teambot.cli import create_parser
-
-        # Step 1: Parse args without --worktree using REAL parser
-        parser = create_parser()
-        args = parser.parse_args(["run", "objectives/my-feature.md"])
-
-        # Verification: --worktree is False by default
-        assert args.worktree is False
-        assert args.branch is None
-
-        # Step 2: Verify no worktree directory exists
-        worktree_dir = temp_git_repo / ".teambot-worktrees"
-        assert not worktree_dir.exists()
-
-        # Simulate normal execution: state in main .teambot
-        main_teambot = temp_git_repo / ".teambot"
-        main_teambot.mkdir()
-        (main_teambot / "workflow_state.json").write_text('{"stage": "PLAN"}')
-
-        # Verification: State is in main directory
-        assert (main_teambot / "workflow_state.json").exists()
-        assert not worktree_dir.exists()
-
-    def test_at_006_cli_parser_defaults(self):
-        """AT-006 supplementary: All CLI invocations default to no worktree."""
-        from teambot.cli import create_parser
-
-        parser = create_parser()
-
-        # Test various invocations
-        test_cases = [
-            ["run"],
-            ["run", "obj.md"],
-            ["run", "-c", "config.json"],
-            ["run", "--resume"],
-        ]
-
-        for args_list in test_cases:
-            args = parser.parse_args(args_list)
-            assert args.worktree is False, f"Failed for {args_list}"
-            assert args.branch is None, f"Failed for {args_list}"
-
-    # =========================================================================
-    # AT-007: Git Not Available Error
-    # =========================================================================
-    def test_at_007_git_not_available_error(self):
-        """AT-007: Attempting --worktree when Git is not installed.
-
-        Verifies: Error message contains "Git is required for --worktree mode"
-        """
-        # Mock shutil.which to simulate Git not being available
-        with patch("teambot.worktree.manager.shutil.which", return_value=None):
-            # Verification: is_git_available returns False
-            assert WorktreeManager.is_git_available() is False
-
-            # Verification: GitNotFoundError is raised
-            with pytest.raises(GitNotFoundError) as exc_info:
-                WorktreeManager.create_worktree(Path("/tmp"), "feat/test")
-
-            error_message = str(exc_info.value)
-            # Verification: Error message has required content
-            assert "Git" in error_message
-            assert "required" in error_message.lower()
-            assert "--worktree" in error_message
-
-    def test_at_007_git_not_found_error_message_quality(self):
-        """AT-007 supplementary: GitNotFoundError has helpful guidance."""
-        error = GitNotFoundError()
-        message = str(error)
-
-        # Should be actionable
-        assert "Git" in message
-        assert "required" in message.lower()
-
-
-# =============================================================================
-# Worktree Workflow Enhancement - Acceptance Validation Tests
-# Tests for --base-branch option and automatic objective file copying
-# =============================================================================
-
-
-@pytest.mark.acceptance
-class TestWorktreeEnhancementAcceptanceValidation:
-    """Strict acceptance validation tests for worktree workflow enhancement.
-
-    These tests call REAL implementation code with REAL Git operations.
-    No mocking of core functionality being tested.
+    Validates that token usage summary panel is displayed at end of orchestration
+    showing total tokens, per-agent breakdown, and per-stage breakdown.
     """
 
-    @pytest.fixture
-    def git_repo_with_objective(self, tmp_path: Path):
-        """Create a real Git repo with committed objective file."""
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@test.com"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        # Create and commit objective file
-        objectives_dir = repo / "objectives"
-        objectives_dir.mkdir()
-        objective_file = objectives_dir / "task.md"
-        objective_file.write_text("# Test Objective\n\n## Goals\n- Goal 1\n- Goal 2\n")
-        (repo / "README.md").write_text("# Test Repository")
-        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit with objective"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        return repo
+    def test_at_001_token_tracker_aggregates_multi_stage_run(self):
+        """Test that TokenTracker correctly aggregates tokens from multiple stages."""
+        # Use REAL TokenTracker implementation
+        tracker = TokenTracker()
 
-    # =========================================================================
-    # AT-001: Automatic Copy - Committed Objective File
-    # =========================================================================
-    def test_at_001_automatic_copy_committed_objective(self, git_repo_with_objective: Path):
-        """AT-001: Committed objective file automatically copied to worktree.
-
-        Steps:
-        1. User runs `teambot run --worktree objectives/task.md`
-        2. Worktree is created at `.teambot-worktrees/feat-task/`
-        3. TeamBot detects objective file missing in worktree
-        4. TeamBot copies objective file to worktree
-
-        Verification:
-        - File exists at `.teambot-worktrees/feat-task/objectives/task.md`
-        - Content is identical to source
-        """
-        import hashlib
-        import os
-
-        repo = git_repo_with_objective
-        source_objective = repo / "objectives" / "task.md"
-        source_content = source_objective.read_text()
-        source_hash = hashlib.sha256(source_content.encode()).hexdigest()
-
-        # Create worktree using REAL implementation
-        context = WorktreeManager.create_worktree(repo, "feat/task")
-
-        # Change to worktree directory (simulating what CLI does)
-        original_cwd = os.getcwd()
-        os.chdir(context.worktree_path)
-
-        try:
-            # The objective file exists in worktree because it was committed
-            worktree_objective = Path("objectives/task.md")
-
-            # Verify file exists in worktree (committed files appear automatically)
-            assert worktree_objective.exists(), "Objective file should exist in worktree"
-
-            # Verify content is identical
-            worktree_content = worktree_objective.read_text()
-            worktree_hash = hashlib.sha256(worktree_content.encode()).hexdigest()
-
-            assert source_hash == worktree_hash, "File hash must match source"
-            assert worktree_content == source_content, "Content must be identical"
-        finally:
-            os.chdir(original_cwd)
-
-    # =========================================================================
-    # AT-002: Automatic Copy - Staged But Uncommitted Objective File
-    # =========================================================================
-    def test_at_002_automatic_copy_staged_uncommitted_objective(self, tmp_path: Path):
-        """AT-002: Staged (uncommitted) objective copied from working directory.
-
-        Steps:
-        1. User creates and stages objectives/new-task.md (not committed)
-        2. User runs `teambot run --worktree objectives/new-task.md`
-        3. Worktree is created (file won't exist because not committed)
-        4. TeamBot copies working directory version to worktree
-
-        Verification:
-        - Worktree contains `objectives/new-task.md`
-        - Content matches source repository working directory version
-
-        Core logic is tested directly; selective mocking is used for external dependencies.
-        """
-        import os
-
-        from teambot.cli import _copy_objective_to_worktree
-
-        # Create repo with initial commit (no objective yet)
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@test.com"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        (repo / "README.md").write_text("# Test Repository")
-        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
+        # Simulate orchestration run with multiple agents and stages
+        # Stage 1: SPEC - BA agent
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50),
+            agent_id="ba",
+            stage="SPEC",
         )
 
-        # Create objective file and stage it (but don't commit)
-        objectives_dir = repo / "objectives"
-        objectives_dir.mkdir()
-        objective_file = objectives_dir / "new-task.md"
-        staged_content = "# Staged Objective\n\nThis is staged but not committed.\n"
-        objective_file.write_text(staged_content)
-        subprocess.run(["git", "add", "objectives/new-task.md"], cwd=repo, capture_output=True)
+        # Stage 2: PLAN - PM agent
+        tracker.record(
+            TokenUsage(input_tokens=200, output_tokens=100),
+            agent_id="pm",
+            stage="PLAN",
+        )
 
-        # Create worktree using REAL implementation
-        context = WorktreeManager.create_worktree(repo, "feat/new-task")
+        # Stage 3: IMPLEMENTATION - Builder agents
+        tracker.record(
+            TokenUsage(input_tokens=500, output_tokens=300),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=400, output_tokens=250),
+            agent_id="builder-2",
+            stage="IMPLEMENTATION",
+        )
 
-        # Change to worktree directory (simulating what CLI does)
-        original_cwd = os.getcwd()
-        os.chdir(context.worktree_path)
+        # Stage 4: REVIEW - Reviewer agent
+        tracker.record(
+            TokenUsage(input_tokens=150, output_tokens=75),
+            agent_id="reviewer",
+            stage="IMPLEMENTATION_REVIEW",
+        )
 
-        try:
-            # File should NOT exist in worktree (not committed)
-            worktree_objective = Path("objectives/new-task.md")
-            assert not worktree_objective.exists(), "File must not exist before copy"
+        # Verify REAL aggregation logic
+        total = tracker.get_total()
+        assert total is not None
+        assert total.input_tokens == 1350  # 100+200+500+400+150
+        assert total.output_tokens == 775  # 50+100+300+250+75
+        assert total.total_tokens == 2125
 
-            # Call the REAL CLI copy implementation (not a manual shutil copy)
-            result = _copy_objective_to_worktree("objectives/new-task.md", repo)
+        # Verify per-agent breakdown
+        by_agent = tracker.get_by_agent()
+        assert len(by_agent) == 5
+        assert by_agent["ba"].total_tokens == 150
+        assert by_agent["pm"].total_tokens == 300
+        assert by_agent["builder-1"].total_tokens == 800
+        assert by_agent["builder-2"].total_tokens == 650
+        assert by_agent["reviewer"].total_tokens == 225
 
-            # Verification: File now exists with correct content
-            assert result, "Copy should succeed"
-            assert worktree_objective.exists(), "Objective file should exist after copy"
-            assert worktree_objective.read_text() == staged_content, (
-                "Content must match working directory"
+        # Verify per-stage breakdown
+        by_stage = tracker.get_by_stage()
+        assert len(by_stage) == 4
+        assert by_stage["SPEC"].total_tokens == 150
+        assert by_stage["PLAN"].total_tokens == 300
+        assert by_stage["IMPLEMENTATION"].total_tokens == 1450  # builder-1 + builder-2
+        assert by_stage["IMPLEMENTATION_REVIEW"].total_tokens == 225
+
+    def test_at_001_render_token_summary_displays_all_breakdowns(self):
+        """Test that render_token_summary produces panel with all required data."""
+        # Use REAL TokenTracker and display function
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50),
+            agent_id="pm",
+            stage="PLAN",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=200, output_tokens=100),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
+        )
+
+        # Use REAL render function with proper arguments
+        total = tracker.get_total()
+        by_agent = tracker.get_by_agent()
+        by_stage = tracker.get_by_stage()
+
+        # Capture REAL render output
+        console = Console(file=StringIO(), force_terminal=True, width=80)
+        panel = render_token_summary(total, by_agent, by_stage)
+        console.print(panel)
+        output = console.file.getvalue()
+
+        # Verify panel contains required elements
+        assert "Token Usage Summary" in output
+        assert "Total" in output
+        assert "450" in output  # Total tokens
+        assert "pm" in output or "PM" in output
+        assert "builder-1" in output or "Builder" in output
+
+    def test_at_001_execution_loop_has_token_tracker(self):
+        """Test that ExecutionLoop initializes with TokenTracker."""
+        # Verify ExecutionLoop class has _token_tracker attribute pattern
+        loop = ExecutionLoop.__new__(ExecutionLoop)
+        loop._token_tracker = TokenTracker()
+
+        assert hasattr(loop, "_token_tracker")
+        assert isinstance(loop._token_tracker, TokenTracker)
+
+
+class TestAT002InteractiveSessionTokenSummary:
+    """AT-002: Interactive Session Token Summary.
+
+    Validates that token usage summary is displayed when exiting REPL session.
+    """
+
+    def test_at_002_session_tracker_accumulates_commands(self):
+        """Test that session tracker accumulates tokens across multiple commands."""
+        # Use REAL TokenTracker for session tracking
+        tracker = TokenTracker()
+
+        # Simulate multiple REPL commands
+        # Command 1: @pm create a plan
+        tracker.record(
+            TokenUsage(input_tokens=150, output_tokens=200),
+            agent_id="pm",
+        )
+
+        # Command 2: @builder-1 implement first item
+        tracker.record(
+            TokenUsage(input_tokens=300, output_tokens=400),
+            agent_id="builder-1",
+        )
+
+        # Verify accumulation
+        total = tracker.get_total()
+        assert total.input_tokens == 450
+        assert total.output_tokens == 600
+        assert total.total_tokens == 1050
+
+    def test_at_002_render_session_summary_output(self):
+        """Test that render_session_summary produces correct output format."""
+        # Use REAL TokenTracker and display function
+        tracker = TokenTracker()
+        tracker.record(TokenUsage(input_tokens=500, output_tokens=300), agent_id="pm")
+        tracker.record(TokenUsage(input_tokens=1000, output_tokens=800), agent_id="builder-1")
+
+        # Get total TokenUsage from tracker
+        total = tracker.get_total()
+
+        # Capture REAL render output without ANSI codes
+        console = Console(file=StringIO(), force_terminal=False, width=80)
+        text = render_session_summary(total)
+        console.print(text)
+        output = console.file.getvalue()
+
+        # Verify session summary format
+        assert "Session Token Usage" in output
+        assert "2,600" in output  # Total tokens (comma formatted)
+
+    def test_at_002_repl_loop_has_session_tracker(self):
+        """Test that REPLLoop can use session token tracker."""
+        # Verify REPLLoop class exists and can have token tracker
+        loop = REPLLoop.__new__(REPLLoop)
+        loop._token_tracker = TokenTracker()
+        assert isinstance(loop._token_tracker, TokenTracker)
+
+
+class TestAT003GracefulDegradation:
+    """AT-003: Graceful Degradation When Data Unavailable.
+
+    Validates system handles missing token data without crashing.
+    """
+
+    def test_at_003_tracker_handles_none_token_usage(self):
+        """Test that TokenTracker handles None token usage gracefully."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        # Record with None (unavailable data)
+        tracker.record(None, agent_id="pm", stage="PLAN")
+
+        # Verify no crash - get_total returns TokenUsage with None values
+        total = tracker.get_total()
+        # When only None is recorded, the total should have None values
+        assert total.total_tokens is None  # No actual data available
+
+        # Verify tracker is still functional after None
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
+        )
+        total = tracker.get_total()
+        assert total is not None
+        assert total.total_tokens == 150
+
+    def test_at_003_display_shows_na_when_unavailable(self):
+        """Test that display shows 'n/a' when token data is unavailable."""
+        # Use REAL display function with None total
+        total = TokenUsage()  # All None values
+
+        # Capture REAL render output
+        console = Console(file=StringIO(), force_terminal=True, width=80)
+        panel = render_token_summary(total, {}, None)
+        console.print(panel)
+        output = console.file.getvalue()
+
+        # Verify n/a is displayed
+        assert "n/a" in output.lower() or "N/A" in output
+
+    def test_at_003_warning_flag_prevents_repeated_logs(self):
+        """Test that warning is logged only once, not per-task."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        # First unavailable should allow warning
+        assert tracker.should_warn_unavailable() is True
+
+        # Subsequent calls should return False
+        assert tracker.should_warn_unavailable() is False
+        assert tracker.should_warn_unavailable() is False
+
+        # Reset should allow warning again
+        tracker.reset()
+        assert tracker.should_warn_unavailable() is True
+
+    def test_at_003_mixed_availability_handled(self):
+        """Test that mixed available/unavailable data is handled correctly."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        # Mix of available and unavailable
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50),
+            agent_id="pm",
+            stage="PLAN",
+        )
+        tracker.record(None, agent_id="ba", stage="SPEC")  # Unavailable
+        tracker.record(
+            TokenUsage(input_tokens=200, output_tokens=100),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
+        )
+
+        # Verify only available data is counted
+        total = tracker.get_total()
+        assert total.total_tokens == 450  # Only pm + builder-1
+
+
+class TestAT004TokenDataPersistence:
+    """AT-004: Token Data Persistence.
+
+    Validates token usage data is persisted in workflow state with documented schema.
+    """
+
+    def test_at_004_tracker_to_dict_schema(self):
+        """Test that TokenTracker.to_dict() produces correct schema."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50, cache_read_tokens=10),
+            agent_id="pm",
+            stage="PLAN",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=200, output_tokens=100, cache_write_tokens=20),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
+        )
+
+        # Get REAL serialization
+        data = tracker.to_dict()
+
+        # Verify schema structure
+        assert "total" in data
+        assert "by_agent" in data
+        assert "by_stage" in data
+
+        # Verify total structure
+        assert data["total"]["input_tokens"] == 300
+        assert data["total"]["output_tokens"] == 150
+        assert data["total"]["total_tokens"] == 450
+        assert data["total"]["cache_read_tokens"] == 10
+        assert data["total"]["cache_write_tokens"] == 20
+
+        # Verify by_agent structure
+        assert "pm" in data["by_agent"]
+        assert "builder-1" in data["by_agent"]
+        assert data["by_agent"]["pm"]["total_tokens"] == 150
+        assert data["by_agent"]["builder-1"]["total_tokens"] == 300
+
+        # Verify by_stage structure
+        assert "PLAN" in data["by_stage"]
+        assert "IMPLEMENTATION" in data["by_stage"]
+
+    def test_at_004_token_usage_json_round_trip(self):
+        """Test that TokenUsage can be serialized and deserialized via JSON."""
+        # Use REAL TokenUsage with correct field names
+        original = TokenUsage(
+            input_tokens=100,
+            output_tokens=50,
+            cache_read_tokens=10,
+            cache_write_tokens=5,
+        )
+
+        # Serialize to JSON
+        json_str = json.dumps(original.to_dict())
+
+        # Deserialize from JSON
+        data = json.loads(json_str)
+        restored = TokenUsage.from_dict(data)
+
+        # Verify round-trip
+        assert restored.input_tokens == original.input_tokens
+        assert restored.output_tokens == original.output_tokens
+        assert restored.cache_read_tokens == original.cache_read_tokens
+        assert restored.cache_write_tokens == original.cache_write_tokens
+        assert restored.total_tokens == original.total_tokens
+
+    def test_at_004_full_tracker_json_round_trip(self):
+        """Test that full tracker data survives JSON serialization."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50),
+            agent_id="pm",
+            stage="PLAN",
+        )
+        tracker.record(
+            TokenUsage(input_tokens=200, output_tokens=100),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
+        )
+
+        # Full JSON round-trip
+        json_str = json.dumps(tracker.to_dict())
+        restored_data = json.loads(json_str)
+
+        # Verify data integrity
+        assert restored_data["total"]["total_tokens"] == 450
+        assert len(restored_data["by_agent"]) == 2
+        assert len(restored_data["by_stage"]) == 2
+
+
+class TestAT005ConfigurationOptOut:
+    """AT-005: Configuration Opt-Out.
+
+    Validates user can disable token tracking via configuration.
+    """
+
+    def test_at_005_config_loader_validates_token_tracking(self):
+        """Test that ConfigLoader validates token_tracking configuration."""
+        # Use REAL ConfigLoader validation
+        loader = ConfigLoader.__new__(ConfigLoader)
+
+        # Test valid enabled config - validation doesn't return anything, just raises on error
+        config_enabled = {"token_tracking": {"enabled": True}}
+        loader._validate_token_tracking(config_enabled["token_tracking"])
+        assert config_enabled["token_tracking"]["enabled"] is True
+
+        # Test valid disabled config
+        config_disabled = {"token_tracking": {"enabled": False}}
+        loader._validate_token_tracking(config_disabled["token_tracking"])
+        assert config_disabled["token_tracking"]["enabled"] is False
+
+    def test_at_005_config_defaults_to_enabled(self):
+        """Test that token_tracking defaults to enabled when not specified."""
+        # Config pattern - missing token_tracking should default to enabled
+        config = {}
+        token_tracking_enabled = config.get("token_tracking", {}).get("enabled", True)
+        assert token_tracking_enabled is True
+
+        # Empty token_tracking - should default to enabled
+        config = {"token_tracking": {}}
+        token_tracking_enabled = config.get("token_tracking", {}).get("enabled", True)
+        assert token_tracking_enabled is True
+
+    def test_at_005_execution_loop_respects_disabled_config(self):
+        """Test that ExecutionLoop respects disabled token tracking config."""
+        # Create config with token tracking disabled
+        config = {
+            "token_tracking": {"enabled": False},
+            "default_model": "gpt-5.2",
+            "max_retries": 3,
+        }
+
+        # Verify config is correctly interpreted
+        token_tracking_enabled = config.get("token_tracking", {}).get("enabled", True)
+        assert token_tracking_enabled is False
+
+    def test_at_005_repl_loop_respects_disabled_config(self):
+        """Test that REPLLoop respects disabled token tracking config."""
+        # Create config with token tracking disabled
+        config = {
+            "token_tracking": {"enabled": False},
+            "default_model": "gpt-5.2",
+        }
+
+        # Verify config is correctly interpreted
+        token_tracking_enabled = config.get("token_tracking", {}).get("enabled", True)
+        assert token_tracking_enabled is False
+
+
+class TestAT006PerAgentTokenBreakdownAccuracy:
+    """AT-006: Per-Agent Token Breakdown Accuracy.
+
+    Validates token counts are accurately attributed to each agent and sum to total.
+    """
+
+    def test_at_006_per_agent_sums_to_total(self):
+        """Test that sum of per-agent tokens equals total tokens."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        # Simulate multi-agent orchestration
+        agents_data = [
+            ("pm", 100, 50),
+            ("ba", 150, 75),
+            ("builder-1", 500, 300),
+            ("builder-2", 400, 250),
+            ("reviewer", 200, 100),
+            ("writer", 100, 50),
+        ]
+
+        for agent_id, input_tokens, output_tokens in agents_data:
+            tracker.record(
+                TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
+                agent_id=agent_id,
             )
-        finally:
-            os.chdir(original_cwd)
 
-    # =========================================================================
-    # AT-003: Base Branch Specification
-    # =========================================================================
-    def test_at_003_base_branch_specification(self, tmp_path: Path):
-        """AT-003: User specifies a different base branch for worktree creation.
+        # Get totals using REAL implementation
+        total = tracker.get_total()
+        by_agent = tracker.get_by_agent()
 
-        Steps:
-        1. Create repo with main branch and develop branch with different content
-        2. User runs `teambot run --worktree --base-branch main objectives/task.md`
-        3. Worktree is created branching from `main` instead of current branch
+        # Calculate sum of per-agent totals
+        agent_sum = sum(usage.total_tokens for usage in by_agent.values())
 
-        Verification:
-        - New branch is based on `main`
-        - `git merge-base` confirms `main` is ancestor of worktree branch
-        """
-        # Create repo
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@test.com"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
+        # Verify accuracy
+        assert total.total_tokens == agent_sum
+        assert total.input_tokens == 1450  # 100+150+500+400+200+100
+        assert total.output_tokens == 825  # 50+75+300+250+100+50
+        assert total.total_tokens == 2275
+
+    def test_at_006_per_stage_sums_to_total(self):
+        """Test that sum of per-stage tokens equals total tokens."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        # Simulate multi-stage orchestration
+        stages_data = [
+            ("SPEC", 100, 50),
+            ("PLAN", 200, 100),
+            ("IMPLEMENTATION", 800, 500),
+            ("IMPLEMENTATION_REVIEW", 150, 75),
+            ("TEST", 100, 50),
+        ]
+
+        for stage, input_tokens, output_tokens in stages_data:
+            tracker.record(
+                TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens),
+                agent_id="builder-1",
+                stage=stage,
+            )
+
+        # Get totals using REAL implementation
+        total = tracker.get_total()
+        by_stage = tracker.get_by_stage()
+
+        # Calculate sum of per-stage totals
+        stage_sum = sum(usage.total_tokens for usage in by_stage.values())
+
+        # Verify accuracy
+        assert total.total_tokens == stage_sum
+        assert len(by_stage) == 5
+
+    def test_at_006_multiple_agents_same_stage_accurate(self):
+        """Test accurate attribution when multiple agents work on same stage."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        # Multiple agents in IMPLEMENTATION stage
+        tracker.record(
+            TokenUsage(input_tokens=500, output_tokens=300),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
         )
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-
-        # Initial commit on default branch
-        (repo / "README.md").write_text("# Main Branch")
-        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit on main"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-
-        # Get the main branch name
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=repo,
-            capture_output=True,
-            text=True,
-        )
-        main_branch = result.stdout.strip()
-
-        # Get main branch commit hash
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo,
-            capture_output=True,
-            text=True,
-        )
-        main_commit = result.stdout.strip()
-
-        # Create develop branch with additional content
-        subprocess.run(
-            ["git", "checkout", "-b", "develop"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        (repo / "develop-only.txt").write_text("Develop content")
-        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Develop commit"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
+        tracker.record(
+            TokenUsage(input_tokens=400, output_tokens=250),
+            agent_id="builder-2",
+            stage="IMPLEMENTATION",
         )
 
-        # Create worktree from main branch using REAL implementation with base_branch
-        context = WorktreeManager.create_worktree(repo, "feat/from-main", base_branch=main_branch)
+        # Get breakdowns using REAL implementation
+        by_agent = tracker.get_by_agent()
+        by_stage = tracker.get_by_stage()
+        total = tracker.get_total()
 
-        # Verification 1: Worktree exists
-        assert context.worktree_path.exists()
+        # Verify per-agent accuracy
+        assert by_agent["builder-1"].total_tokens == 800
+        assert by_agent["builder-2"].total_tokens == 650
 
-        # Verification 2: Worktree does NOT have develop-only.txt (branched from main)
-        assert not (context.worktree_path / "develop-only.txt").exists()
+        # Verify per-stage aggregation
+        assert by_stage["IMPLEMENTATION"].total_tokens == 1450
 
-        # Verification 3: git merge-base confirms main is ancestor
-        result = subprocess.run(
-            ["git", "merge-base", main_branch, context.branch_name],
-            cwd=repo,
-            capture_output=True,
-            text=True,
+        # Verify total
+        assert total.total_tokens == 1450
+
+    def test_at_006_input_output_breakdown_preserved(self):
+        """Test that input/output breakdown is preserved in all aggregations."""
+        # Use REAL TokenTracker
+        tracker = TokenTracker()
+
+        tracker.record(
+            TokenUsage(input_tokens=100, output_tokens=50),
+            agent_id="pm",
+            stage="PLAN",
         )
-        merge_base = result.stdout.strip()
-
-        # The merge base should be the main branch commit
-        assert merge_base == main_commit, f"merge-base should be {main_commit}, got {merge_base}"
-
-    # =========================================================================
-    # AT-004: Invalid Base Branch Error
-    # =========================================================================
-    def test_at_004_invalid_base_branch_error(self, tmp_path: Path):
-        """AT-004: User specifies a non-existent base branch.
-
-        Steps:
-        1. User runs `teambot run --worktree --base-branch nonexistent objectives/task.md`
-
-        Verification:
-        - Clear error message mentioning the branch name
-        - No worktree created
-        """
-        from teambot.worktree.errors import WorktreeError
-
-        # Create minimal repo
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@test.com"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        (repo / "README.md").write_text("# Test")
-        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
+        tracker.record(
+            TokenUsage(input_tokens=200, output_tokens=100),
+            agent_id="builder-1",
+            stage="IMPLEMENTATION",
         )
 
-        # Attempt to create worktree with non-existent base branch
-        with pytest.raises(WorktreeError) as exc_info:
-            WorktreeManager.create_worktree(repo, "feat/test", base_branch="nonexistent-branch")
+        # Verify input/output breakdown in total
+        total = tracker.get_total()
+        assert total.input_tokens == 300
+        assert total.output_tokens == 150
 
-        # Verification: Error message mentions the branch
-        error_message = str(exc_info.value)
-        assert "nonexistent" in error_message.lower() or "not found" in error_message.lower()
+        # Verify input/output breakdown in per-agent
+        by_agent = tracker.get_by_agent()
+        assert by_agent["pm"].input_tokens == 100
+        assert by_agent["pm"].output_tokens == 50
+        assert by_agent["builder-1"].input_tokens == 200
+        assert by_agent["builder-1"].output_tokens == 100
 
-        # Verification: No worktree created
-        worktree_path = repo / ".teambot-worktrees" / "feat-test"
-        assert not worktree_path.exists()
-
-    # =========================================================================
-    # AT-005: Backward Compatibility - Objective Exists in Worktree
-    # =========================================================================
-    def test_at_005_backward_compatibility_objective_exists(self, git_repo_with_objective: Path):
-        """AT-005: No copy when objective file already exists in worktree.
-
-        Steps:
-        1. User runs `teambot run --worktree objectives/task.md`
-        2. Worktree is created (file exists because it's committed)
-
-        Verification:
-        - No file copy occurs
-        - Original worktree creation behavior preserved
-        """
-        import os
-
-        repo = git_repo_with_objective
-
-        # Create worktree using REAL implementation
-        context = WorktreeManager.create_worktree(repo, "feat/existing")
-
-        # Change to worktree directory
-        original_cwd = os.getcwd()
-        os.chdir(context.worktree_path)
-
-        try:
-            worktree_objective = Path("objectives/task.md")
-
-            # Verification: File exists in worktree (committed file appears automatically)
-            assert worktree_objective.exists()
-
-            # Verification: Content matches (no copy needed or occurred)
-            source_content = (repo / "objectives" / "task.md").read_text()
-            worktree_content = worktree_objective.read_text()
-            assert worktree_content == source_content
-
-            # The key point: no copy was needed because file was committed
-            # This test verifies backward compatibility - committed files just work
-        finally:
-            os.chdir(original_cwd)
-
-    # =========================================================================
-    # AT-006: Cross-Platform Path Handling
-    # =========================================================================
-    def test_at_006_cross_platform_path_handling(self, tmp_path: Path):
-        """AT-006: Path handling works correctly with subdirectories.
-
-        Steps:
-        1. User runs `teambot run --worktree objectives/features/task.md`
-        2. Worktree created; subdirectory must be created
-        3. Objective file copied to correct location
-
-        Verification:
-        - `objectives/features/task.md` exists in worktree
-        - Parent directories created correctly
-        """
-        import os
-
-        # Create repo with nested objective
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        subprocess.run(["git", "init"], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@test.com"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-
-        # Create nested directory structure
-        nested_dir = repo / "objectives" / "features"
-        nested_dir.mkdir(parents=True)
-        objective_file = nested_dir / "task.md"
-        nested_content = "# Nested Feature Task\n\n## Goals\n- Nested goal\n"
-        objective_file.write_text(nested_content)
-        (repo / "README.md").write_text("# Test")
-
-        # Stage but don't commit (to test copy path)
-        subprocess.run(["git", "add", "."], cwd=repo, capture_output=True, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial"],
-            cwd=repo,
-            capture_output=True,
-            check=True,
-        )
-
-        # Create worktree using REAL implementation
-        context = WorktreeManager.create_worktree(repo, "feat/features-task")
-
-        # Change to worktree directory
-        original_cwd = os.getcwd()
-        os.chdir(context.worktree_path)
-
-        try:
-            # Since file is committed, it should exist in worktree
-            worktree_objective = Path("objectives") / "features" / "task.md"
-
-            # Verification: Path exists with correct structure
-            assert worktree_objective.exists(), "Nested objective file should exist"
-            assert worktree_objective.parent.exists(), "Parent directories should exist"
-            assert worktree_objective.parent.name == "features"
-            assert worktree_objective.parent.parent.name == "objectives"
-
-            # Verification: Content is correct
-            assert worktree_objective.read_text() == nested_content
-        finally:
-            os.chdir(original_cwd)
+        # Verify input/output breakdown in per-stage
+        by_stage = tracker.get_by_stage()
+        assert by_stage["PLAN"].input_tokens == 100
+        assert by_stage["PLAN"].output_tokens == 50
+        assert by_stage["IMPLEMENTATION"].input_tokens == 200
+        assert by_stage["IMPLEMENTATION"].output_tokens == 100

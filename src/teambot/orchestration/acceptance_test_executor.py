@@ -259,9 +259,12 @@ class AcceptanceTestExecutor:
 
         # Execute via builder agent
         try:
-            self.validation_output = await asyncio.wait_for(
+            _result = await asyncio.wait_for(
                 sdk_client.execute_streaming("builder-1", prompt, None),
                 timeout=self.timeout,
+            )
+            self.validation_output, _token_usage = (
+                _result if isinstance(_result, tuple) else (_result, None)
             )
         except TimeoutError:
             self.validation_output = "ERROR: Validation timed out"

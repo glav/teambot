@@ -103,6 +103,9 @@ def create_default_config() -> dict[str, Any]:
                 "post_review",
             ]
         },
+        "token_tracking": {
+            "enabled": True,
+        },
     }
 
 
@@ -164,6 +167,10 @@ class ConfigLoader:
         # Validate logging config if present
         if "logging" in config:
             self._validate_logging(config["logging"])
+
+        # Validate token_tracking config if present
+        if "token_tracking" in config:
+            self._validate_token_tracking(config["token_tracking"])
 
     def _validate_agent(self, agent: dict[str, Any], seen_ids: set[str]) -> None:
         """Validate a single agent configuration."""
@@ -298,6 +305,22 @@ class ConfigLoader:
                     f"'logging.level' must be one of: {', '.join(sorted(VALID_LOG_LEVELS))}"
                 )
 
+    def _validate_token_tracking(self, token_tracking: dict[str, Any]) -> None:
+        """Validate token_tracking configuration.
+
+        Args:
+            token_tracking: The token_tracking configuration dict.
+
+        Raises:
+            ConfigError: If validation fails.
+        """
+        if not isinstance(token_tracking, dict):
+            raise ConfigError("'token_tracking' must be an object")
+
+        if "enabled" in token_tracking:
+            if not isinstance(token_tracking["enabled"], bool):
+                raise ConfigError("'token_tracking.enabled' must be a boolean")
+
     def _apply_defaults(self, config: dict[str, Any]) -> None:
         """Apply default values for missing optional fields."""
         if "teambot_dir" not in config:
@@ -337,3 +360,10 @@ class ConfigLoader:
         if "level" not in logging_cfg:
             logging_cfg["level"] = "INFO"
         # Note: console_output defaults to None (mode-dependent)
+
+        # Apply token_tracking defaults (enabled by default)
+        if "token_tracking" not in config:
+            config["token_tracking"] = {}
+        token_tracking = config["token_tracking"]
+        if "enabled" not in token_tracking:
+            token_tracking["enabled"] = True

@@ -7,6 +7,8 @@ import importlib.metadata
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
+from rich.console import Console
+
 from teambot import __version__
 from teambot.config.schema import (
     get_available_models,
@@ -19,6 +21,7 @@ from teambot.repl.router import VALID_AGENTS
 if TYPE_CHECKING:
     from teambot.repl.router import AgentRouter
     from teambot.tasks.executor import TaskExecutor
+    from teambot.tokens.tracker import TokenTracker
 
 
 @dataclass
@@ -108,6 +111,7 @@ Available commands:
   /cancel <id>   - Cancel pending task
   /use-agent <id> - Set default agent for plain text input
   /reset-agent   - Reset default agent to config value
+  /tokens        - Show session token usage (`/cost` is alias, `-d` for details)
   /history       - Show command history
   /quit          - Exit interactive mode
 
@@ -612,6 +616,43 @@ def handle_cancel(args: list[str], executor: Optional["TaskExecutor"]) -> Comman
         )
 
 
+def handle_tokens(args: list[str], token_tracker: Optional["TokenTracker"] = None) -> CommandResult:
+    """Handle /tokens command - show session token usage.
+
+    Args:
+        args: Command arguments. Supports --detailed or -d for per-agent breakdown.
+        token_tracker: Optional TokenTracker instance (may be None if tracking disabled).
+
+    Returns:
+        CommandResult with token usage summary.
+    """
+    if token_tracker is None:
+        return CommandResult(output="Token tracking is disabled")
+
+    total = token_tracker.get_total()
+    if total.total_tokens is None or total.total_tokens == 0:
+        return CommandResult(output="No token usage recorded yet")
+
+    # Check for --detailed flag
+    detailed = "--detailed" in args or "-d" in args
+
+    if detailed:
+        from teambot.tokens.display import render_token_summary
+
+        by_agent = token_tracker.get_by_agent()
+        panel = render_token_summary(total, by_agent)
+        # Convert Rich Panel to string for CommandResult
+        console = Console(force_terminal=False, no_color=True, width=80)
+        with console.capture() as capture:
+            console.print(panel)
+        return CommandResult(output=capture.get().strip())
+    else:
+        from teambot.tokens.display import render_session_summary
+
+        summary = render_session_summary(total)
+        return CommandResult(output=summary)
+
+
 class SystemCommands:
     """Handler for system commands in REPL.
 
@@ -624,6 +665,7 @@ class SystemCommands:
         executor: Optional["TaskExecutor"] = None,
         router: Optional["AgentRouter"] = None,
         config: dict | None = None,
+        token_tracker: Optional["TokenTracker"] = None,
     ):
         """Initialize system commands.
 
@@ -632,11 +674,13 @@ class SystemCommands:
             executor: Optional task executor for task commands.
             router: Optional agent router for default agent commands.
             config: Optional configuration dict for notification settings.
+            token_tracker: Optional TokenTracker for session token usage.
         """
         self._orchestrator = orchestrator
         self._executor: TaskExecutor | None = executor
         self._router = router
         self._config = config
+        self._token_tracker = token_tracker
         self._history: list[dict[str, Any]] = []
         self._session_model_overrides: dict[str, str] = {}
 
@@ -689,6 +733,8 @@ class SystemCommands:
             "model": self.model,
             "use-agent": self.use_agent,
             "reset-agent": self.reset_agent,
+            "tokens": self.tokens,
+            "cost": self.tokens,  # Alias
         }
 
         handler = handlers.get(command)
@@ -758,3 +804,7 @@ class SystemCommands:
     def reset_agent(self, args: list[str]) -> CommandResult:
         """Handle /reset-agent command."""
         return handle_reset_agent(args, self._router)
+
+    def tokens(self, args: list[str]) -> CommandResult:
+        """Handle /tokens command."""
+        return handle_tokens(args, self._token_tracker)
