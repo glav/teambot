@@ -269,9 +269,7 @@ class TeamBotApp(App):
                     output.write_streaming_chunk(agent_id, chunk)
 
                 try:
-                    result = await self._sdk_client.execute_streaming(
-                        agent_id, content, on_chunk
-                    )
+                    result = await self._sdk_client.execute_streaming(agent_id, content, on_chunk)
                     result_text = self._handle_streaming_result(result, agent_id)
                     task.mark_completed(result_text)
                     # Store result by agent_id for $ref lookups
