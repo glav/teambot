@@ -10,7 +10,7 @@ include = ["src/teambot/**/*.css", "src/teambot/scaffolds/**"]
 
 [project]
 name = "teambot"
-version = "0.3.0"
+version = "0.4.0"
 description = "CLI wrapper for GitHub Copilot CLI enabling autonomous AI agent teams"
 requires-python = ">=3.10"
 dependencies = [
