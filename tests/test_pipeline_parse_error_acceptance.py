@@ -66,9 +66,7 @@ class TestPipelineParseErrorAcceptance:
             Parsed as 3-stage pipeline
         """
         # Call REAL implementation
-        result = parse_command(
-            "@pm create a plan -> @builder-1 implement it -> @reviewer check it"
-        )
+        result = parse_command("@pm create a plan -> @builder-1 implement it -> @reviewer check it")
 
         # Verify: is_pipeline == True, len(pipeline) == 3, agents correct
         assert result.is_pipeline is True, "Should be parsed as pipeline"
