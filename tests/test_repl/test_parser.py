@@ -519,3 +519,145 @@ class TestExtractReferences:
     def test_extract_ignores_numeric_start(self):
         """$100 is not a valid reference (must start with letter)."""
         assert extract_references("Cost is $100") == []
+
+
+class TestQuoteAwareHelpers:
+    """Tests for quote-aware helper functions."""
+
+    def test_is_in_quotes_double(self):
+        """Position inside double quotes detected."""
+        from teambot.repl.parser import _is_in_quotes
+
+        text = 'before "inside" after'
+        assert _is_in_quotes(text, 0) is False  # 'b'
+        assert _is_in_quotes(text, 8) is True  # 'i'
+        assert _is_in_quotes(text, 16) is False  # 'a'
+
+    def test_is_in_quotes_single(self):
+        """Position inside single quotes detected."""
+        from teambot.repl.parser import _is_in_quotes
+
+        text = "before 'inside' after"
+        assert _is_in_quotes(text, 0) is False
+        assert _is_in_quotes(text, 8) is True
+        assert _is_in_quotes(text, 16) is False
+
+    def test_is_in_quotes_nested(self):
+        """Inner quotes don't close outer quotes."""
+        from teambot.repl.parser import _is_in_quotes
+
+        text = """before "outer 'inner' outer" after"""
+        assert _is_in_quotes(text, 8) is True  # 'o' in outer
+        assert _is_in_quotes(text, 15) is True  # 'i' - still in double quotes
+        assert _is_in_quotes(text, 22) is True  # second 'o' - still in double
+        assert _is_in_quotes(text, 30) is False  # 'a' in after
+
+    def test_has_pipeline_outside_quotes_true(self):
+        """Detects pipeline outside quotes."""
+        from teambot.repl.parser import _has_pipeline_outside_quotes
+
+        assert _has_pipeline_outside_quotes("@pm task -> @builder") is True
+
+    def test_has_pipeline_outside_quotes_false(self):
+        """No pipeline when arrow is quoted."""
+        from teambot.repl.parser import _has_pipeline_outside_quotes
+
+        assert _has_pipeline_outside_quotes('@pm "-> @builder" syntax') is False
+
+    def test_split_pipeline_respects_quotes(self):
+        """Split only happens outside quotes."""
+        from teambot.repl.parser import _split_pipeline_quote_aware
+
+        parts = _split_pipeline_quote_aware('@pm "-> @ba" -> @builder')
+        assert len(parts) == 2
+        assert parts[0] == '@pm "-> @ba"'
+        assert parts[1] == "@builder"
+
+
+class TestQuotedPipelineHandling:
+    """Tests for pipeline detection with quoted strings."""
+
+    def test_double_quoted_arrow_not_pipeline(self):
+        """UT-002: Arrow inside double quotes is not a pipeline."""
+        result = parse_command('@pm explain "-> @builder-1" syntax')
+
+        assert result.is_pipeline is False
+        assert result.agent_id == "pm"
+        assert '"-> @builder-1"' in result.content
+
+    def test_single_quoted_arrow_not_pipeline(self):
+        """UT-001: Arrow inside single quotes is not a pipeline."""
+        result = parse_command("@pm explain '-> @builder-1' syntax")
+
+        assert result.is_pipeline is False
+        assert result.agent_id == "pm"
+        assert "'-> @builder-1'" in result.content
+
+    def test_nested_quotes_handled(self):
+        """UT-003: Inner quotes of different type don't close outer."""
+        result = parse_command("@pm explain \"the '-> @notify' syntax\"")
+
+        assert result.is_pipeline is False
+        assert "'-> @notify'" in result.content
+
+    def test_quoted_arrow_with_agent_mention(self):
+        """UT-004: Quoted arrow with agent mention not pipeline."""
+        result = parse_command("@pm explain '-> @builder' syntax")
+
+        assert result.is_pipeline is False
+        assert result.agent_id == "pm"
+
+    def test_mixed_quoted_and_unquoted_arrows(self):
+        """UT-005: Quoted arrows ignored, unquoted arrows split."""
+        result = parse_command('@pm explain "-> @ba" then -> @builder-1 implement')
+
+        assert result.is_pipeline is True
+        assert len(result.pipeline) == 2
+        assert '"-> @ba"' in result.pipeline[0].content
+        assert result.pipeline[1].agent_ids == ["builder-1"]
+
+    def test_multiple_quoted_arrows_no_pipeline(self):
+        """UT-006: Multiple quoted arrows do not create pipeline."""
+        result = parse_command('@pm compare "-> @ba" with "-> @notify"')
+
+        assert result.is_pipeline is False
+        assert '"-> @ba"' in result.content
+        assert '"-> @notify"' in result.content
+
+    def test_unclosed_quote_treats_rest_as_quoted(self):
+        """UT-007: Unclosed quote protects remaining content."""
+        result = parse_command('@pm explain "-> @builder-1 is cool')
+
+        assert result.is_pipeline is False
+
+    def test_empty_quotes_around_arrow(self):
+        """UT-008: Empty quotes before arrow, unquoted arrow works."""
+        result = parse_command("@pm '' -> @builder-1 task")
+
+        assert result.is_pipeline is True
+        assert len(result.pipeline) == 2
+
+    def test_quoted_content_with_real_pipeline(self):
+        """Quoted content before real pipeline works."""
+        result = parse_command('@pm "task description" -> @builder-1 implement')
+
+        assert result.is_pipeline is True
+        assert len(result.pipeline) == 2
+        assert '"task description"' in result.pipeline[0].content
+        assert result.pipeline[1].agent_ids == ["builder-1"]
+
+
+class TestQuotedDefaultAgentPipeline:
+    """Tests for default agent pipeline detection with quotes."""
+
+    def test_quoted_arrow_no_default_agent_needed(self):
+        """UT-010: Quoted arrow doesn't trigger default agent prepend."""
+        assert needs_default_agent_for_pipeline('explain "-> @notify" to me') is False
+
+    def test_unquoted_arrow_needs_default_agent(self):
+        """Unquoted arrow triggers default agent prepend."""
+        assert needs_default_agent_for_pipeline("tell joke -> @notify") is True
+
+    def test_mixed_quotes_only_unquoted_counts(self):
+        """UT-009: Only unquoted arrows trigger default agent."""
+        assert needs_default_agent_for_pipeline('explain "-> @ba" then -> @notify') is True

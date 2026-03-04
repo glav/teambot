@@ -14,7 +14,8 @@
                         ],
                         "url": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainerFeature.schema.json"
                     }
-                ]
+                ],
+                "python.terminal.activateEnvInCurrentTerminal": false
             },
             "extensions": [
                 "mads-hartmann.bash-ide-vscode",

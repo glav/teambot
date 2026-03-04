@@ -96,6 +96,117 @@ REFERENCE_PATTERN = re.compile(r"(?<!\\)\$([a-zA-Z][a-zA-Z0-9_-]*)")
 MODEL_FLAG_PATTERN = re.compile(r"(?:--model|-m)\s+([^\s]+)")
 
 
+def _is_in_quotes(text: str, pos: int) -> bool:
+    """Check if position in text is inside a quoted string.
+
+    Args:
+        text: The text to check.
+        pos: Position to check (0-indexed).
+
+    Returns:
+        True if position is inside single or double quotes.
+    """
+    in_single = False
+    in_double = False
+    for i, char in enumerate(text):
+        if i >= pos:
+            break
+        if char == '"' and not in_single:
+            in_double = not in_double
+        elif char == "'" and not in_double:
+            # Only check for apostrophe when NOT already in single quotes
+            # If we're in single quotes, this is a closing quote
+            if in_single or not _is_apostrophe(text, i):
+                in_single = not in_single
+    return in_single or in_double
+
+
+def _is_apostrophe(text: str, pos: int) -> bool:
+    """Check if single quote at position is likely an apostrophe (not a string delimiter).
+
+    Args:
+        text: The text to check.
+        pos: Position of the single quote.
+
+    Returns:
+        True if the single quote is likely an apostrophe in a word.
+    """
+    # Apostrophe is preceded by a letter (e.g., "what's", "don't")
+    if pos > 0 and text[pos - 1].isalpha():
+        return True
+    return False
+
+
+def _has_pipeline_outside_quotes(text: str) -> bool:
+    """Check if text contains -> @ pattern outside quoted strings.
+
+    Args:
+        text: The text to check.
+
+    Returns:
+        True if unquoted pipeline pattern found.
+    """
+    i = 0
+    in_single = False
+    in_double = False
+    while i < len(text):
+        char = text[i]
+        if char == '"' and not in_single:
+            in_double = not in_double
+        elif char == "'" and not in_double:
+            # Only check for apostrophe when NOT already in single quotes
+            # If we're in single quotes, this is a closing quote
+            if in_single or not _is_apostrophe(text, i):
+                in_single = not in_single
+        elif not (in_single or in_double):
+            rest = text[i:]
+            if re.match(r"\s*->\s*@", rest):
+                return True
+        i += 1
+    return False
+
+
+def _split_pipeline_quote_aware(text: str) -> list[str]:
+    """Split text by -> @ pattern only when outside quotes.
+
+    Args:
+        text: Text potentially containing pipeline operators.
+
+    Returns:
+        List of parts split at unquoted -> @ patterns.
+        The @ is preserved at the start of each subsequent part.
+    """
+    parts = []
+    current_start = 0
+    i = 0
+    in_single = False
+    in_double = False
+
+    while i < len(text):
+        char = text[i]
+        if char == '"' and not in_single:
+            in_double = not in_double
+        elif char == "'" and not in_double:
+            # Only check for apostrophe when NOT already in single quotes
+            # If we're in single quotes, this is a closing quote
+            if in_single or not _is_apostrophe(text, i):
+                in_single = not in_single
+        elif not (in_single or in_double):
+            rest = text[i:]
+            match = re.match(r"\s*->\s*(?=@)", rest)
+            if match:
+                parts.append(text[current_start:i])
+                i += match.end()
+                current_start = i
+                continue
+        i += 1
+
+    if current_start < len(text):
+        parts.append(text[current_start:])
+
+    return parts
+
+
 def extract_references(content: str | None) -> list[str]:
     """Extract $agent references from content.
 
@@ -161,7 +272,11 @@ def needs_default_agent_for_pipeline(input_text: str) -> bool:
     Returns:
         True if input needs default agent for pipeline parsing.
     """
-    return RAW_PIPELINE_PATTERN.match(input_text) is not None
+    # First check the basic pattern, then verify it's not in quotes
+    if not RAW_PIPELINE_PATTERN.match(input_text):
+        return False
+    # Use quote-aware detection to avoid false positives from quoted arrows
+    return _has_pipeline_outside_quotes(input_text)
 
 
 def prepend_default_agent(input_text: str, default_agent: str) -> str:
@@ -189,8 +304,8 @@ def _parse_agent_command(input_text: str, agent_match: re.Match) -> Command:
     Returns:
         Parsed Command object.
     """
-    # Check for pipeline (->)
-    if PIPELINE_PATTERN.search(input_text):
+    # Check for pipeline (->) using quote-aware detection
+    if _has_pipeline_outside_quotes(input_text):
         return _parse_pipeline(input_text)
 
     # Parse single stage
@@ -269,9 +384,9 @@ def _parse_pipeline(input_text: str) -> Command:
     Returns:
         Parsed Command with pipeline stages.
     """
-    # Split by -> @
+    # Split by -> @ using quote-aware splitting
     # We need to preserve the @ for each stage after the split
-    parts = re.split(r"\s*->\s*(?=@)", input_text)
+    parts = _split_pipeline_quote_aware(input_text)
 
     if len(parts) < 2:
         # Not actually a pipeline, treat as regular command

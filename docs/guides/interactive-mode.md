@@ -19,9 +19,25 @@ teambot: /status
 teambot: /help
 ```
 
-## Pipelines with Dependencies
+## Pipeline Operator (`->`)
 
-Use `->` to chain tasks where each depends on the previous output:
+The pipeline operator chains multiple agent commands together, passing context from one stage to the next.
+
+### Basic Syntax
+
+```
+@agent1 <task> -> @agent2 <task> -> @agent3 <task>
+```
+
+### How It Works
+
+| Stage | Input | Output |
+|-------|-------|--------|
+| First (`@agent1`) | User's task | Result passed to next stage |
+| Middle (`@agent2`) | Previous result + task | Result passed to next stage |
+| Final (`@agent3`) | Previous result + task | Displayed to user |
+
+### Examples
 
 ```bash
 # Two-stage pipeline: plan then implement
@@ -30,6 +46,14 @@ teambot: @pm Create a plan for user authentication -> @builder-1 Implement based
 # Three-stage pipeline: requirements -> implementation -> review
 teambot: @ba Write requirements for the API -> @builder-1 Implement this API -> @reviewer Review the implementation
 ```
+
+| Command | Description |
+|---------|-------------|
+| `@pm plan feature -> @builder-1 implement` | PM plans, builder implements |
+| `@ba requirements -> @writer document -> @reviewer review` | 3-stage workflow |
+| `tell joke -> @notify` | Uses default agent for first stage |
+
+### Context Flow
 
 The output from each stage is automatically injected into the next agent's context:
 
@@ -46,6 +70,12 @@ Implementation complete...
 [Context includes implementation from @builder-1]
 Code review feedback...
 ```
+
+### Rules
+
+- Each stage must target an agent (`@agent`)
+- Stages execute sequentially, not in parallel
+- Use quotes to mention `->` literally: `@pm explain the "->" operator`
 
 ## Multi-Agent Same Prompt
 
