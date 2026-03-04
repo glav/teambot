@@ -93,9 +93,7 @@ class TestPipelineParseErrorAcceptance:
         # Verify: is_pipeline == False, full quoted string preserved in content
         assert result.is_pipeline is False, "Should NOT be parsed as pipeline"
         assert result.agent_id == "pm", "Should route to PM agent"
-        assert "'->'".replace("'", "'") in result.content or "'->" in result.content, (
-            "Content should preserve the nested quoted arrow"
-        )
+        assert "'->'" in result.content, "Content should preserve the nested quoted arrow"
 
     def test_at_005_error_message_quality_preserved(self):
         """AT-005: Malformed pipeline still produces helpful error.
