@@ -8,6 +8,7 @@ import pytest
 from teambot.repl.parser import ParseError, parse_command
 
 
+@pytest.mark.acceptance
 class TestPipelineParseErrorAcceptance:
     """Acceptance tests for quote-aware pipeline parsing."""
 
