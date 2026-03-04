@@ -1094,6 +1094,15 @@ class ExecutionLoop:
         }
         return fallback_outputs.get(stage, [])
 
+    def _resolve_project_root(self) -> Path:
+        """Resolve project root for relative stage paths and git checkpoints."""
+        if self.stages_config.source != "built-in-defaults":
+            # For explicit stages.yaml, treat its directory as project root.
+            return Path(self.stages_config.source).parent
+
+        # For built-in defaults, self.teambot_dir is .teambot/<feature>.
+        return self.teambot_dir.parent.parent
+
     def _load_prompt_template(self, stage_config: Any) -> str | None:
         """Load prompt template content from file if specified.
 
@@ -1106,12 +1115,8 @@ class ExecutionLoop:
         if not stage_config or not stage_config.prompt_template:
             return None
 
-        # Resolve path relative to project root (where stages.yaml lives)
-        # Find project root by looking for common markers
-        project_root = self.teambot_dir.parent  # .teambot parent is project root
-        if self.stages_config.source != "built-in-defaults":
-            # Use the directory containing stages.yaml as reference
-            project_root = Path(self.stages_config.source).parent
+        # Resolve path relative to project root (where stages.yaml lives).
+        project_root = self._resolve_project_root()
 
         template_path = project_root / stage_config.prompt_template
         if template_path.exists():
@@ -1200,6 +1205,8 @@ class ExecutionLoop:
         if not self.config.get("git_checkpoints", False):
             return
 
+        project_root = self._resolve_project_root()
+
         try:
             # Check if there are any changes to commit
             result = subprocess.run(
@@ -1207,6 +1214,8 @@ class ExecutionLoop:
                 capture_output=True,
                 text=True,
                 timeout=30,
+                check=True,
+                cwd=project_root,
             )
             if not result.stdout.strip():
                 return  # Nothing to commit
@@ -1218,6 +1227,7 @@ class ExecutionLoop:
                 text=True,
                 timeout=30,
                 check=True,
+                cwd=project_root,
             )
 
             # Commit with stage-identifying message
@@ -1229,9 +1239,10 @@ class ExecutionLoop:
                 text=True,
                 timeout=30,
                 check=True,
+                cwd=project_root,
             )
             logger.debug("Git checkpoint created for %s", completed_stage.name)
-        except Exception:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
             logger.debug("Git checkpoint skipped for %s (non-fatal)", completed_stage.name)
 
     @classmethod

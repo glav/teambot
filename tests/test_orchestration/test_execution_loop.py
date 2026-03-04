@@ -751,6 +751,111 @@ work_to_review_mapping: {}
         assert "nonexistent/prompt.md" not in context
         assert "# Objective:" in context
 
+    def test_load_prompt_template_from_builtin_defaults_uses_repo_root(
+        self, objective_file: Path, teambot_dir: Path, test_stages_config
+    ) -> None:
+        """Built-in defaults resolve prompt paths relative to repository root."""
+        prompt_file = teambot_dir.parent / ".agent" / "commands" / "sdd" / "builtin.prompt.md"
+        prompt_file.parent.mkdir(parents=True)
+        prompt_file.write_text(
+            "# Built-in Prompt\n\nUse repo-root relative path.", encoding="utf-8"
+        )
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=test_stages_config,
+        )
+        loop.stages_config.stages[
+            WorkflowStage.SPEC
+        ].prompt_template = ".agent/commands/sdd/builtin.prompt.md"
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "# Built-in Prompt" in context
+        assert "Use repo-root relative path." in context
+
+
+class TestGitCheckpointing:
+    """Tests for git checkpoint behavior."""
+
+    def test_create_git_checkpoint_uses_project_root_cwd(
+        self,
+        objective_file: Path,
+        teambot_dir: Path,
+        test_stages_config,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Built-in defaults run git subprocess calls from .teambot parent directory."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"git_checkpoints": True},
+            teambot_dir=teambot_dir,
+            stages_config=test_stages_config,
+        )
+        expected_cwd = teambot_dir.parent
+        calls: list[tuple[list[str], dict]] = []
+
+        class _Result:
+            def __init__(self, stdout: str = "") -> None:
+                self.stdout = stdout
+
+        def fake_run(cmd: list[str], **kwargs):
+            calls.append((cmd, kwargs))
+            if cmd[:2] == ["git", "status"]:
+                return _Result(stdout=" M src/teambot/orchestration/execution_loop.py")
+            return _Result(stdout="")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+
+        loop._create_git_checkpoint(WorkflowStage.SPEC)
+
+        assert [cmd for cmd, _ in calls] == [
+            ["git", "status", "--porcelain"],
+            ["git", "add", "-A"],
+            ["git", "commit", "-m", "teambot: user-authentication — SPEC complete", "--no-verify"],
+        ]
+        assert all(kwargs["cwd"] == expected_cwd for _, kwargs in calls)
+
+    def test_create_git_checkpoint_uses_stages_source_dir_when_configured(
+        self,
+        objective_file: Path,
+        teambot_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Configured stages.yaml source directory is used as git checkpoint cwd."""
+        stages_yaml = tmp_path / "custom-repo" / "stages.yaml"
+        stages_yaml.parent.mkdir(parents=True)
+        stages_yaml.write_text("stages: {}", encoding="utf-8")
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={"git_checkpoints": True},
+            teambot_dir=teambot_dir,
+        )
+        loop.stages_config.source = str(stages_yaml.resolve())
+
+        expected_cwd = stages_yaml.parent.resolve()
+        calls: list[tuple[list[str], dict]] = []
+
+        class _Result:
+            def __init__(self, stdout: str = "") -> None:
+                self.stdout = stdout
+
+        def fake_run(cmd: list[str], **kwargs):
+            calls.append((cmd, kwargs))
+            if cmd[:2] == ["git", "status"]:
+                return _Result(stdout=" M src/teambot/orchestration/execution_loop.py")
+            return _Result(stdout="")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+
+        loop._create_git_checkpoint(WorkflowStage.SPEC)
+
+        assert all(kwargs["cwd"] == expected_cwd for _, kwargs in calls)
+
 
 class TestFeatureSpecFinding:
     """Tests for finding and loading feature specifications."""
