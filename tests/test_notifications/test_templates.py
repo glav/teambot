@@ -457,7 +457,7 @@ class TestCustomMessageTemplate:
             event_type="critical_failure",
             data={
                 "artifact": "<script>alert('xss')</script>",
-                "stage": "TEST",
+                "stage": "ACCEPTANCE_TEST",
                 "recovery_steps": ["<b>Do not trust</b> this input"],
             },
             feature_name="xss-test",

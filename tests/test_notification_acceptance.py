@@ -47,7 +47,7 @@ class TestNotificationAcceptanceScenarios:
         # Create REAL NotificationEvent for stage completion
         event = NotificationEvent(
             event_type="stage_changed",
-            data={"stage": "BUSINESS_PROBLEM"},
+            data={"stage": "SPEC"},
             feature_name="simple-task",
         )
 
@@ -57,7 +57,7 @@ class TestNotificationAcceptanceScenarios:
         # Verify message format
         assert "📌" in message or "✅" in message  # Emoji prefix
         assert "<b>" in message  # Bold formatting
-        assert "BUSINESS_PROBLEM" in message  # Stage name
+        assert "SPEC" in message  # Stage name
         assert "simple-task" in message  # Feature name
 
         # Test actual send with mocked HTTP (external service)
@@ -88,7 +88,7 @@ class TestNotificationAcceptanceScenarios:
             call_args = mock_client.post.call_args
             assert "sendMessage" in call_args[0][0]
             assert call_args[1]["json"]["parse_mode"] == "HTML"
-            assert "BUSINESS_PROBLEM" in call_args[1]["json"]["text"]
+            assert "SPEC" in call_args[1]["json"]["text"]
 
     # =========================================================================
     # AT-002: Notification Failure Does Not Block Workflow

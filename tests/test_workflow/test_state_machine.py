@@ -135,8 +135,7 @@ class TestWorkflowStateMachine:
     def test_can_transition_valid(self, teambot_dir):
         """Test valid transition check."""
         machine = WorkflowStateMachine(teambot_dir)
-        # From SETUP, can go to BUSINESS_PROBLEM or SPEC
-        assert machine.can_transition_to(WorkflowStage.BUSINESS_PROBLEM)
+        # From SETUP, can go to SPEC
         assert machine.can_transition_to(WorkflowStage.SPEC)
 
     def test_can_transition_invalid(self, teambot_dir):
@@ -160,16 +159,6 @@ class TestWorkflowStateMachine:
         machine = WorkflowStateMachine(teambot_dir)
         with pytest.raises(ValueError, match="Cannot transition"):
             machine.transition_to(WorkflowStage.COMPLETE)
-
-    def test_skip_optional_stage(self, teambot_dir):
-        """Test skipping optional stage."""
-        machine = WorkflowStateMachine(teambot_dir)
-        # First transition to BUSINESS_PROBLEM
-        machine.transition_to(WorkflowStage.BUSINESS_PROBLEM)
-
-        # BUSINESS_PROBLEM is optional, skip it
-        machine.skip_stage(WorkflowStage.BUSINESS_PROBLEM)
-        assert machine.current_stage == WorkflowStage.SPEC
 
     def test_skip_required_stage_raises(self, teambot_dir):
         """Test skipping required stage raises error."""
@@ -222,7 +211,6 @@ class TestWorkflowStateMachine:
         machine.transition_to(WorkflowStage.PLAN_REVIEW)
         machine.transition_to(WorkflowStage.IMPLEMENTATION)
         machine.transition_to(WorkflowStage.IMPLEMENTATION_REVIEW)
-        machine.transition_to(WorkflowStage.TEST)
         machine.transition_to(WorkflowStage.ACCEPTANCE_TEST)
         machine.transition_to(WorkflowStage.POST_REVIEW)
         machine.transition_to(WorkflowStage.COMPLETE)
@@ -247,7 +235,6 @@ class TestWorkflowStateMachine:
         machine.transition_to(WorkflowStage.PLAN_REVIEW)
         machine.transition_to(WorkflowStage.IMPLEMENTATION)
         machine.transition_to(WorkflowStage.IMPLEMENTATION_REVIEW)
-        machine.transition_to(WorkflowStage.TEST)
         machine.transition_to(WorkflowStage.ACCEPTANCE_TEST)
         machine.transition_to(WorkflowStage.POST_REVIEW)
         machine.transition_to(WorkflowStage.COMPLETE)

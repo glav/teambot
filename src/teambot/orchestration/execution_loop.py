@@ -52,12 +52,11 @@ WORK_TO_REVIEW_MAPPING = {
     WorkflowStage.SPEC: WorkflowStage.SPEC_REVIEW,
     WorkflowStage.PLAN: WorkflowStage.PLAN_REVIEW,
     WorkflowStage.IMPLEMENTATION: WorkflowStage.IMPLEMENTATION_REVIEW,
-    WorkflowStage.TEST: WorkflowStage.POST_REVIEW,
+    WorkflowStage.ACCEPTANCE_TEST: WorkflowStage.POST_REVIEW,
 }
 
 STAGE_AGENTS = {
     WorkflowStage.SETUP: {"work": "pm", "review": None},
-    WorkflowStage.BUSINESS_PROBLEM: {"work": "ba", "review": None},
     WorkflowStage.SPEC: {"work": "ba", "review": "reviewer"},
     WorkflowStage.SPEC_REVIEW: {"work": "ba", "review": "reviewer"},
     WorkflowStage.RESEARCH: {"work": "builder-1", "review": None},
@@ -66,14 +65,13 @@ STAGE_AGENTS = {
     WorkflowStage.PLAN_REVIEW: {"work": "pm", "review": "reviewer"},
     WorkflowStage.IMPLEMENTATION: {"work": "builder-1", "review": "reviewer"},
     WorkflowStage.IMPLEMENTATION_REVIEW: {"work": "builder-1", "review": "reviewer"},
-    WorkflowStage.TEST: {"work": "builder-1", "review": None},
+    WorkflowStage.ACCEPTANCE_TEST: {"work": "builder-1", "review": None},
     WorkflowStage.POST_REVIEW: {"work": "pm", "review": "reviewer"},
     WorkflowStage.COMPLETE: {"work": None, "review": None},
 }
 
 STAGE_ORDER = [
     WorkflowStage.SETUP,
-    WorkflowStage.BUSINESS_PROBLEM,
     WorkflowStage.SPEC,
     WorkflowStage.SPEC_REVIEW,
     WorkflowStage.RESEARCH,
@@ -82,7 +80,7 @@ STAGE_ORDER = [
     WorkflowStage.PLAN_REVIEW,
     WorkflowStage.IMPLEMENTATION,
     WorkflowStage.IMPLEMENTATION_REVIEW,
-    WorkflowStage.TEST,
+    WorkflowStage.ACCEPTANCE_TEST,
     WorkflowStage.POST_REVIEW,
     WorkflowStage.COMPLETE,
 ]
@@ -258,6 +256,9 @@ class ExecutionLoop:
 
                 # Save state after each stage completion for resumability
                 self._save_state()
+
+                # Create git checkpoint for rollback and clean diffs
+                self._create_git_checkpoint(stage)
 
             self._emit_completed_event(on_progress, "complete")
             self._save_state(ExecutionResult.COMPLETE)
@@ -1182,6 +1183,56 @@ class ExecutionLoop:
             state["token_tracking"] = self._token_tracker.to_dict()
 
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    def _create_git_checkpoint(self, completed_stage: WorkflowStage) -> None:
+        """Create a git commit checkpoint after a stage completes.
+
+        This enables clean diffs for review stages and rollback on failures.
+        Failures are logged but do not halt the workflow.
+        Only runs when git_checkpoints is enabled in config.
+        """
+        import logging
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        # Only create checkpoints when explicitly enabled
+        if not self.config.get("git_checkpoints", False):
+            return
+
+        try:
+            # Check if there are any changes to commit
+            result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if not result.stdout.strip():
+                return  # Nothing to commit
+
+            # Stage all changes
+            subprocess.run(
+                ["git", "add", "-A"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True,
+            )
+
+            # Commit with stage-identifying message
+            feature = self.feature_name or "unknown"
+            msg = f"teambot: {feature} — {completed_stage.name} complete"
+            subprocess.run(
+                ["git", "commit", "-m", msg, "--no-verify"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True,
+            )
+            logger.debug("Git checkpoint created for %s", completed_stage.name)
+        except Exception:
+            logger.debug("Git checkpoint skipped for %s (non-fatal)", completed_stage.name)
 
     @classmethod
     def resume(cls, teambot_dir: Path, config: dict[str, Any]) -> ExecutionLoop:

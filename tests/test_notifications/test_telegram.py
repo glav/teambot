@@ -84,7 +84,7 @@ class TestTelegramChannelFormat:
         channel = TelegramChannel()
         event = NotificationEvent(
             event_type="review_progress",
-            data={"stage": "TEST", "message": "x" * 5000},
+            data={"stage": "ACCEPTANCE_TEST", "message": "x" * 5000},
             feature_name="test",
         )
 

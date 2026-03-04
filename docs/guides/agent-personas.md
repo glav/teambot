@@ -51,7 +51,7 @@ Use the short ID (e.g., `@pm`) or the full alias (e.g., `@project_manager`) when
 - Gathers and analyzes requirements
 - Defines business problems and goals
 - Creates user stories and acceptance criteria
-- Leads BUSINESS_PROBLEM and SPEC stages
+- Leads SPEC stage
 
 **When to use**: Requirements gathering, user stories, acceptance criteria
 
@@ -100,19 +100,19 @@ Each stage has designated agents:
 | Stage | Primary Agent | Review Agent |
 |-------|---------------|--------------|
 | SETUP | pm | - |
-| BUSINESS_PROBLEM | ba, pm | - |
 | SPEC | ba, writer | reviewer |
 | RESEARCH | builder, writer | - |
 | TEST_STRATEGY | builder, reviewer | - |
 | PLAN | pm, builder | reviewer |
 | IMPLEMENTATION | builder-1, builder-2 | reviewer |
-| TEST | builder, reviewer | - |
+| IMPLEMENTATION_REVIEW | reviewer | - |
+| ACCEPTANCE_TEST | builder | - |
 | POST_REVIEW | pm, reviewer | - |
 
 ---
 
 ## Next Steps
 
-- [Workflow Stages](workflow-stages.md) - The 14-stage process
+- [Workflow Stages](workflow-stages.md) - The 12-stage process
 - [Interactive Mode](interactive-mode.md) - Using agents interactively
 - [Configuration](configuration.md) - Configuring agents

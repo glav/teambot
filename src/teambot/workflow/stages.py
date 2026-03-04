@@ -10,13 +10,12 @@ class WorkflowStage(Enum):
     """Prescriptive workflow stages.
 
     Workflow:
-    Setup → Business Problem → Spec → Review → Research →
+    Setup → Spec → Review → Research →
     Test Strategy → Plan → Review → Task Implementation →
-    Review → Test → Acceptance Test → Post Implementation Review
+    Review → Acceptance Test → Post Implementation Review
     """
 
     SETUP = auto()
-    BUSINESS_PROBLEM = auto()
     SPEC = auto()
     SPEC_REVIEW = auto()
     RESEARCH = auto()
@@ -25,7 +24,6 @@ class WorkflowStage(Enum):
     PLAN_REVIEW = auto()
     IMPLEMENTATION = auto()
     IMPLEMENTATION_REVIEW = auto()
-    TEST = auto()
     ACCEPTANCE_TEST = auto()
     POST_REVIEW = auto()
     COMPLETE = auto()
@@ -51,14 +49,6 @@ STAGE_METADATA: dict[WorkflowStage, StageMetadata] = {
         allowed_personas=["project_manager", "pm"],
         required_artifacts=[],
         optional=False,
-        next_stages=[WorkflowStage.BUSINESS_PROBLEM, WorkflowStage.SPEC],
-    ),
-    WorkflowStage.BUSINESS_PROBLEM: StageMetadata(
-        name="Business Problem",
-        description="Define the business problem, goals, and success criteria",
-        allowed_personas=["business_analyst", "ba", "project_manager", "pm"],
-        required_artifacts=["problem_statement.md"],
-        optional=True,  # Skip for small changes
         next_stages=[WorkflowStage.SPEC],
     ),
     WorkflowStage.SPEC: StageMetadata(
@@ -122,14 +112,6 @@ STAGE_METADATA: dict[WorkflowStage, StageMetadata] = {
         description="Review implemented changes",
         allowed_personas=["reviewer"],
         required_artifacts=["impl_review.md"],
-        optional=False,
-        next_stages=[WorkflowStage.TEST],
-    ),
-    WorkflowStage.TEST: StageMetadata(
-        name="Test",
-        description="Execute tests and validate implementation",
-        allowed_personas=["builder", "developer", "reviewer"],
-        required_artifacts=["test_results.md"],
         optional=False,
         next_stages=[WorkflowStage.ACCEPTANCE_TEST],
     ),

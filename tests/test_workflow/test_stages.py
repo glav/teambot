@@ -18,7 +18,6 @@ class TestWorkflowStage:
         """Test all expected stages are defined."""
         expected = [
             "SETUP",
-            "BUSINESS_PROBLEM",
             "SPEC",
             "SPEC_REVIEW",
             "RESEARCH",
@@ -27,7 +26,6 @@ class TestWorkflowStage:
             "PLAN_REVIEW",
             "IMPLEMENTATION",
             "IMPLEMENTATION_REVIEW",
-            "TEST",
             "ACCEPTANCE_TEST",
             "POST_REVIEW",
             "COMPLETE",
@@ -37,7 +35,7 @@ class TestWorkflowStage:
 
     def test_stage_count(self):
         """Test correct number of stages."""
-        assert len(WorkflowStage) == 14
+        assert len(WorkflowStage) == 12
 
 
 class TestStageMetadata:
@@ -85,7 +83,7 @@ class TestStageMetadataRegistry:
         meta = STAGE_METADATA[WorkflowStage.SETUP]
         assert meta.name == "Setup"
         assert "pm" in meta.allowed_personas or "project_manager" in meta.allowed_personas
-        assert WorkflowStage.BUSINESS_PROBLEM in meta.next_stages
+        assert WorkflowStage.SPEC in meta.next_stages
 
     def test_implementation_metadata(self):
         """Test IMPLEMENTATION stage metadata."""
@@ -139,10 +137,6 @@ class TestCanSkipStage:
         """Test SETUP cannot be skipped."""
         assert can_skip_stage(WorkflowStage.SETUP) is False
 
-    def test_business_problem_skippable(self):
-        """Test BUSINESS_PROBLEM can be skipped."""
-        assert can_skip_stage(WorkflowStage.BUSINESS_PROBLEM) is True
-
     def test_spec_not_skippable(self):
         """Test SPEC cannot be skipped."""
         assert can_skip_stage(WorkflowStage.SPEC) is False
@@ -154,7 +148,6 @@ class TestGetNextStages:
     def test_setup_next_stages(self):
         """Test SETUP next stages."""
         next_stages = get_next_stages(WorkflowStage.SETUP)
-        assert WorkflowStage.BUSINESS_PROBLEM in next_stages
         assert WorkflowStage.SPEC in next_stages
 
     def test_spec_next_stage(self):

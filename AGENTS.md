@@ -20,7 +20,7 @@ teambot/
 │   ├── messaging/            # Inter-agent messaging (multiprocessing queues)
 │   ├── prompts/              # Persona-specific prompt templates
 │   ├── visualization/        # Rich console display
-│   └── workflow/             # 13-stage workflow state machine
+│   └── workflow/             # 12-stage workflow state machine
 ├── tests/                    # Test suite (1050 tests, 80% coverage)
 ├── docs/
 │   ├── guides/               # User documentation (10 guides)
@@ -111,13 +111,18 @@ uv run ruff format .
 | `builder-2` | Builder (Secondary) | Implementation (parallel) |
 | `reviewer` | Reviewer | Code review, QA |
 
-### Workflow Stages (14)
+### Workflow Stages (12)
 
 ```
-SETUP → BUSINESS_PROBLEM → SPEC → SPEC_REVIEW → RESEARCH →
-TEST_STRATEGY → PLAN → PLAN_REVIEW → IMPLEMENTATION →
-IMPLEMENTATION_REVIEW → TEST → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
+SETUP → SPEC → SPEC_REVIEW → RESEARCH ∥ TEST_STRATEGY →
+PLAN → PLAN_REVIEW → IMPLEMENTATION →
+IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
+
+**Notes:**
+- `RESEARCH` and `TEST_STRATEGY` run in parallel (denoted by `∥`)
+- `IMPLEMENTATION_REVIEW` now also verifies test execution and coverage (the former standalone `TEST` stage has been merged into it)
+- Stages support `prerequisite_artifacts`, `output_schema`, `max_context_tokens`, and git checkpoints for fine-grained control
 
 ### Key Components
 
@@ -163,6 +168,8 @@ A sequential workflow with quality gates for taking a feature from specification
 | `commands/sdd/sdd.5-task-planner-for-feature.prompt.md` | Creates actionable implementation plans for the feature. |
 | `commands/sdd/sdd.6-review-plan.prompt.md` | Reviews and validates implementation plans before execution. |
 | `commands/sdd/sdd.7-task-implementer-for-feature.prompt.md` | Implements task plans with progressive tracking and change records. |
+| `commands/sdd/sdd.7b-implementation-review.prompt.md` | Reviews implementation changes, verifies test execution and coverage. |
+| `commands/sdd/sdd.7c-acceptance-test.prompt.md` | Runs end-to-end acceptance tests against the implementation. |
 | `commands/sdd/sdd.8-post-implementation-review.prompt.md` | Performs post-implementation review and final validation. |
 
 #### Instructions (`instructions/`)

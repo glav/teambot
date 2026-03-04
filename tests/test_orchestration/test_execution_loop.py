@@ -428,6 +428,11 @@ class TestExecutionLoopStatePersistence:
             teambot_dir=teambot_dir,
         )
 
+        # Create prerequisite artifacts so stages can reach the review stage
+        artifacts_dir = loop.teambot_dir / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        (artifacts_dir / "feature_spec.md").write_text("# Spec", encoding="utf-8")
+
         # Create a client that always rejects
         mock_client = AsyncMock()
         mock_client.execute_streaming.return_value = "REJECTED: Not good enough."
@@ -1558,6 +1563,12 @@ This feature implements user authentication functionality.
         config = load_stages_config()
         config.stages[WorkflowStage.PLAN_REVIEW].prerequisite_artifacts = ["plan.md"]
 
+        # Create artifacts needed for all stages before PLAN_REVIEW
+        (artifacts_dir / "spec_review.md").write_text("# Review", encoding="utf-8")
+        (artifacts_dir / "research.md").write_text("# Research", encoding="utf-8")
+        (artifacts_dir / "test_strategy.md").write_text("# Test Strategy", encoding="utf-8")
+        (artifacts_dir / "implementation_plan.md").write_text("# Plan", encoding="utf-8")
+
         loop = ExecutionLoop(
             objective_path=obj_path,
             config={},
@@ -1616,6 +1627,7 @@ This feature implements user authentication functionality.
         config = load_stages_config()
         for stage_config in config.stages.values():
             stage_config.prerequisites = []
+            stage_config.prerequisite_artifacts = []
 
         loop = ExecutionLoop(
             objective_path=obj_path,

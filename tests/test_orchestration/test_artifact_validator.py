@@ -77,7 +77,7 @@ class TestMissingArtifactError:
         """MissingArtifactError is a proper Exception subclass."""
         error = MissingArtifactError(
             artifact_path=Path("test.md"),
-            stage="TEST",
+            stage="ACCEPTANCE_TEST",
             recovery_steps=["Step 1"],
         )
         assert isinstance(error, Exception)
@@ -109,7 +109,7 @@ class TestMissingArtifactError:
         """Exception accepts Path objects for artifact_path."""
         error = MissingArtifactError(
             artifact_path=Path("/absolute/path/to/file.md"),
-            stage="TEST",
+            stage="ACCEPTANCE_TEST",
             recovery_steps=["Do something"],
         )
         assert isinstance(error.artifact_path, Path)

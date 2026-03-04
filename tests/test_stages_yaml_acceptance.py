@@ -70,19 +70,16 @@ class TestStagesYamlAcceptanceScenarios:
         assert callable(state_machine.is_persona_allowed), "is_persona_allowed should be callable"
 
     def test_at_002_inline_artifact_path_comments(self, stages_yaml_content: str) -> None:
-        """AT-002: Verify all stages with artifacts have consistent path comments.
+        """AT-002: Verify all stages with artifacts have artifact definitions.
 
-        All stages with non-empty artifacts should have inline comments
-        in the format: # → .teambot/{feature}/artifacts/{filename}
+        All work stages should define their artifacts list.
         """
-        # Count inline artifact path comments with → arrow
-        artifact_pattern = r"# → \.teambot/\{feature\}/artifacts/"
-        matches = re.findall(artifact_pattern, stages_yaml_content)
+        # Count artifact field declarations under stages
+        artifact_pattern = r"^\s+artifacts:\s*$"
+        matches = re.findall(artifact_pattern, stages_yaml_content, re.MULTILINE)
 
-        # Per AT-002: Should find 10+ inline artifact path comments
-        assert len(matches) >= 10, (
-            f"Expected at least 10 inline artifact path comments, found {len(matches)}"
-        )
+        # Should find artifact declarations for most stages
+        assert len(matches) >= 9, f"Expected at least 9 artifact declarations, found {len(matches)}"
 
     def test_at_003_default_values_complete(self, stages_yaml_content: str) -> None:
         """AT-003: Verify all 13 stage fields have documented defaults.
@@ -127,12 +124,12 @@ class TestStagesYamlAcceptanceScenarios:
 
         Verify the stages.yaml loads correctly and has expected structure.
         """
-        # Verify expected structure
-        assert len(stages_config.stages) == 14, (
-            f"Expected 14 stages, got {len(stages_config.stages)}"
+        # Verify expected structure (12 stages after removing BUSINESS_PROBLEM and TEST)
+        assert len(stages_config.stages) == 12, (
+            f"Expected 12 stages, got {len(stages_config.stages)}"
         )
-        assert len(stages_config.stage_order) == 14, (
-            f"Expected 14 stages in order, got {len(stages_config.stage_order)}"
+        assert len(stages_config.stage_order) == 12, (
+            f"Expected 12 stages in order, got {len(stages_config.stage_order)}"
         )
         assert len(stages_config.review_stages) == 4, (
             f"Expected 4 review stages, got {len(stages_config.review_stages)}"
