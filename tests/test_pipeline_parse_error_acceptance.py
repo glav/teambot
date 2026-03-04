@@ -28,9 +28,7 @@ class TestPipelineParseErrorAcceptance:
         # Verify: result.is_pipeline == False and '->' appears in result.content
         assert result.is_pipeline is False, "Should NOT be parsed as pipeline"
         assert result.agent_id == "pm", "Should route to PM agent"
-        assert "'->'".replace("'", "'") in result.content or "'->" in result.content, (
-            "Content should include the quoted arrow operator"
-        )
+        assert "'->'" in result.content, "Content should include the quoted arrow operator"
 
     def test_at_002_mixed_quoted_and_unquoted_pipeline(self):
         """AT-002: User explains syntax and then actually uses a pipeline.
