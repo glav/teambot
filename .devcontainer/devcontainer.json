@@ -15,6 +15,7 @@
                         "url": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainerFeature.schema.json"
                     }
                 ],
+                "python.terminal.activateEnvironment": false,
                 "python.terminal.activateEnvInCurrentTerminal": false
             },
             "extensions": [
