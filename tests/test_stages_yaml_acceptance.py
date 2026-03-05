@@ -80,7 +80,14 @@ class TestStagesYamlAcceptanceScenarios:
         stages_data = data.get("stages", {})
 
         # Should find artifact declarations for most stages
-        assert len(matches) >= 8, f"Expected at least 8 artifact declarations, found {len(matches)}"
+        stages_with_artifacts = [
+            stage_name
+            for stage_name, stage_data in stages_data.items()
+            if "artifacts" in stage_data
+        ]
+        assert len(stages_with_artifacts) >= 8, (
+            f"Expected at least 8 artifact declarations, found {len(stages_with_artifacts)}"
+        )
         stages_missing_artifacts = [
             stage_name
             for stage_name, stage_data in stages_data.items()
