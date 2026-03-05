@@ -105,7 +105,7 @@ Each stage has designated agents:
 | TEST_STRATEGY | builder, reviewer | - |
 | PLAN | pm, builder | reviewer |
 | IMPLEMENTATION | builder-1, builder-2 | reviewer |
-| IMPLEMENTATION_REVIEW | reviewer | - |
+| IMPLEMENTATION_REVIEW | builder-1 | reviewer |
 | ACCEPTANCE_TEST | builder | - |
 | POST_REVIEW | pm, reviewer | - |
 
