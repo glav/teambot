@@ -1242,8 +1242,13 @@ class ExecutionLoop:
                 cwd=project_root,
             )
             logger.debug("Git checkpoint created for %s", completed_stage.name)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
-            logger.debug("Git checkpoint skipped for %s (non-fatal)", completed_stage.name)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+            logger.debug(
+                "Git checkpoint skipped for %s (non-fatal): %s",
+                completed_stage.name,
+                exc,
+                exc_info=True,
+            )
 
     @classmethod
     def resume(cls, teambot_dir: Path, config: dict[str, Any]) -> ExecutionLoop:
