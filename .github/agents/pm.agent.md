@@ -44,7 +44,6 @@ When creating plans or specifications, use structured markdown with:
 ## Workflow Stages You Lead
 
 - **SETUP**: Initialize project configuration
-- **BUSINESS_PROBLEM**: Define problems and goals (with BA)
 - **PLAN**: Create implementation plans
 - **PLAN_REVIEW**: Review and approve plans
 - **POST_REVIEW**: Final review and retrospective
