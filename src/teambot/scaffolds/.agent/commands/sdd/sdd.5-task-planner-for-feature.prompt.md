@@ -351,3 +351,84 @@ PLANNING_VALIDATION: PASS | FAIL
 - Dependency Graph: INCLUDED | N/A (<5 tasks) | MISSING
 - Circular Dependencies: NONE | FOUND (list)
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "PLAN",
+  "status": "COMPLETE",
+  "total_phases": 3,
+  "total_tasks": 12,
+  "artifacts_produced": ["implementation_plan.md"],
+  "blockers": []
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "PLAN" | Stage identifier (must be exactly "PLAN") |
+| `status` | string | Yes | "COMPLETE", "INCOMPLETE" | Planning outcome |
+| `total_phases` | integer | Yes | Positive integer | Number of implementation phases defined |
+| `total_tasks` | integer | Yes | Positive integer | Total number of tasks across all phases |
+| `artifacts_produced` | array | Yes | Array of strings | List of files created (typically `["implementation_plan.md"]`) |
+| `blockers` | array | No | Array of strings | List of issues preventing completion. Use empty array `[]` when no blockers exist |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Implementation Plan: [Feature Name]
+
+[Your markdown plan here...]
+
+### ✅ Plan Complete
+
+Implementation plan with 3 phases and 12 actionable tasks is ready for review.
+
+```json
+{
+  "stage": "PLAN",
+  "status": "COMPLETE",
+  "total_phases": 3,
+  "total_tasks": 12,
+  "artifacts_produced": ["implementation_plan.md"],
+  "blockers": []
+}
+```
+````
+
+### Status Field Logic
+
+- Use `"status": "COMPLETE"` when all tasks are defined with clear file references and dependencies
+- Use `"status": "INCOMPLETE"` when critical planning questions remain unresolved
+- Count `total_phases` as the number of major implementation phases (typically 2-5)
+- Count `total_tasks` as all individual tasks across all phases
+- Always include `"implementation_plan.md"` in `artifacts_produced` if the file was created
+- Populate `blockers` array with specific issues when status is "INCOMPLETE"
+
+### Example: Incomplete Plan
+
+```json
+{
+  "stage": "PLAN",
+  "status": "INCOMPLETE",
+  "total_phases": 2,
+  "total_tasks": 8,
+  "artifacts_produced": ["implementation_plan.md"],
+  "blockers": [
+    "Database migration strategy requires DBA approval",
+    "API rate limiting approach needs security review",
+    "Test data generation strategy is undefined"
+  ]
+}
+```

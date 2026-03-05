@@ -303,3 +303,94 @@ All implementation tasks have been completed.
 **➡️ Recommended Next Step:**
 Run **Step 8** (`sdd.8-post-implementation-review.prompt.md`) for final validation and cleanup.
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "IMPLEMENTATION",
+  "status": "COMPLETE",
+  "tasks_completed": 12,
+  "tasks_total": 12,
+  "files_created": 3,
+  "files_modified": 5,
+  "tests_written": 8,
+  "tests_passing": true,
+  "blockers": []
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "IMPLEMENTATION" | Stage identifier (must be exactly "IMPLEMENTATION") |
+| `status` | string | Yes | "COMPLETE", "INCOMPLETE" | Implementation outcome |
+| `tasks_completed` | integer | Yes | Non-negative integer | Number of tasks finished |
+| `tasks_total` | integer | Yes | Positive integer | Total number of tasks in plan |
+| `files_created` | integer | No | Non-negative integer | Number of new files created |
+| `files_modified` | integer | No | Non-negative integer | Number of existing files changed |
+| `tests_written` | integer | No | Non-negative integer | Number of test cases added |
+| `tests_passing` | boolean | No | true, false | Whether all tests pass |
+| `blockers` | array | No | Array of strings | List of issues preventing completion. Use empty array `[]` when no blockers exist |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Implementation Complete: [Feature Name]
+
+[Your markdown implementation summary here...]
+
+### ✅ All Tasks Complete
+
+12/12 tasks completed successfully with all tests passing.
+
+```json
+{
+  "stage": "IMPLEMENTATION",
+  "status": "COMPLETE",
+  "tasks_completed": 12,
+  "tasks_total": 12,
+  "files_created": 3,
+  "files_modified": 5,
+  "tests_written": 8,
+  "tests_passing": true,
+  "blockers": []
+}
+```
+````
+
+### Status Field Logic
+
+- Use `"status": "COMPLETE"` when `tasks_completed == tasks_total` and all tests pass
+- Use `"status": "INCOMPLETE"` when tasks remain or tests fail
+- Set `tests_passing: true` only when all test suites pass
+- Populate `blockers` array with specific issues when status is "INCOMPLETE"
+
+### Example: Incomplete Implementation
+
+```json
+{
+  "stage": "IMPLEMENTATION",
+  "status": "INCOMPLETE",
+  "tasks_completed": 8,
+  "tasks_total": 12,
+  "files_created": 2,
+  "files_modified": 4,
+  "tests_written": 5,
+  "tests_passing": false,
+  "blockers": [
+    "Task 9: Database migration fails on PostgreSQL 13",
+    "Task 11: API rate limiting causes test timeouts",
+    "3 unit tests failing due to mock configuration"
+  ]
+}
+```
