@@ -955,9 +955,6 @@ class ExecutionLoop:
                 stage=stage.name,
             )
 
-        # Store output for later stages
-        self.stage_outputs[stage] = output
-
         # Validate output against JSON schema if configured for this stage
         stage_config_for_schema = self.stages_config.stages.get(stage)
         if stage_config_for_schema and stage_config_for_schema.output_schema:
@@ -966,6 +963,9 @@ class ExecutionLoop:
                 stage_config_for_schema.output_schema,
                 stage,
             )
+
+        # Store output for later stages only after validation succeeds
+        self.stage_outputs[stage] = output
 
         if on_progress:
             on_progress("agent_complete", {"agent_id": work_agent})
@@ -1193,19 +1193,31 @@ class ExecutionLoop:
         Returns:
             The extracted JSON string, or None if no JSON was found.
         """
+        import json
         import re
+
+        def _extract_first_json_block(candidate_text: str) -> str | None:
+            decoder = json.JSONDecoder()
+            for index, char in enumerate(candidate_text):
+                if char not in "{[":
+                    continue
+                try:
+                    _, end_index = decoder.raw_decode(candidate_text, index)
+                except json.JSONDecodeError:
+                    continue
+                return candidate_text[index:end_index]
+            return None
 
         # Try markdown code block first (``` json ... ``` or ``` ... ```)
         match = re.search(r"```(?:json)?\s*\n?([\s\S]*?)\n?```", text)
         if match:
-            return match.group(1).strip()
+            extracted = _extract_first_json_block(match.group(1).strip())
+            if extracted is not None:
+                return extracted
 
-        # Try to find raw JSON object or array (greedy — captures from the first
-        # opening brace/bracket to the last closing one, which is the outermost
-        # structure in typical single-JSON LLM responses).
-        match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
-        if match:
-            return match.group(1)
+        extracted = _extract_first_json_block(text)
+        if extracted is not None:
+            return extracted
 
         return None
 

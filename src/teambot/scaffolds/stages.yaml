@@ -287,7 +287,6 @@ stages:
       - implementation_plan.md
     prerequisite_artifacts:
       - research.md
-      - test_strategy.md
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
@@ -303,7 +302,7 @@ stages:
         artifacts_produced: { type: array, items: { type: string } }
         blockers: { type: array, items: { type: string } }
       required: ["stage", "status", "total_phases", "total_tasks", "artifacts_produced"]
-    max_context_tokens: 32000  # Needs research + test strategy + spec
+    max_context_tokens: 32000  # Needs research + spec + planning context
 
   PLAN_REVIEW:
     name: Plan Review
@@ -374,7 +373,7 @@ stages:
         tests_passing: { type: boolean }
         blockers: { type: array, items: { type: string } }
       required: ["stage", "status", "tasks_completed", "tasks_total"]
-    max_context_tokens: 48000  # Largest context — needs plan, details, research, test strategy
+    max_context_tokens: 48000  # Largest context — needs plan, details, and research context
 
   IMPLEMENTATION_REVIEW:
     name: Implementation Review
@@ -390,7 +389,6 @@ stages:
       - test_results.md
     prerequisite_artifacts:
       - implementation_plan.md
-      - test_strategy.md
     exit_criteria:
       - Implementation approved or revision feedback provided
       - All tests passing

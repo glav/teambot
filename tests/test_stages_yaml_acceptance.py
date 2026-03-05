@@ -167,3 +167,45 @@ class TestStagesYamlAcceptanceScenarios:
         # Verify work_to_review_mapping
         assert stages_config.work_to_review_mapping[WorkflowStage.SPEC] == WorkflowStage.SPEC_REVIEW
         assert stages_config.work_to_review_mapping[WorkflowStage.PLAN] == WorkflowStage.PLAN_REVIEW
+
+    @pytest.mark.parametrize(
+        "stages_file",
+        [Path("stages.yaml"), Path("src/teambot/scaffolds/stages.yaml")],
+    )
+    def test_at_006_prerequisite_artifacts_have_modeled_source(self, stages_file: Path) -> None:
+        """AT-006: Every prerequisite artifact has an upstream producer or explicit source."""
+        data = yaml.safe_load(stages_file.read_text(encoding="utf-8"))
+        stages_data = data.get("stages", {})
+        stage_order: list[str] = data.get("stage_order", [])
+
+        producers_by_artifact: dict[str, set[str]] = {}
+        for stage_name, stage_data in stages_data.items():
+            for artifact in stage_data.get("artifacts", []):
+                producers_by_artifact.setdefault(artifact, set()).add(stage_name)
+
+        stage_positions = {stage_name: index for index, stage_name in enumerate(stage_order)}
+
+        # Add non-stage-produced artifacts here only if intentionally sourced from
+        # outside the stage graph (for example: user-provided files).
+        explicitly_modeled_external_sources: set[str] = set()
+
+        missing_sources: list[tuple[str, str]] = []
+        for stage_name, stage_data in stages_data.items():
+            for prerequisite in stage_data.get("prerequisite_artifacts", []):
+                producers = producers_by_artifact.get(prerequisite, set())
+                upstream_producers = {
+                    producer
+                    for producer in producers
+                    if stage_positions.get(producer, -1) < stage_positions.get(stage_name, -1)
+                }
+                if (
+                    not upstream_producers
+                    and prerequisite not in explicitly_modeled_external_sources
+                ):
+                    missing_sources.append((stage_name, prerequisite))
+
+        assert not missing_sources, (
+            "Each prerequisite_artifact must be produced by an upstream stage artifacts list "
+            "or be declared in explicitly_modeled_external_sources. "
+            f"Missing: {missing_sources}"
+        )

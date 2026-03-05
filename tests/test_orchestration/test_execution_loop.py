@@ -1973,12 +1973,30 @@ class TestExtractJsonFromOutput:
         result = loop._extract_json_from_output(text)
 
         assert result is not None
-        # The greedy regex captures from first { to last } — verify it's valid JSON
+        # Verify extracted content is parseable JSON.
         import json
 
         parsed = json.loads(result)
         assert parsed["stage"] == "SETUP"
         assert parsed["status"] == "PASS"
+
+    def test_extracts_first_json_when_multiple_objects_present(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Extraction returns the first complete JSON object from mixed output."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        text = (
+            'First result {"stage": "SPEC", "status": "COMPLETE"} then notes '
+            'and another object {"extra": true}.'
+        )
+        result = loop._extract_json_from_output(text)
+
+        assert result == '{"stage": "SPEC", "status": "COMPLETE"}'
 
     def test_returns_none_for_no_json(self, objective_file: Path, teambot_dir: Path) -> None:
         """None is returned when there is no JSON in the output."""
@@ -2051,6 +2069,23 @@ class TestOutputSchemaValidation:
         assert output == output_with_block
 
     @pytest.mark.asyncio
+    async def test_interleaved_multiple_json_objects_uses_first_complete_object(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Schema validation succeeds when extra JSON appears later in output."""
+        output = (
+            'Primary payload: {"stage": "SPEC", "status": "COMPLETE"}\n'
+            'Additional debug object: {"debug": true}'
+        )
+        mock_sdk_client.execute_streaming.return_value = output
+        loop.sdk_client = mock_sdk_client
+
+        result = await loop._execute_work_stage(WorkflowStage.SPEC, None)
+
+        assert result == output
+        assert loop.stage_outputs[WorkflowStage.SPEC] == output
+
+    @pytest.mark.asyncio
     async def test_non_json_output_raises_critical_failure(
         self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
     ) -> None:
@@ -2065,6 +2100,7 @@ class TestOutputSchemaValidation:
 
         assert exc_info.value.stage == "SPEC"
         assert "does not contain valid JSON" in exc_info.value.error
+        assert WorkflowStage.SPEC not in loop.stage_outputs
 
     @pytest.mark.asyncio
     async def test_schema_violation_raises_critical_failure(
@@ -2082,6 +2118,7 @@ class TestOutputSchemaValidation:
 
         assert exc_info.value.stage == "SPEC"
         assert "status" in exc_info.value.error
+        assert WorkflowStage.SPEC not in loop.stage_outputs
 
     @pytest.mark.asyncio
     async def test_schema_violation_results_in_critical_failure_run(
