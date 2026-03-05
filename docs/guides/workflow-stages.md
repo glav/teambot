@@ -1,11 +1,11 @@
 # Workflow Stages
 
-TeamBot enforces a 12-stage prescriptive workflow for autonomous development.
+TeamBot enforces a 11-stage prescriptive workflow for autonomous development.
 
 ## Stage Flow
 
 ```
-SETUP → SPEC → SPEC_REVIEW → RESEARCH ∥ TEST_STRATEGY →
+SETUP → SPEC → SPEC_REVIEW → RESEARCH →
 PLAN → PLAN_REVIEW → IMPLEMENTATION →
 IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
@@ -18,7 +18,6 @@ IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 | `SPEC` | Create feature specification | BA, Writer |
 | `SPEC_REVIEW` | Review and approve spec | Reviewer, PM |
 | `RESEARCH` | Research technical approaches | Builder, Writer |
-| `TEST_STRATEGY` | Define testing approach | Builder, Reviewer |
 | `PLAN` | Create implementation plan | PM, Builder |
 | `PLAN_REVIEW` | Review and approve plan | Reviewer, PM |
 | `IMPLEMENTATION` | Execute the plan | Builder (parallel) |

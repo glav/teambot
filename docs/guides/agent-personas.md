@@ -102,7 +102,6 @@ Each stage has designated agents:
 | SETUP | pm | - |
 | SPEC | ba, writer | reviewer |
 | RESEARCH | builder, writer | - |
-| TEST_STRATEGY | builder, reviewer | - |
 | PLAN | pm, builder | reviewer |
 | IMPLEMENTATION | builder-1, builder-2 | reviewer |
 | IMPLEMENTATION_REVIEW | reviewer | - |

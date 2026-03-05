@@ -209,7 +209,6 @@ The `prompt_template` field allows stages to use specialized prompt files from `
 | SPEC | `sdd.1-create-feature-spec.prompt.md` | Feature specification creation |
 | SPEC_REVIEW | `sdd.2-review-spec.prompt.md` | Specification review |
 | RESEARCH | `sdd.3-research-feature.prompt.md` | Technical research |
-| TEST_STRATEGY | `sdd.4-determine-test-strategy.prompt.md` | Test approach planning |
 | PLAN | `sdd.5-task-planner-for-feature.prompt.md` | Task breakdown |
 | PLAN_REVIEW | `sdd.6-review-plan.prompt.md` | Plan review |
 | IMPLEMENTATION | `sdd.7-task-implementer-for-feature.prompt.md` | Code implementation |

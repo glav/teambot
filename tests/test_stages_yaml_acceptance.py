@@ -79,7 +79,7 @@ class TestStagesYamlAcceptanceScenarios:
         matches = re.findall(artifact_pattern, stages_yaml_content, re.MULTILINE)
 
         # Should find artifact declarations for most stages
-        assert len(matches) >= 9, f"Expected at least 9 artifact declarations, found {len(matches)}"
+        assert len(matches) >= 8, f"Expected at least 8 artifact declarations, found {len(matches)}"
 
     def test_at_003_default_values_complete(self, stages_yaml_content: str) -> None:
         """AT-003: Verify all 13 stage fields have documented defaults.
@@ -124,12 +124,12 @@ class TestStagesYamlAcceptanceScenarios:
 
         Verify the stages.yaml loads correctly and has expected structure.
         """
-        # Verify expected structure (12 stages after removing BUSINESS_PROBLEM and TEST)
-        assert len(stages_config.stages) == 12, (
-            f"Expected 12 stages, got {len(stages_config.stages)}"
+        # Verify expected structure (11 stages after removing BUSINESS_PROBLEM, TEST, TEST_STRATEGY)
+        assert len(stages_config.stages) == 11, (
+            f"Expected 11 stages, got {len(stages_config.stages)}"
         )
-        assert len(stages_config.stage_order) == 12, (
-            f"Expected 12 stages in order, got {len(stages_config.stage_order)}"
+        assert len(stages_config.stage_order) == 11, (
+            f"Expected 11 stages in order, got {len(stages_config.stage_order)}"
         )
         assert len(stages_config.review_stages) == 4, (
             f"Expected 4 review stages, got {len(stages_config.review_stages)}"

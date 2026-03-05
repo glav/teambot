@@ -117,7 +117,7 @@ During the `IMPLEMENTATION` stage, `builder-1` and `builder-2` execute concurren
 
 ### Parallel Stage Executor (`orchestration/parallel_stage_executor.py`)
 
-Executes entire workflow stages concurrently when configured in `parallel_groups` (e.g., `RESEARCH` and `TEST_STRATEGY` run in parallel after `SPEC_REVIEW`). Each parallel stage must use a **different work_agent** — sharing the same agent across parallel stages causes SDK session conflicts and is rejected at startup.
+Executes entire workflow stages concurrently when configured in `parallel_groups` (e.g., two stages run in parallel after `SPEC_REVIEW`). Each parallel stage must use a **different work_agent** — sharing the same agent across parallel stages causes SDK session conflicts and is rejected at startup.
 
 ### Time Manager (`orchestration/time_manager.py`)
 

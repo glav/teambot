@@ -351,13 +351,6 @@ class TestArtifactPathResolution:
                     review_agent=None,
                     prerequisites=["research.md"],
                 ),
-                WorkflowStage.TEST_STRATEGY: StageConfig(
-                    name="Test Strategy",
-                    description="Define test strategy",
-                    work_agent="builder-1",
-                    review_agent=None,
-                    prerequisites=["test_strategy.md"],
-                ),
                 WorkflowStage.PLAN: StageConfig(
                     name="Plan",
                     description="Create implementation plan",
@@ -369,7 +362,6 @@ class TestArtifactPathResolution:
             stage_order=[
                 WorkflowStage.SPEC,
                 WorkflowStage.RESEARCH,
-                WorkflowStage.TEST_STRATEGY,
                 WorkflowStage.PLAN,
             ],
             work_to_review_mapping={},

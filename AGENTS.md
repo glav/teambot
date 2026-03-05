@@ -20,7 +20,7 @@ teambot/
 │   ├── messaging/            # Inter-agent messaging (multiprocessing queues)
 │   ├── prompts/              # Persona-specific prompt templates
 │   ├── visualization/        # Rich console display
-│   └── workflow/             # 12-stage workflow state machine
+│   └── workflow/             # 11-stage workflow state machine
 ├── tests/                    # Test suite (1050 tests, 80% coverage)
 ├── docs/
 │   ├── guides/               # User documentation (10 guides)
@@ -111,16 +111,15 @@ uv run ruff format .
 | `builder-2` | Builder (Secondary) | Implementation (parallel) |
 | `reviewer` | Reviewer | Code review, QA |
 
-### Workflow Stages (12)
+### Workflow Stages (11)
 
 ```
-SETUP → SPEC → SPEC_REVIEW → RESEARCH ∥ TEST_STRATEGY →
+SETUP → SPEC → SPEC_REVIEW → RESEARCH →
 PLAN → PLAN_REVIEW → IMPLEMENTATION →
 IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
 
 **Notes:**
-- `RESEARCH` and `TEST_STRATEGY` run in parallel (denoted by `∥`)
 - `IMPLEMENTATION_REVIEW` now also verifies test execution and coverage (the former standalone `TEST` stage has been merged into it)
 - Stages support `prerequisite_artifacts`, `output_schema`, `max_context_tokens`, and git checkpoints for fine-grained control
 
