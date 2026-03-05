@@ -43,6 +43,5 @@ When creating specifications or requirements:
 
 ## Workflow Stages You Lead
 
-- **BUSINESS_PROBLEM**: Define business problems and goals
 - **SPEC**: Create detailed feature specifications
 - **SPEC_REVIEW**: Address feedback on specifications
