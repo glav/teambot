@@ -69,7 +69,7 @@ Produce the results as a structured artifact.
 
 You MUST produce results in the following format. The JSON block at the top is machine-parseable by the orchestrator.
 
-```markdown
+````markdown
 # Acceptance Test Results
 
 ## Summary
@@ -112,7 +112,7 @@ You MUST produce results in the following format. The JSON block at the top is m
 
 ### AT-002: {{Next Scenario}}
 ...
-```
+````
 
 ## Execution Rules
 

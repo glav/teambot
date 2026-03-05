@@ -10,10 +10,11 @@ from typing import TYPE_CHECKING, Any
 from teambot.orchestration.acceptance_test_executor import (
     AcceptanceTestExecutor,
     AcceptanceTestResult,
+    AcceptanceTestScenario,
     generate_acceptance_test_report,
 )
 from teambot.orchestration.artifact_validator import ArtifactValidator
-from teambot.orchestration.exceptions import MissingArtifactError
+from teambot.orchestration.exceptions import MissingArtifactError, OutputSchemaValidationError
 from teambot.orchestration.objective_parser import parse_objective_file
 from teambot.orchestration.review_iterator import ReviewIterator, ReviewStatus
 from teambot.orchestration.stage_config import (
@@ -262,8 +263,8 @@ class ExecutionLoop:
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
-        except MissingArtifactError:
-            # Critical failure - missing required artifact
+        except (MissingArtifactError, OutputSchemaValidationError):
+            # Critical failure - missing required artifact or invalid stage output schema
             self._emit_completed_event(on_progress, "critical_failure")
             self._save_state(ExecutionResult.CRITICAL_FAILURE)
             return ExecutionResult.CRITICAL_FAILURE
@@ -474,6 +475,13 @@ class ExecutionLoop:
         )
 
         executor.load_scenarios()
+
+        if not executor.scenarios:
+            # Fall back to frontmatter acceptance scenarios if available
+            if self.objective.frontmatter.acceptance_scenarios:
+                executor.scenarios = self._frontmatter_scenarios_to_acceptance_tests(
+                    self.objective.frontmatter.acceptance_scenarios
+                )
 
         if not executor.scenarios:
             # No acceptance tests defined - this is an ERROR (acceptance tests are MANDATORY)
@@ -853,6 +861,35 @@ class ExecutionLoop:
 
         return None
 
+    def _frontmatter_scenarios_to_acceptance_tests(
+        self, scenarios_data: list[dict[str, Any]]
+    ) -> list[AcceptanceTestScenario]:
+        """Convert frontmatter acceptance_scenarios to AcceptanceTestScenario objects.
+
+        Args:
+            scenarios_data: List of scenario dicts from YAML frontmatter
+
+        Returns:
+            List of AcceptanceTestScenario instances
+        """
+        result = []
+        for i, s in enumerate(scenarios_data, 1):
+            scenario_id = f"AT-{i:03d}"
+            name = s.get("name", f"Scenario {i}")
+            # Frontmatter scenarios use `name` for both display name and description;
+            # a separate `description` key is used if present for fuller detail.
+            description = s.get("description", name)
+            result.append(
+                AcceptanceTestScenario(
+                    id=scenario_id,
+                    name=name,
+                    description=description,
+                    steps=s.get("steps", []),
+                    expected_result=s.get("expected", ""),
+                )
+            )
+        return result
+
     def _validate_required_artifacts(
         self,
         stage: WorkflowStage,
@@ -920,6 +957,15 @@ class ExecutionLoop:
 
         # Store output for later stages
         self.stage_outputs[stage] = output
+
+        # Validate output against JSON schema if configured for this stage
+        stage_config_for_schema = self.stages_config.stages.get(stage)
+        if stage_config_for_schema and stage_config_for_schema.output_schema:
+            self._validate_output_schema(
+                output,
+                stage_config_for_schema.output_schema,
+                stage,
+            )
 
         if on_progress:
             on_progress("agent_complete", {"agent_id": work_agent})
@@ -1011,6 +1057,20 @@ class ExecutionLoop:
             if self.objective.context:
                 parts.extend(["", "## Context", self.objective.context])
 
+            # Include frontmatter configuration if available
+            fmd = self.objective.frontmatter
+            config_parts = []
+            if fmd.language:
+                config_parts.append(f"- **Language**: {fmd.language}")
+            if fmd.framework:
+                config_parts.append(f"- **Framework**: {fmd.framework}")
+            if fmd.test_preference:
+                config_parts.append(f"- **Test Preference**: {fmd.test_preference}")
+            if fmd.scope:
+                config_parts.append(f"- **Scope**: {fmd.scope}")
+            if config_parts:
+                parts.extend(["", "## Project Configuration"] + config_parts)
+
         # Add working directory information
         parts.extend(
             [
@@ -1065,7 +1125,147 @@ class ExecutionLoop:
                     ]
                 )
 
-        return "\n".join(parts)
+        context = "\n".join(parts)
+
+        # Enforce max_context_tokens budget: truncate context if it exceeds the soft limit
+        if stage_config and stage_config.max_context_tokens is not None:
+            context = self._enforce_context_token_limit(
+                context, stage_config.max_context_tokens, stage
+            )
+
+        return context
+
+    def _enforce_context_token_limit(
+        self,
+        context: str,
+        max_context_tokens: int,
+        stage: WorkflowStage,
+    ) -> str:
+        """Truncate context to fit within the configured token budget.
+
+        Uses the rough 4-chars-per-token heuristic from ContextCompactor.
+        When the context exceeds the budget, it is truncated from the end
+        (which trims prior stage outputs first) and a notice is appended.
+
+        Args:
+            context: Full context string to potentially truncate.
+            max_context_tokens: Maximum allowed token count for this stage.
+            stage: The workflow stage (for log messages).
+
+        Returns:
+            The (possibly truncated) context string.
+        """
+        import logging
+
+        from teambot.history.compactor import estimate_tokens
+
+        logger = logging.getLogger(__name__)
+
+        estimated = estimate_tokens(context)
+        if estimated <= max_context_tokens:
+            return context
+
+        logger.warning(
+            "Context for stage %s exceeds max_context_tokens (%d estimated > %d limit); "
+            "truncating to fit budget.",
+            stage.name,
+            estimated,
+            max_context_tokens,
+        )
+        # Truncate to the character equivalent of the token budget
+        max_chars = max_context_tokens * 4
+        truncation_notice = "\n...[context truncated to fit max_context_tokens budget]"
+        if max_chars <= len(truncation_notice):
+            # Limit is so small that even the notice exceeds it; return just the notice
+            # so the caller still receives a valid (albeit minimal) context string.
+            return truncation_notice
+        return context[: max_chars - len(truncation_notice)] + truncation_notice
+
+    def _extract_json_from_output(self, text: str) -> str | None:
+        """Extract a JSON string from raw agent output.
+
+        Handles JSON embedded in markdown code blocks (```json ... ```)
+        and bare JSON objects or arrays.
+
+        Args:
+            text: Raw agent output text.
+
+        Returns:
+            The extracted JSON string, or None if no JSON was found.
+        """
+        import re
+
+        # Try markdown code block first (``` json ... ``` or ``` ... ```)
+        match = re.search(r"```(?:json)?\s*\n?([\s\S]*?)\n?```", text)
+        if match:
+            return match.group(1).strip()
+
+        # Try to find raw JSON object or array (greedy — captures from the first
+        # opening brace/bracket to the last closing one, which is the outermost
+        # structure in typical single-JSON LLM responses).
+        match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
+        if match:
+            return match.group(1)
+
+        return None
+
+    def _validate_output_schema(
+        self,
+        output: str,
+        schema: dict[str, Any],
+        stage: WorkflowStage,
+    ) -> None:
+        """Validate agent output against the configured JSON schema for the stage.
+
+        Attempts to extract and parse JSON from the output, then validates it
+        against the provided schema using jsonschema.
+
+        Args:
+            output: Raw agent output string (may contain JSON in markdown code blocks).
+            schema: JSON Schema dict to validate against.
+            stage: The workflow stage (for error context).
+
+        Raises:
+            OutputSchemaValidationError: If the output cannot be parsed as JSON or
+                fails schema validation.
+        """
+        import json
+        import logging
+
+        import jsonschema
+
+        logger = logging.getLogger(__name__)
+
+        json_str = self._extract_json_from_output(output)
+        if json_str is None:
+            raise OutputSchemaValidationError(
+                stage=stage.name,
+                schema=schema,
+                error="Output does not contain valid JSON",
+                output_preview=output[:200],
+            )
+
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError as exc:
+            raise OutputSchemaValidationError(
+                stage=stage.name,
+                schema=schema,
+                error=f"Failed to parse JSON: {exc}",
+                output_preview=json_str[:200],
+            ) from exc
+
+        try:
+            jsonschema.validate(instance=data, schema=schema)
+        except jsonschema.ValidationError as exc:
+            raise OutputSchemaValidationError(
+                stage=stage.name,
+                schema=schema,
+                error=exc.message,
+                output_preview=json_str[:200],
+            ) from exc
+
+        logger.debug("Output schema validation passed for stage %s", stage.name)
 
     def _get_stage_outputs(self, stage: WorkflowStage) -> list[str]:
         """Get expected output description for a specific stage.
@@ -1240,8 +1440,13 @@ class ExecutionLoop:
                 cwd=project_root,
             )
             logger.debug("Git checkpoint created for %s", completed_stage.name)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
-            logger.debug("Git checkpoint skipped for %s (non-fatal)", completed_stage.name)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+            logger.debug(
+                "Git checkpoint skipped for %s (non-fatal): %s",
+                completed_stage.name,
+                exc,
+                exc_info=True,
+            )
 
     @classmethod
     def resume(cls, teambot_dir: Path, config: dict[str, Any]) -> ExecutionLoop:

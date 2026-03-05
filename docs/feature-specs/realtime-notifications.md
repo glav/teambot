@@ -513,11 +513,11 @@ TeamBot users lack visibility into workflow execution when not actively monitori
 - Valid Telegram bot and chat exist
 **Steps**:
 1. Run `teambot run objectives/simple-task.md`
-2. Workflow reaches BUSINESS_PROBLEM stage and completes
+2. Workflow reaches SPEC stage and completes
 3. Observe Telegram chat
 **Expected Result**: Telegram message received with:
 - ✅ emoji prefix
-- Bold stage name "BUSINESS_PROBLEM"
+- Bold stage name "SPEC"
 - Duration (e.g., "12m 34s")
 - Agent name (e.g., "ba")
 **Verification**: Message appears in Telegram chat within 5 seconds of stage completion

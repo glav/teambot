@@ -4,7 +4,7 @@ This directory contains the enhanced Spec-Driven Development workflow with integ
 
 ## 📋 Workflow Overview
 
-The SDD workflow consists of 10 prompt files (steps 0–8, plus 7b and 7c) spanning 12 stages with built-in quality gates. The workflow goes directly from SETUP → SPEC (problem definition is captured in the objective template frontmatter and the SPEC stage's Q&A process). There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage.
+The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spanning 12 stages with built-in quality gates. The workflow goes directly from SETUP → SPEC (problem definition is captured in the objective template frontmatter and the SPEC stage's Q&A process). There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage.
 
 **Stages (11):** SETUP, SPEC, SPEC_REVIEW, RESEARCH, PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, ACCEPTANCE_TEST, POST_REVIEW, COMPLETE
 
@@ -74,10 +74,10 @@ The SDD workflow consists of 10 prompt files (steps 0–8, plus 7b and 7c) spann
 
 ### 7. **Prerequisite Artifacts & Structured Output** (NEW in v4.0)
 - **`prerequisite_artifacts`** enforced on all stages — each stage declares the artifacts it requires, and the orchestrator performs fail-fast validation before the stage runs
-- **`output_schema`** for structured JSON output — every stage emits a well-defined JSON result for downstream consumption
-- **`max_context_tokens`** for context budget management — prevents runaway context usage per stage
+- **`output_schema`** field available in stage configuration — reserved for structured JSON output definition (parsed and stored, but not yet enforced by the orchestrator)
+- **`max_context_tokens`** field available in stage configuration — reserved for context budget management (parsed and stored, but not yet enforced)
 - **Git checkpoints** created automatically between stages for safe rollback
-- **Objective template** now includes YAML frontmatter with structured fields (title, type, priority, etc.) to capture problem definition at the point of entry
+- **Objective template** uses markdown sections (Goals, Success Criteria, Constraints) to capture problem definition at the point of entry
 
 ## 📖 Detailed Step Descriptions
 
@@ -506,7 +506,7 @@ A successfully completed SDD workflow results in:
 - **NEW**: Git checkpoints created automatically between stages for safe rollback
 - **NEW**: Objective template now includes YAML frontmatter with structured fields
 - **CHANGED**: Workflow reduced from 14 stages to 12 stages
-- **CHANGED**: Workflow is now 10 prompt files (steps 0–8, plus 7b and 7c)
+- **CHANGED**: Workflow is now 11 prompt files (steps 0–8, plus 7b and 7c)
 - **CHANGED**: Artifact paths align with `.teambot/{feature}/artifacts/` via orchestrator
 
 ### Version 3.1 (2026-01-21)
@@ -546,6 +546,6 @@ A successfully completed SDD workflow results in:
 
 ---
 
-**Last Updated**: 2025-01-22  
+**Last Updated**: 2026-03-05  
 **Version**: 4.0  
 **Maintained By**: SDD Workflow Enhancement Project

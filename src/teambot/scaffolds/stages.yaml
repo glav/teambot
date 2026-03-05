@@ -436,7 +436,8 @@ stages:
       - No failures blocking completion
     optional: false
     is_acceptance_test_stage: true  # Special flag for acceptance test handling
-    prompt_template: .agent/commands/sdd/sdd.7c-acceptance-test.prompt.md
+    # No prompt_template: acceptance testing is code-driven via AcceptanceTestExecutor,
+    # which builds its own validation prompt from parsed feature spec scenarios.
     include_objective: true
     output_schema:
       type: object

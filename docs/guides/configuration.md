@@ -170,7 +170,6 @@ stages:
 
 stage_order:
   - SETUP
-  - BUSINESS_PROBLEM
   - SPEC
   - SPEC_REVIEW
   # ... remaining stages
