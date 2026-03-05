@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from teambot.orchestration.objective_parser import (
+    FrontmatterData,
     ParsedObjective,
     SuccessCriterion,
     parse_objective_file,
@@ -178,3 +179,157 @@ class TestFeatureName:
         result = parse_objective_file(objective_file)
         # Title is "Implement User Authentication"
         assert result.feature_name == "user-authentication"
+
+
+class TestFrontmatterData:
+    """Tests for FrontmatterData dataclass."""
+
+    def test_default_values_are_none_or_empty(self) -> None:
+        """All FrontmatterData fields default to None or empty list."""
+        fmd = FrontmatterData()
+        assert fmd.feature_name is None
+        assert fmd.language is None
+        assert fmd.framework is None
+        assert fmd.test_preference is None
+        assert fmd.scope is None
+        assert fmd.acceptance_scenarios == []
+
+    def test_can_set_all_fields(self) -> None:
+        """All fields can be set."""
+        fmd = FrontmatterData(
+            feature_name="my-feature",
+            language="python",
+            framework="fastapi",
+            test_preference="tdd",
+            scope="medium",
+            acceptance_scenarios=[{"name": "test", "steps": [], "expected": "pass"}],
+        )
+        assert fmd.feature_name == "my-feature"
+        assert fmd.language == "python"
+        assert fmd.framework == "fastapi"
+        assert fmd.test_preference == "tdd"
+        assert fmd.scope == "medium"
+        assert len(fmd.acceptance_scenarios) == 1
+
+
+class TestParsedObjectiveWithFrontmatter:
+    """Tests for ParsedObjective with frontmatter defaults."""
+
+    def test_frontmatter_defaults_to_empty(self) -> None:
+        """ParsedObjective.frontmatter defaults to a FrontmatterData()."""
+        obj = ParsedObjective(title="Test")
+        assert isinstance(obj.frontmatter, FrontmatterData)
+        assert obj.frontmatter.feature_name is None
+
+    def test_frontmatter_instances_not_shared(self) -> None:
+        """Each ParsedObjective gets its own FrontmatterData instance."""
+        obj1 = ParsedObjective(title="A")
+        obj2 = ParsedObjective(title="B")
+        obj1.frontmatter.feature_name = "a-feature"
+        assert obj2.frontmatter.feature_name is None
+
+
+class TestFrontmatterParsing:
+    """Tests for frontmatter parsing in parse_objective_file."""
+
+    def test_frontmatter_feature_name_is_parsed(
+        self, objective_file_with_frontmatter: Path
+    ) -> None:
+        """feature_name from frontmatter is parsed into FrontmatterData."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.frontmatter.feature_name == "user-auth"
+
+    def test_frontmatter_language_is_parsed(self, objective_file_with_frontmatter: Path) -> None:
+        """language from frontmatter is parsed correctly."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.frontmatter.language == "python"
+
+    def test_frontmatter_framework_is_parsed(self, objective_file_with_frontmatter: Path) -> None:
+        """framework from frontmatter is parsed correctly."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.frontmatter.framework == "fastapi"
+
+    def test_frontmatter_test_preference_is_parsed(
+        self, objective_file_with_frontmatter: Path
+    ) -> None:
+        """test_preference from frontmatter is parsed correctly."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.frontmatter.test_preference == "tdd"
+
+    def test_frontmatter_scope_is_parsed(self, objective_file_with_frontmatter: Path) -> None:
+        """scope from frontmatter is parsed correctly."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.frontmatter.scope == "medium"
+
+    def test_frontmatter_acceptance_scenarios_are_parsed(
+        self, objective_file_with_frontmatter: Path
+    ) -> None:
+        """acceptance_scenarios from frontmatter are parsed correctly."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert len(result.frontmatter.acceptance_scenarios) == 1
+        scenario = result.frontmatter.acceptance_scenarios[0]
+        assert scenario["name"] == "User can log in"
+        assert scenario["steps"] == ["POST /login with valid credentials"]
+        assert scenario["expected"] == "JWT token returned with 200 status"
+
+    def test_frontmatter_feature_name_overrides_title(
+        self, objective_file_with_frontmatter: Path
+    ) -> None:
+        """Frontmatter feature_name takes priority over title-derived name."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        # Title would give "user-authentication", but frontmatter has "user-auth"
+        assert result.feature_name == "user-auth"
+
+    def test_body_sections_still_parsed_with_frontmatter(
+        self, objective_file_with_frontmatter: Path
+    ) -> None:
+        """Markdown body sections are correctly parsed when frontmatter is present."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.title == "Implement User Authentication"
+        assert result.goals == ["Add login/logout functionality"]
+        assert any(
+            c.description == "Login validates credentials against database"
+            for c in result.success_criteria
+        )
+
+    def test_file_without_frontmatter_still_works(self, objective_file: Path) -> None:
+        """Files without frontmatter parse correctly (backward compatibility)."""
+        result = parse_objective_file(objective_file)
+        assert result.frontmatter.feature_name is None
+        assert result.frontmatter.language is None
+        assert result.frontmatter.acceptance_scenarios == []
+        # Normal parsing still works
+        assert result.title == "Implement User Authentication"
+        assert len(result.goals) == 3
+
+    def test_partial_frontmatter_works(self, tmp_path: Path) -> None:
+        """Partial frontmatter (some fields missing) parses without error."""
+        content = """---
+language: python
+scope: small
+---
+# My Task
+
+## Goals
+1. Do the thing
+
+## Success Criteria
+- [ ] Thing is done
+"""
+        path = tmp_path / "partial_frontmatter.md"
+        path.write_text(content, encoding="utf-8")
+        result = parse_objective_file(path)
+        assert result.frontmatter.language == "python"
+        assert result.frontmatter.scope == "small"
+        assert result.frontmatter.feature_name is None
+        assert result.frontmatter.framework is None
+        assert result.frontmatter.test_preference is None
+        assert result.frontmatter.acceptance_scenarios == []
+        assert result.title == "My Task"
+
+    def test_raw_content_includes_frontmatter(self, objective_file_with_frontmatter: Path) -> None:
+        """raw_content stores the full file including frontmatter delimiters."""
+        result = parse_objective_file(objective_file_with_frontmatter)
+        assert result.raw_content.startswith("---")
+        assert "feature_name: user-auth" in result.raw_content
+        assert "# Objective:" in result.raw_content
