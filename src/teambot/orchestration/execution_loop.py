@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from teambot.orchestration.acceptance_test_executor import (
     AcceptanceTestExecutor,
     AcceptanceTestResult,
+    AcceptanceTestScenario,
     generate_acceptance_test_report,
 )
 from teambot.orchestration.artifact_validator import ArtifactValidator
@@ -478,6 +479,13 @@ class ExecutionLoop:
         executor.load_scenarios()
 
         if not executor.scenarios:
+            # Fall back to frontmatter acceptance scenarios if available
+            if self.objective.frontmatter.acceptance_scenarios:
+                executor.scenarios = self._frontmatter_scenarios_to_acceptance_tests(
+                    self.objective.frontmatter.acceptance_scenarios
+                )
+
+        if not executor.scenarios:
             # No acceptance tests defined - this is an ERROR (acceptance tests are MANDATORY)
             self.acceptance_test_result = AcceptanceTestResult(
                 total=0,
@@ -855,6 +863,35 @@ class ExecutionLoop:
 
         return None
 
+    def _frontmatter_scenarios_to_acceptance_tests(
+        self, scenarios_data: list[dict[str, Any]]
+    ) -> list[AcceptanceTestScenario]:
+        """Convert frontmatter acceptance_scenarios to AcceptanceTestScenario objects.
+
+        Args:
+            scenarios_data: List of scenario dicts from YAML frontmatter
+
+        Returns:
+            List of AcceptanceTestScenario instances
+        """
+        result = []
+        for i, s in enumerate(scenarios_data, 1):
+            scenario_id = f"AT-{i:03d}"
+            name = s.get("name", f"Scenario {i}")
+            # Frontmatter scenarios use `name` for both display name and description;
+            # a separate `description` key is used if present for fuller detail.
+            description = s.get("description", name)
+            result.append(
+                AcceptanceTestScenario(
+                    id=scenario_id,
+                    name=name,
+                    description=description,
+                    steps=s.get("steps", []),
+                    expected_result=s.get("expected", ""),
+                )
+            )
+        return result
+
     def _validate_required_artifacts(
         self,
         stage: WorkflowStage,
@@ -1012,6 +1049,20 @@ class ExecutionLoop:
 
             if self.objective.context:
                 parts.extend(["", "## Context", self.objective.context])
+
+            # Include frontmatter configuration if available
+            fmd = self.objective.frontmatter
+            config_parts = []
+            if fmd.language:
+                config_parts.append(f"- **Language**: {fmd.language}")
+            if fmd.framework:
+                config_parts.append(f"- **Framework**: {fmd.framework}")
+            if fmd.test_preference:
+                config_parts.append(f"- **Test Preference**: {fmd.test_preference}")
+            if fmd.scope:
+                config_parts.append(f"- **Scope**: {fmd.scope}")
+            if config_parts:
+                parts.extend(["", "## Project Configuration"] + config_parts)
 
         # Add working directory information
         parts.extend(
