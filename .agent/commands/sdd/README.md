@@ -506,7 +506,7 @@ A successfully completed SDD workflow results in:
 - **NEW**: Git checkpoints created automatically between stages for safe rollback
 - **NEW**: Objective template now includes YAML frontmatter with structured fields
 - **CHANGED**: Workflow reduced from 14 stages to 12 stages
-- **CHANGED**: Workflow is now 10 prompt files (steps 0–8, plus 7b and 7c)
+- **CHANGED**: Workflow is now 11 prompt files (steps 0–8, plus 7b and 7c)
 - **CHANGED**: Artifact paths align with `.teambot/{feature}/artifacts/` via orchestrator
 
 ### Version 3.1 (2026-01-21)
