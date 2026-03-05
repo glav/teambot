@@ -34,6 +34,9 @@ def _mock_load_stages_config():
         if config_path is None:
             for stage_config in config.stages.values():
                 stage_config.artifacts = []
+                # Clear output_schema so mock agents returning plain text
+                # don't trigger OutputSchemaValidationError in unrelated tests.
+                stage_config.output_schema = None
 
         return config
 
@@ -151,8 +154,44 @@ def test_stages_config():
     # Clear any artifact requirements - tests don't have all artifacts
     for stage_config in config.stages.values():
         stage_config.artifacts = []
+        # Clear output_schema so mock agents returning plain text
+        # don't trigger OutputSchemaValidationError in unrelated tests.
+        stage_config.output_schema = None
 
     return config
+
+
+@pytest.fixture
+def objective_with_frontmatter_content() -> str:
+    return """---
+feature_name: user-auth
+language: python
+framework: fastapi
+test_preference: tdd
+scope: medium
+acceptance_scenarios:
+  - name: "User can log in"
+    steps:
+      - "POST /login with valid credentials"
+    expected: "JWT token returned with 200 status"
+---
+# Objective: Implement User Authentication
+
+## Goals
+1. Add login/logout functionality
+
+## Success Criteria
+- [ ] Login validates credentials against database
+"""
+
+
+@pytest.fixture
+def objective_file_with_frontmatter(
+    tmp_path: Path, objective_with_frontmatter_content: str
+) -> Path:
+    path = tmp_path / "objective_with_frontmatter.md"
+    path.write_text(objective_with_frontmatter_content, encoding="utf-8")
+    return path
 
 
 @pytest.fixture
@@ -170,10 +209,10 @@ def teambot_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def teambot_dir_with_spec(tmp_path: Path, sample_feature_spec_content: str) -> Path:
-    """Create a teambot directory with feature spec.
+    """Create a teambot directory with feature spec and all prerequisite artifacts.
 
-    Creates the spec in the expected location based on the sample objective's
-    feature name (user-authentication).
+    Creates the spec and all stage prerequisite artifacts in the expected location
+    based on the sample objective's feature name (user-authentication).
     """
     dir_path = tmp_path / ".teambot"
     dir_path.mkdir()
@@ -184,5 +223,19 @@ def teambot_dir_with_spec(tmp_path: Path, sample_feature_spec_content: str) -> P
     artifacts_dir = feature_dir / "artifacts"
     artifacts_dir.mkdir()
     (artifacts_dir / "feature_spec.md").write_text(sample_feature_spec_content, encoding="utf-8")
+
+    # Create all prerequisite artifacts so the full workflow can complete
+    for artifact in [
+        "spec_review.md",
+        "research.md",
+        "test_strategy.md",
+        "implementation_plan.md",
+        "plan_review.md",
+        "impl_review.md",
+        "test_results.md",
+        "acceptance_test_results.md",
+        "post_review.md",
+    ]:
+        (artifacts_dir / artifact).write_text(f"# {artifact}", encoding="utf-8")
 
     return dir_path

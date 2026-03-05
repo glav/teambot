@@ -34,6 +34,8 @@ class StageConfig:
     parallel_agents: list[str] | None = None
     prompt_template: str | None = None
     include_objective: bool = True  # Whether to include objective content in context
+    output_schema: dict[str, Any] | None = None  # JSON schema for structured output
+    max_context_tokens: int | None = None  # Soft limit on context tokens for this stage
 
 
 @dataclass
@@ -157,6 +159,8 @@ def _parse_configuration(data: dict[str, Any]) -> StagesConfiguration:
             parallel_agents=stage_data.get("parallel_agents"),
             prompt_template=stage_data.get("prompt_template"),
             include_objective=stage_data.get("include_objective", True),
+            output_schema=stage_data.get("output_schema"),
+            max_context_tokens=stage_data.get("max_context_tokens"),
         )
         stages[workflow_stage] = config
 
@@ -251,16 +255,13 @@ def _get_default_configuration() -> StagesConfiguration:
     # Default agent assignments (from original execution_loop.py)
     default_agents = {
         WorkflowStage.SETUP: ("pm", None),
-        WorkflowStage.BUSINESS_PROBLEM: ("ba", None),
         WorkflowStage.SPEC: ("ba", "reviewer"),
         WorkflowStage.SPEC_REVIEW: ("ba", "reviewer"),
         WorkflowStage.RESEARCH: ("builder-1", None),
-        WorkflowStage.TEST_STRATEGY: ("builder-1", None),
         WorkflowStage.PLAN: ("pm", "reviewer"),
         WorkflowStage.PLAN_REVIEW: ("pm", "reviewer"),
         WorkflowStage.IMPLEMENTATION: ("builder-1", "reviewer"),
         WorkflowStage.IMPLEMENTATION_REVIEW: ("builder-1", "reviewer"),
-        WorkflowStage.TEST: ("builder-1", None),
         WorkflowStage.ACCEPTANCE_TEST: ("builder-1", None),
         WorkflowStage.POST_REVIEW: ("pm", "reviewer"),
         WorkflowStage.COMPLETE: (None, None),
@@ -309,16 +310,13 @@ def _get_default_configuration() -> StagesConfiguration:
 
     stage_order = [
         WorkflowStage.SETUP,
-        WorkflowStage.BUSINESS_PROBLEM,
         WorkflowStage.SPEC,
         WorkflowStage.SPEC_REVIEW,
         WorkflowStage.RESEARCH,
-        WorkflowStage.TEST_STRATEGY,
         WorkflowStage.PLAN,
         WorkflowStage.PLAN_REVIEW,
         WorkflowStage.IMPLEMENTATION,
         WorkflowStage.IMPLEMENTATION_REVIEW,
-        WorkflowStage.TEST,
         WorkflowStage.ACCEPTANCE_TEST,
         WorkflowStage.POST_REVIEW,
         WorkflowStage.COMPLETE,
@@ -328,7 +326,7 @@ def _get_default_configuration() -> StagesConfiguration:
         WorkflowStage.SPEC: WorkflowStage.SPEC_REVIEW,
         WorkflowStage.PLAN: WorkflowStage.PLAN_REVIEW,
         WorkflowStage.IMPLEMENTATION: WorkflowStage.IMPLEMENTATION_REVIEW,
-        WorkflowStage.TEST: WorkflowStage.POST_REVIEW,
+        WorkflowStage.ACCEPTANCE_TEST: WorkflowStage.POST_REVIEW,
     }
 
     acceptance_test_stages_default: set[WorkflowStage] = {WorkflowStage.ACCEPTANCE_TEST}

@@ -1,10 +1,12 @@
 # Spec-Driven Development (SDD) Workflow
 
-This directory contains the enhanced Spec-Driven Development workflow with integrated review gates, testing strategy, and deterministic outputs.
+This directory contains the enhanced Spec-Driven Development workflow with integrated review gates, testing strategy, acceptance testing, and deterministic outputs.
 
 ## 📋 Workflow Overview
 
-The SDD workflow consists of 9 sequential steps with built-in quality gates:
+The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spanning 12 stages with built-in quality gates. The workflow goes directly from SETUP → SPEC (problem definition is captured in the objective template frontmatter and the SPEC stage's Q&A process). There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage.
+
+**Stages (11):** SETUP, SPEC, SPEC_REVIEW, RESEARCH, PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, ACCEPTANCE_TEST, POST_REVIEW, COMPLETE
 
 ```
 0. sdd.0-initialize.prompt.md                → Initialize environment
@@ -22,6 +24,10 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 6. sdd.6-review-plan.prompt.md               → Review plan for readiness
    ↓
 7. sdd.7-task-implementer-for-feature.prompt.md → Execute implementation
+   ↓
+7b. sdd.7b-implementation-review.prompt.md   → Review code + verify tests
+   ↓
+7c. sdd.7c-acceptance-test.prompt.md          → Execute acceptance tests
    ↓
 8. sdd.8-post-implementation-review.prompt.md → Final validation
 ```
@@ -65,6 +71,13 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 - Every step has a **Quick Reference table** at the top
 - Shows: Purpose, Input, Output, Key Deliverables, Next Step
 - Enables quick navigation and understanding
+
+### 7. **Prerequisite Artifacts & Structured Output** (NEW in v4.0)
+- **`prerequisite_artifacts`** enforced on all stages — each stage declares the artifacts it requires, and the orchestrator performs fail-fast validation before the stage runs
+- **`output_schema`** field available in stage configuration — reserved for structured JSON output definition (parsed and stored, but not yet enforced by the orchestrator)
+- **`max_context_tokens`** field available in stage configuration — reserved for context budget management (parsed and stored, but not yet enforced)
+- **Git checkpoints** created automatically between stages for safe rollback
+- **Objective template** uses markdown sections (Goals, Success Criteria, Constraints) to capture problem definition at the point of entry
 
 ## 📖 Detailed Step Descriptions
 
@@ -275,7 +288,51 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 - Test files (when applicable)
 - Changes log: `.agent-tracking/changes/{{date}}-{{name}}-changes.md`
 
-**Next Step**: Run `sdd.8-post-implementation-review.prompt.md`
+**Next Step**: Run `sdd.7b-implementation-review.prompt.md`
+
+---
+
+### Step 7b: Implementation Review
+**File**: `sdd.7b-implementation-review.prompt.md`  
+**Role**: Implementation Review Specialist
+
+**Purpose**: Review implemented code for quality, correctness, and verify that tests execute successfully with adequate coverage. This step replaces the previously separate TEST stage by combining code review with test verification.
+
+**Validation Checks**:
+- ✅ Code follows project conventions and patterns from research
+- ✅ Implementation matches the task plan and feature specification
+- ✅ All tests pass (`uv run pytest` or equivalent)
+- ✅ Coverage targets from test strategy are met
+- ✅ No regressions introduced
+- ✅ Error handling and edge cases addressed
+
+**Outputs**:
+- Review report: `.agent-tracking/implementation-reviews/{{date}}-{{name}}-impl-review.md`
+- Decision: APPROVED | NEEDS_REVISION | BLOCKED
+
+**If Approved**: Proceed to `sdd.7c-acceptance-test.prompt.md`  
+**If Revisions Needed**: Return to `sdd.7-task-implementer-for-feature.prompt.md` with feedback
+
+---
+
+### Step 7c: Acceptance Test
+**File**: `sdd.7c-acceptance-test.prompt.md`  
+**Role**: Acceptance Test Specialist
+
+**Purpose**: Execute acceptance test scenarios derived from the feature specification to validate that the implementation meets the stated requirements and user expectations.
+
+**Key Features**:
+- Reads acceptance criteria and scenarios from the feature spec
+- Executes each scenario against the implemented code
+- Reports PASS/FAIL per scenario with evidence
+- Validates end-to-end behavior, not just unit-level correctness
+
+**Outputs**:
+- Acceptance test report: `.agent-tracking/acceptance-tests/{{date}}-{{name}}-acceptance.md`
+- Decision: PASSED | FAILED
+
+**If Passed**: Proceed to `sdd.8-post-implementation-review.prompt.md`  
+**If Failed**: Return to `sdd.7-task-implementer-for-feature.prompt.md` with failure details
 
 ---
 
@@ -328,7 +385,9 @@ For code-related features:
 - [ ] Spec reviewed before research (Step 2)
 - [ ] Test strategy determined before planning (Step 4)
 - [ ] Plan reviewed before implementation (Step 6)
-- [ ] Implementation reviewed before completion (Step 8)
+- [ ] Implementation reviewed and tests verified (Step 7b)
+- [ ] Acceptance tests executed (Step 7c)
+- [ ] Post-implementation review before completion (Step 8)
 
 ### Validation Command Checklist (NEW)
 Each step must output explicit validation status:
@@ -348,11 +407,14 @@ Each step must output explicit validation status:
 ├── details/                   # Step 5 task details
 ├── plan-reviews/              # Step 6 review reports
 ├── changes/                   # Step 7 change logs
-└── implementation-reviews/    # Step 8 final reviews
+├── implementation-reviews/    # Step 7b reviews + Step 8 final reviews
+└── acceptance-tests/          # Step 7c acceptance test reports
 
 docs/
 └── feature-specs/             # Step 1 specifications
 ```
+
+> **Note:** `.agent-tracking/` paths should align with `.teambot/{feature}/artifacts/` via the orchestrator. When the SDD workflow is invoked through the teambot orchestrator, artifact paths are mapped so that tracking data is consolidated under the `.teambot/` project structure.
 
 ## 🎓 Best Practices
 
@@ -360,7 +422,7 @@ docs/
 Don't skip steps. Each builds on the previous and provides essential input for the next.
 
 ### 2. Review Gates Are Critical
-The even-numbered steps (2, 4, 6, 8) include review gates that catch issues early before expensive downstream work begins.
+The review steps (2, 6, 7b, 7c, 8) include quality gates that catch issues early before expensive downstream work begins.
 
 ### 3. Testing Is Not Optional
 For any code implementation, test strategy and test implementation are mandatory, not optional extras.
@@ -379,7 +441,7 @@ State files enable session continuity. Keep them updated and validate them when 
 1. **Initialize the environment**: Run `sdd.0-initialize.prompt.md` (recommended first time)
 2. **Start a new feature**: Run `sdd.1-create-feature-spec.prompt.md`
 3. **Follow the handoff messages**: Each step tells you which step to run next
-4. **Don't skip review gates**: Steps 2, 4, 6, 8 save time by catching issues early
+4. **Don't skip review gates**: Steps 2, 6, 7b, 7c, and 8 save time by catching issues early
 5. **Trust the process**: The workflow is designed for quality and completeness
 
 ## 📊 Success Metrics
@@ -433,7 +495,21 @@ A successfully completed SDD workflow results in:
 
 ## 📝 Version History
 
-### Version 3.1 (Current - 2026-01-21)
+### Version 4.0 (Current)
+- **REMOVED**: BUSINESS_PROBLEM stage — problem definition is now captured in the objective template YAML frontmatter and the SPEC stage Q&A process
+- **REMOVED**: Separate TEST stage — test execution and coverage verification merged into IMPLEMENTATION_REVIEW (Step 7b)
+- **NEW**: Step 7b: Implementation Review (`sdd.7b-implementation-review.prompt.md`) — reviews code and verifies test execution/coverage in a single gate
+- **NEW**: Step 7c: Acceptance Test (`sdd.7c-acceptance-test.prompt.md`) — executes acceptance test scenarios from the feature specification
+- **NEW**: `prerequisite_artifacts` enforced on all stages with fail-fast validation
+- **NEW**: `output_schema` for structured JSON output from each stage
+- **NEW**: `max_context_tokens` for context budget management per stage
+- **NEW**: Git checkpoints created automatically between stages for safe rollback
+- **NEW**: Objective template now includes YAML frontmatter with structured fields
+- **CHANGED**: Workflow reduced from 14 stages to 12 stages
+- **CHANGED**: Workflow is now 11 prompt files (steps 0–8, plus 7b and 7c)
+- **CHANGED**: Artifact paths align with `.teambot/{feature}/artifacts/` via orchestrator
+
+### Version 3.1 (2026-01-21)
 - **CHANGED**: Renumbered all steps to use whole integers (0-8) instead of half-integers
 - **CHANGED**: All internal references updated to new step numbers
 
@@ -470,6 +546,6 @@ A successfully completed SDD workflow results in:
 
 ---
 
-**Last Updated**: 2026-01-21  
-**Version**: 3.0  
+**Last Updated**: 2026-03-05  
+**Version**: 4.0  
 **Maintained By**: SDD Workflow Enhancement Project

@@ -1,13 +1,13 @@
 # Workflow Stages
 
-TeamBot enforces a 14-stage prescriptive workflow for autonomous development.
+TeamBot enforces a 11-stage prescriptive workflow for autonomous development.
 
 ## Stage Flow
 
 ```
-SETUP → BUSINESS_PROBLEM → SPEC → SPEC_REVIEW → RESEARCH →
-TEST_STRATEGY → PLAN → PLAN_REVIEW → IMPLEMENTATION →
-IMPLEMENTATION_REVIEW → TEST → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
+SETUP → SPEC → SPEC_REVIEW → RESEARCH →
+PLAN → PLAN_REVIEW → IMPLEMENTATION →
+IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
 
 ## Stage Details
@@ -15,16 +15,13 @@ IMPLEMENTATION_REVIEW → TEST → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 | Stage | Description | Allowed Personas |
 |-------|-------------|------------------|
 | `SETUP` | Initialize project and configuration | PM |
-| `BUSINESS_PROBLEM` | Define business problem and goals (optional) | BA, PM |
 | `SPEC` | Create feature specification | BA, Writer |
 | `SPEC_REVIEW` | Review and approve spec | Reviewer, PM |
 | `RESEARCH` | Research technical approaches | Builder, Writer |
-| `TEST_STRATEGY` | Define testing approach | Builder, Reviewer |
 | `PLAN` | Create implementation plan | PM, Builder |
 | `PLAN_REVIEW` | Review and approve plan | Reviewer, PM |
 | `IMPLEMENTATION` | Execute the plan | Builder (parallel) |
-| `IMPLEMENTATION_REVIEW` | Review changes | Reviewer |
-| `TEST` | Execute tests and validate | Builder, Reviewer |
+| `IMPLEMENTATION_REVIEW` | Review changes and verify test execution/coverage | Reviewer |
 | `ACCEPTANCE_TEST` | Run end-to-end acceptance tests | Builder |
 | `POST_REVIEW` | Final review and retrospective | PM, Reviewer |
 | `COMPLETE` | Workflow complete | - |
@@ -69,17 +66,6 @@ The `ACCEPTANCE_TEST` stage runs after unit tests pass, validating the implement
 - `POST_REVIEW` has `requires_acceptance_tests_passed: true`, blocking final approval until all acceptance scenarios pass
 - Results are saved to `.teambot/{feature}/artifacts/acceptance_test_results.md`
 - **Error scenarios are supported**: scenarios that expect errors (e.g., testing invalid input rejection) treat command failures as correct behavior when the expected result describes an error
-
-## Optional Stages
-
-The `BUSINESS_PROBLEM` stage is optional. If your objective already has clear requirements, this stage may be skipped.
-
-Configure stage behavior in `stages.yaml`:
-
-```yaml
-BUSINESS_PROBLEM:
-  optional: true
-```
 
 ---
 

@@ -40,7 +40,6 @@ When working in parallel with Builder-1:
 ## Workflow Stages You Lead
 
 - **RESEARCH**: Research technical approaches
-- **TEST_STRATEGY**: Define testing approach
 - **IMPLEMENTATION**: Execute the implementation plan (parallel)
 - **TEST**: Execute tests and fix failures
 

@@ -33,7 +33,6 @@ You are the hands-on implementer who turns plans and specifications into working
 ## Workflow Stages You Lead
 
 - **RESEARCH**: Research technical approaches
-- **TEST_STRATEGY**: Define testing approach
 - **IMPLEMENTATION**: Execute the implementation plan
 - **TEST**: Execute tests and fix failures
 

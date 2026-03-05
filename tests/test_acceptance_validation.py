@@ -474,7 +474,7 @@ class TestAT006PerAgentTokenBreakdownAccuracy:
             ("PLAN", 200, 100),
             ("IMPLEMENTATION", 800, 500),
             ("IMPLEMENTATION_REVIEW", 150, 75),
-            ("TEST", 100, 50),
+            ("ACCEPTANCE_TEST", 100, 50),
         ]
 
         for stage, input_tokens, output_tokens in stages_data:

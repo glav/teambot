@@ -81,10 +81,10 @@ work_to_review_mapping: {}
                 # Change back before temp dir cleanup (Windows compatibility)
                 monkeypatch.chdir(original_dir)
 
-        # Should get default configuration with 14 stages
+        # Should get default configuration with 11 stages
         assert WorkflowStage.SETUP in config.stages
         assert WorkflowStage.ACCEPTANCE_TEST in config.stages
-        assert len(config.stage_order) == 14
+        assert len(config.stage_order) == 11
 
     def test_load_from_cwd_stages_yaml(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -275,10 +275,10 @@ class TestDefaultConfiguration:
     """Tests for default configuration."""
 
     def test_default_has_all_stages(self) -> None:
-        """Default configuration has all 14 stages."""
+        """Default configuration has all 11 stages."""
         config = _get_default_configuration()
 
-        assert len(config.stages) == 14
+        assert len(config.stages) == 11
         assert WorkflowStage.SETUP in config.stages
         assert WorkflowStage.ACCEPTANCE_TEST in config.stages
         assert WorkflowStage.COMPLETE in config.stages
@@ -289,7 +289,7 @@ class TestDefaultConfiguration:
 
         assert config.stage_order[0] == WorkflowStage.SETUP
         assert config.stage_order[-1] == WorkflowStage.COMPLETE
-        assert len(config.stage_order) == 14
+        assert len(config.stage_order) == 11
 
     def test_default_has_review_stages(self) -> None:
         """Default configuration identifies review stages."""
@@ -363,12 +363,13 @@ stages:
     work_agent: builder-1
     review_agent: null
     allowed_personas: [builder]
-  TEST_STRATEGY:
-    name: Test Strategy
-    description: Test strategy
+  PLAN_REVIEW:
+    name: Plan Review
+    description: Plan review
     work_agent: builder-2
     review_agent: null
     allowed_personas: [builder]
+    is_review_stage: false
   PLAN:
     name: Plan
     description: Plan
@@ -386,7 +387,7 @@ stage_order:
   - SETUP
   - SPEC_REVIEW
   - RESEARCH
-  - TEST_STRATEGY
+  - PLAN_REVIEW
   - PLAN
   - COMPLETE
 
@@ -397,7 +398,7 @@ parallel_groups:
     after: SPEC_REVIEW
     stages:
       - RESEARCH
-      - TEST_STRATEGY
+      - PLAN_REVIEW
     before: PLAN
 """
         config_file = tmp_path / "stages.yaml"
@@ -411,7 +412,7 @@ parallel_groups:
         assert group.after == WorkflowStage.SPEC_REVIEW
         assert group.before == WorkflowStage.PLAN
         assert WorkflowStage.RESEARCH in group.stages
-        assert WorkflowStage.TEST_STRATEGY in group.stages
+        assert WorkflowStage.PLAN_REVIEW in group.stages
 
     def test_parse_parallel_groups_missing_defaults_empty(self, tmp_path: Path) -> None:
         """Missing parallel_groups defaults to empty list."""
@@ -495,12 +496,13 @@ stages:
     work_agent: builder-1
     review_agent: null
     allowed_personas: [builder]
-  TEST_STRATEGY:
-    name: Test Strategy
-    description: Test strategy
+  PLAN_REVIEW:
+    name: Plan Review
+    description: Plan review
     work_agent: builder-1
     review_agent: null
     allowed_personas: [builder]
+    is_review_stage: false
   COMPLETE:
     name: Complete
     description: Done
@@ -511,7 +513,7 @@ stages:
 stage_order:
   - SETUP
   - RESEARCH
-  - TEST_STRATEGY
+  - PLAN_REVIEW
   - COMPLETE
 
 work_to_review_mapping: {}
@@ -521,7 +523,7 @@ parallel_groups:
     after: SETUP
     stages:
       - RESEARCH
-      - TEST_STRATEGY
+      - PLAN_REVIEW
     before: COMPLETE
 """
         config_file = tmp_path / "stages.yaml"
@@ -546,12 +548,13 @@ stages:
     work_agent: builder-1
     review_agent: null
     allowed_personas: [builder]
-  TEST_STRATEGY:
-    name: Test Strategy
-    description: Test strategy
+  PLAN_REVIEW:
+    name: Plan Review
+    description: Plan review
     work_agent: builder-2
     review_agent: null
     allowed_personas: [builder]
+    is_review_stage: false
   COMPLETE:
     name: Complete
     description: Done
@@ -562,7 +565,7 @@ stages:
 stage_order:
   - SETUP
   - RESEARCH
-  - TEST_STRATEGY
+  - PLAN_REVIEW
   - COMPLETE
 
 work_to_review_mapping: {}
@@ -572,7 +575,7 @@ parallel_groups:
     after: SETUP
     stages:
       - RESEARCH
-      - TEST_STRATEGY
+      - PLAN_REVIEW
     before: COMPLETE
 """
         config_file = tmp_path / "stages.yaml"

@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from teambot.orchestration.stage_config import load_stages_config
 from teambot.workflow.stages import WorkflowStage
@@ -70,18 +71,31 @@ class TestStagesYamlAcceptanceScenarios:
         assert callable(state_machine.is_persona_allowed), "is_persona_allowed should be callable"
 
     def test_at_002_inline_artifact_path_comments(self, stages_yaml_content: str) -> None:
-        """AT-002: Verify all stages with artifacts have consistent path comments.
+        """AT-002: Verify all stages with artifacts have artifact definitions.
 
-        All stages with non-empty artifacts should have inline comments
-        in the format: # → .teambot/{feature}/artifacts/{filename}
+        All work stages should define their artifacts list, including stages that
+        use the inline empty-list form (e.g. ``artifacts: []``).
         """
-        # Count inline artifact path comments with → arrow
-        artifact_pattern = r"# → \.teambot/\{feature\}/artifacts/"
-        matches = re.findall(artifact_pattern, stages_yaml_content)
+        data = yaml.safe_load(stages_yaml_content)
+        stages_data = data.get("stages", {})
 
-        # Per AT-002: Should find 10+ inline artifact path comments
-        assert len(matches) >= 10, (
-            f"Expected at least 10 inline artifact path comments, found {len(matches)}"
+        # Should find artifact declarations for most stages
+        stages_with_artifacts = [
+            stage_name
+            for stage_name, stage_data in stages_data.items()
+            if "artifacts" in stage_data
+        ]
+        assert len(stages_with_artifacts) >= 8, (
+            f"Expected at least 8 artifact declarations, found {len(stages_with_artifacts)}"
+        )
+        stages_missing_artifacts = [
+            stage_name
+            for stage_name, stage_data in stages_data.items()
+            if "artifacts" not in stage_data
+        ]
+
+        assert not stages_missing_artifacts, (
+            f"The following stages are missing the 'artifacts' key: {stages_missing_artifacts}"
         )
 
     def test_at_003_default_values_complete(self, stages_yaml_content: str) -> None:
@@ -127,12 +141,12 @@ class TestStagesYamlAcceptanceScenarios:
 
         Verify the stages.yaml loads correctly and has expected structure.
         """
-        # Verify expected structure
-        assert len(stages_config.stages) == 14, (
-            f"Expected 14 stages, got {len(stages_config.stages)}"
+        # Verify expected structure (11 stages after removing BUSINESS_PROBLEM, TEST, TEST_STRATEGY)
+        assert len(stages_config.stages) == 11, (
+            f"Expected 11 stages, got {len(stages_config.stages)}"
         )
-        assert len(stages_config.stage_order) == 14, (
-            f"Expected 14 stages in order, got {len(stages_config.stage_order)}"
+        assert len(stages_config.stage_order) == 11, (
+            f"Expected 11 stages in order, got {len(stages_config.stage_order)}"
         )
         assert len(stages_config.review_stages) == 4, (
             f"Expected 4 review stages, got {len(stages_config.review_stages)}"
@@ -153,3 +167,45 @@ class TestStagesYamlAcceptanceScenarios:
         # Verify work_to_review_mapping
         assert stages_config.work_to_review_mapping[WorkflowStage.SPEC] == WorkflowStage.SPEC_REVIEW
         assert stages_config.work_to_review_mapping[WorkflowStage.PLAN] == WorkflowStage.PLAN_REVIEW
+
+    @pytest.mark.parametrize(
+        "stages_file",
+        [Path("stages.yaml"), Path("src/teambot/scaffolds/stages.yaml")],
+    )
+    def test_at_006_prerequisite_artifacts_have_modeled_source(self, stages_file: Path) -> None:
+        """AT-006: Every prerequisite artifact has an upstream producer or explicit source."""
+        data = yaml.safe_load(stages_file.read_text(encoding="utf-8"))
+        stages_data = data.get("stages", {})
+        stage_order: list[str] = data.get("stage_order", [])
+
+        producers_by_artifact: dict[str, set[str]] = {}
+        for stage_name, stage_data in stages_data.items():
+            for artifact in stage_data.get("artifacts", []):
+                producers_by_artifact.setdefault(artifact, set()).add(stage_name)
+
+        stage_positions = {stage_name: index for index, stage_name in enumerate(stage_order)}
+
+        # Add non-stage-produced artifacts here only if intentionally sourced from
+        # outside the stage graph (for example: user-provided files).
+        explicitly_modeled_external_sources: set[str] = set()
+
+        missing_sources: list[tuple[str, str]] = []
+        for stage_name, stage_data in stages_data.items():
+            for prerequisite in stage_data.get("prerequisite_artifacts", []):
+                producers = producers_by_artifact.get(prerequisite, set())
+                upstream_producers = {
+                    producer
+                    for producer in producers
+                    if stage_positions.get(producer, -1) < stage_positions.get(stage_name, -1)
+                }
+                if (
+                    not upstream_producers
+                    and prerequisite not in explicitly_modeled_external_sources
+                ):
+                    missing_sources.append((stage_name, prerequisite))
+
+        assert not missing_sources, (
+            "Each prerequisite_artifact must be produced by an upstream stage artifacts list "
+            "or be declared in explicitly_modeled_external_sources. "
+            f"Missing: {missing_sources}"
+        )

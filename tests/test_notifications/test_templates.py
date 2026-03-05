@@ -107,12 +107,12 @@ class TestMessageTemplates:
         """Render event with stages list."""
         event = NotificationEvent(
             event_type="parallel_group_start",
-            data={"group": "test", "stages": ["RESEARCH", "TEST_STRATEGY"]},
+            data={"group": "test", "stages": ["RESEARCH", "PLAN"]},
         )
 
         result = templates.render(event)
 
-        assert "RESEARCH, TEST_STRATEGY" in result
+        assert "RESEARCH, PLAN" in result
 
     def test_render_unknown_event_fallback(self, templates: MessageTemplates) -> None:
         """Unknown event type uses fallback template."""
@@ -199,20 +199,20 @@ class TestMessageTemplates:
     ) -> None:
         """parallel_stage_complete uses stage from event.data, not event.stage.
 
-        Regression test: when running parallel stages (e.g. RESEARCH + TEST_STRATEGY),
-        event.stage is the bus-tracked 'current stage' (first parallel stage), but
-        event.data['stage'] carries the actual completed stage. The data stage must
-        take precedence so notifications show the correct stage name.
+        Regression test: when running parallel stages, event.stage is the
+        bus-tracked 'current stage' (first parallel stage), but event.data['stage']
+        carries the actual completed stage. The data stage must take precedence so
+        notifications show the correct stage name.
         """
         event = NotificationEvent(
             event_type="parallel_stage_complete",
-            data={"stage": "TEST_STRATEGY", "agent": "builder-2"},
+            data={"stage": "PLAN_REVIEW", "agent": "builder-2"},
             stage="RESEARCH",  # Bus-tracked current stage (wrong for this event)
         )
 
         result = templates.render(event)
 
-        assert "TEST_STRATEGY" in result
+        assert "PLAN_REVIEW" in result
         assert "builder-2" in result
         assert "RESEARCH" not in result
 
@@ -222,13 +222,13 @@ class TestMessageTemplates:
         """parallel_stage_failed uses stage from event.data, not event.stage."""
         event = NotificationEvent(
             event_type="parallel_stage_failed",
-            data={"stage": "TEST_STRATEGY", "agent": "builder-2"},
+            data={"stage": "PLAN_REVIEW", "agent": "builder-2"},
             stage="RESEARCH",
         )
 
         result = templates.render(event)
 
-        assert "TEST_STRATEGY" in result
+        assert "PLAN_REVIEW" in result
         assert "RESEARCH" not in result
 
     def test_render_escapes_html_in_stages_list(self, templates: MessageTemplates) -> None:
@@ -457,7 +457,7 @@ class TestCustomMessageTemplate:
             event_type="critical_failure",
             data={
                 "artifact": "<script>alert('xss')</script>",
-                "stage": "TEST",
+                "stage": "ACCEPTANCE_TEST",
                 "recovery_steps": ["<b>Do not trust</b> this input"],
             },
             feature_name="xss-test",

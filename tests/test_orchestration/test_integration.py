@@ -100,7 +100,6 @@ class TestResumeAfterCancellation:
             "status": "paused",
             "stage_outputs": {
                 "SETUP": "Setup complete",
-                "BUSINESS_PROBLEM": "Problem defined",
                 "SPEC": "Specification written",
             },
         }
@@ -348,6 +347,20 @@ Uses React components with Express API endpoints.
 """
         (artifacts_dir / "feature_spec.md").write_text(feature_spec, encoding="utf-8")
 
+        # Create all prerequisite artifacts so the full workflow can complete
+        for artifact in [
+            "spec_review.md",
+            "research.md",
+            "test_strategy.md",
+            "implementation_plan.md",
+            "plan_review.md",
+            "impl_review.md",
+            "test_results.md",
+            "acceptance_test_results.md",
+            "post_review.md",
+        ]:
+            (artifacts_dir / artifact).write_text(f"# {artifact}", encoding="utf-8")
+
         # Mock successful execution
         mock_client = AsyncMock()
         mock_client.execute_streaming.return_value = "VERIFIED_APPROVED: Implementation complete."
@@ -370,7 +383,7 @@ Uses React components with Express API endpoints.
         assert result == ExecutionResult.COMPLETE
 
         # Verify all major stages were visited
-        expected_stages = ["SETUP", "SPEC", "PLAN", "IMPLEMENTATION", "TEST"]
+        expected_stages = ["SETUP", "SPEC", "PLAN", "IMPLEMENTATION", "ACCEPTANCE_TEST"]
         for stage in expected_stages:
             assert stage in stages_visited, f"Expected {stage} to be visited"
 
@@ -394,6 +407,23 @@ Uses React components with Express API endpoints.
 
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()
+
+        # Create prerequisite artifacts so stages can reach review phase
+        artifacts_dir = teambot_dir / "complex" / "artifacts"
+        artifacts_dir.mkdir(parents=True)
+        for artifact in [
+            "feature_spec.md",
+            "spec_review.md",
+            "research.md",
+            "test_strategy.md",
+            "implementation_plan.md",
+            "plan_review.md",
+            "impl_review.md",
+            "test_results.md",
+            "acceptance_test_results.md",
+            "post_review.md",
+        ]:
+            (artifacts_dir / artifact).write_text(f"# {artifact}", encoding="utf-8")
 
         # Mock rejection on all iterations
         mock_client = AsyncMock()

@@ -77,7 +77,7 @@ class TestMissingArtifactError:
         """MissingArtifactError is a proper Exception subclass."""
         error = MissingArtifactError(
             artifact_path=Path("test.md"),
-            stage="TEST",
+            stage="ACCEPTANCE_TEST",
             recovery_steps=["Step 1"],
         )
         assert isinstance(error, Exception)
@@ -109,7 +109,7 @@ class TestMissingArtifactError:
         """Exception accepts Path objects for artifact_path."""
         error = MissingArtifactError(
             artifact_path=Path("/absolute/path/to/file.md"),
-            stage="TEST",
+            stage="ACCEPTANCE_TEST",
             recovery_steps=["Do something"],
         )
         assert isinstance(error.artifact_path, Path)
@@ -351,13 +351,6 @@ class TestArtifactPathResolution:
                     review_agent=None,
                     prerequisites=["research.md"],
                 ),
-                WorkflowStage.TEST_STRATEGY: StageConfig(
-                    name="Test Strategy",
-                    description="Define test strategy",
-                    work_agent="builder-1",
-                    review_agent=None,
-                    prerequisites=["test_strategy.md"],
-                ),
                 WorkflowStage.PLAN: StageConfig(
                     name="Plan",
                     description="Create implementation plan",
@@ -369,7 +362,6 @@ class TestArtifactPathResolution:
             stage_order=[
                 WorkflowStage.SPEC,
                 WorkflowStage.RESEARCH,
-                WorkflowStage.TEST_STRATEGY,
                 WorkflowStage.PLAN,
             ],
             work_to_review_mapping={},

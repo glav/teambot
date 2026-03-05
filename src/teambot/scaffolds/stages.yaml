@@ -29,6 +29,10 @@
 #   parallel_agents   - Agents that can run in parallel (default: null)
 #   prompt_template   - Path to SDD prompt file (relative to repo root) (default: null)
 #   include_objective - Include objective content in agent context (default: true)
+#   output_schema     - JSON schema for structured stage output (default: null)
+#                       When set, orchestrator validates output and extracts routing decisions.
+#   max_context_tokens - Soft limit on context tokens for this stage (default: null)
+#                        When set, prior-stage artifacts are summarized to fit budget.
 #
 # Global Sections (at file level):
 #   stages            - Map of stage definitions (required)
@@ -114,9 +118,9 @@
 #     post_spec_review:
 #       after: SPEC_REVIEW      # Parallel stages start after SPEC_REVIEW completes
 #       stages:
-#         - RESEARCH            # These two stages run concurrently
-#         - TEST_STRATEGY
-#       before: PLAN            # PLAN waits for both RESEARCH and TEST_STRATEGY
+#         - STAGE_A             # These two stages run concurrently
+#         - STAGE_B
+#       before: PLAN            # PLAN waits for both STAGE_A and STAGE_B
 #
 # Constraints:
 #   - Parallel stages must be independent (no dependencies between them)
@@ -165,24 +169,15 @@ stages:
     optional: false
     prompt_template: .agent/commands/sdd/sdd.0-initialize.prompt.md
     include_objective: false  # Generic initialization, no objective needed
-
-  BUSINESS_PROBLEM:
-    name: Business Problem
-    description: Define the business problem, goals, and success criteria
-    work_agent: ba
-    review_agent: null
-    allowed_personas:
-      - business_analyst
-      - ba
-      - project_manager
-      - pm
-    artifacts:
-      - problem_statement.md  # → .teambot/{feature}/artifacts/problem_statement.md
-    exit_criteria:
-      - Clear problem definition with measurable goals
-    optional: true  # May be skipped for small changes
-    prompt_template: null  # No SDD prompt for this stage
-    include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "SETUP" }
+        status: { type: string, enum: ["PASS", "FAIL"] }
+        environment_ready: { type: boolean }
+        blockers: { type: array, items: { type: string } }
+      required: ["stage", "status", "environment_ready"]
+    max_context_tokens: null  # Lightweight stage, no budget needed
 
   SPEC:
     name: Specification
@@ -195,12 +190,22 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - feature_spec.md  # → .teambot/{feature}/artifacts/feature_spec.md
+      - feature_spec.md
+    prerequisite_artifacts: []  # First content stage, no prereqs
     exit_criteria:
       - Complete specification with all required sections
     optional: false
     prompt_template: .agent/commands/sdd/sdd.1-create-feature-spec.prompt.md
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "SPEC" }
+        status: { type: string, enum: ["COMPLETE", "INCOMPLETE"] }
+        artifacts_produced: { type: array, items: { type: string } }
+        blockers: { type: array, items: { type: string } }
+      required: ["stage", "status", "artifacts_produced"]
+    max_context_tokens: null
 
   SPEC_REVIEW:
     name: Spec Review
@@ -212,13 +217,31 @@ stages:
       - project_manager
       - pm
     artifacts:
-      - spec_review.md  # → .teambot/{feature}/artifacts/spec_review.md
+      - spec_review.md
+    prerequisite_artifacts:
+      - feature_spec.md
     exit_criteria:
       - Specification approved or revision feedback provided
     optional: false
     is_review_stage: true
     prompt_template: .agent/commands/sdd/sdd.2-review-spec.prompt.md
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "SPEC_REVIEW" }
+        decision: { type: string, enum: ["APPROVED", "NEEDS_REVISION", "BLOCKED"] }
+        scores:
+          type: object
+          properties:
+            completeness: { type: integer, minimum: 0, maximum: 10 }
+            clarity: { type: integer, minimum: 0, maximum: 10 }
+            testability: { type: integer, minimum: 0, maximum: 10 }
+            technical_readiness: { type: integer, minimum: 0, maximum: 10 }
+        blockers: { type: array, items: { type: string } }
+        artifacts_produced: { type: array, items: { type: string } }
+      required: ["stage", "decision", "scores"]
+    max_context_tokens: null
 
   RESEARCH:
     name: Research
@@ -231,29 +254,24 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - research.md  # → .teambot/{feature}/artifacts/research.md
+      - research.md
+    prerequisite_artifacts:
+      - feature_spec.md
     exit_criteria:
       - Research document with implementation recommendations
     optional: false
     prompt_template: .agent/commands/sdd/sdd.3-research-feature.prompt.md
     include_objective: true
-
-  TEST_STRATEGY:
-    name: Test Strategy
-    description: Define testing approach (TDD vs Code-First), coverage targets, and test patterns
-    work_agent: builder-2
-    review_agent: null
-    allowed_personas:
-      - builder
-      - developer
-      - reviewer
-    artifacts:
-      - test_strategy.md  # → .teambot/{feature}/artifacts/test_strategy.md
-    exit_criteria:
-      - Test strategy document with approach per component
-    optional: false
-    prompt_template: .agent/commands/sdd/sdd.4-determine-test-strategy.prompt.md
-    include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "RESEARCH" }
+        status: { type: string, enum: ["COMPLETE", "INCOMPLETE"] }
+        artifacts_produced: { type: array, items: { type: string } }
+        key_findings: { type: array, items: { type: string } }
+        blockers: { type: array, items: { type: string } }
+      required: ["stage", "status", "artifacts_produced"]
+    max_context_tokens: 32000  # Research can reference large codebases
 
   PLAN:
     name: Plan
@@ -266,12 +284,25 @@ stages:
       - builder
       - developer
     artifacts:
-      - implementation_plan.md  # → .teambot/{feature}/artifacts/implementation_plan.md
+      - implementation_plan.md
+    prerequisite_artifacts:
+      - research.md
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
     prompt_template: .agent/commands/sdd/sdd.5-task-planner-for-feature.prompt.md
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "PLAN" }
+        status: { type: string, enum: ["COMPLETE", "INCOMPLETE"] }
+        total_phases: { type: integer }
+        total_tasks: { type: integer }
+        artifacts_produced: { type: array, items: { type: string } }
+        blockers: { type: array, items: { type: string } }
+      required: ["stage", "status", "total_phases", "total_tasks", "artifacts_produced"]
+    max_context_tokens: 32000  # Needs research + spec + planning context
 
   PLAN_REVIEW:
     name: Plan Review
@@ -283,13 +314,31 @@ stages:
       - project_manager
       - pm
     artifacts:
-      - plan_review.md  # → .teambot/{feature}/artifacts/plan_review.md
+      - plan_review.md
+    prerequisite_artifacts:
+      - implementation_plan.md
     exit_criteria:
       - Plan approved or revision feedback provided
     optional: false
     is_review_stage: true
     prompt_template: .agent/commands/sdd/sdd.6-review-plan.prompt.md
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "PLAN_REVIEW" }
+        decision: { type: string, enum: ["APPROVED", "NEEDS_REVISION", "BLOCKED"] }
+        scores:
+          type: object
+          properties:
+            completeness: { type: integer, minimum: 0, maximum: 10 }
+            actionability: { type: integer, minimum: 0, maximum: 10 }
+            test_integration: { type: integer, minimum: 0, maximum: 10 }
+            implementation_readiness: { type: integer, minimum: 0, maximum: 10 }
+        blockers: { type: array, items: { type: string } }
+        artifacts_produced: { type: array, items: { type: string } }
+      required: ["stage", "decision", "scores"]
+    max_context_tokens: 32000
 
   IMPLEMENTATION:
     name: Implementation
@@ -300,6 +349,8 @@ stages:
       - builder
       - developer
     artifacts: []  # Dynamic based on plan
+    prerequisite_artifacts:
+      - implementation_plan.md
     exit_criteria:
       - All tasks complete
       - Code implemented per plan
@@ -309,43 +360,56 @@ stages:
       - builder-2
     prompt_template: .agent/commands/sdd/sdd.7-task-implementer-for-feature.prompt.md
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "IMPLEMENTATION" }
+        status: { type: string, enum: ["COMPLETE", "INCOMPLETE"] }
+        tasks_completed: { type: integer }
+        tasks_total: { type: integer }
+        files_created: { type: integer }
+        files_modified: { type: integer }
+        tests_written: { type: integer }
+        tests_passing: { type: boolean }
+        blockers: { type: array, items: { type: string } }
+      required: ["stage", "status", "tasks_completed", "tasks_total"]
+    max_context_tokens: 48000  # Largest context — needs plan, details, and research context
 
   IMPLEMENTATION_REVIEW:
     name: Implementation Review
-    description: Review implemented changes for quality, correctness, and adherence to spec
+    description: >
+      Review implemented changes for quality, correctness, and adherence to spec.
+      Also verifies that test execution and coverage meet the defined test strategy requirements.
     work_agent: builder-1
     review_agent: reviewer
     allowed_personas:
       - reviewer
     artifacts:
-      - impl_review.md  # → .teambot/{feature}/artifacts/impl_review.md
+      - impl_review.md
+      - test_results.md
+    prerequisite_artifacts:
+      - implementation_plan.md
     exit_criteria:
       - Implementation approved or revision feedback provided
+      - All tests passing
+      - Coverage targets met
     optional: false
     is_review_stage: true
     prompt_template: .agent/commands/sdd/sdd.7b-implementation-review.prompt.md
     include_objective: true
-
-  TEST:
-    name: Test
-    description: >
-      Execute tests and validate implementation meets requirements.
-      New tests should be introduced to ensure new functionality is covered
-      and tests pass before continuing.
-    work_agent: builder-1
-    review_agent: null
-    allowed_personas:
-      - builder
-      - developer
-      - reviewer
-    artifacts:
-      - test_results.md  # → .teambot/{feature}/artifacts/test_results.md
-    exit_criteria:
-      - All tests passing
-      - Coverage targets met
-    optional: false
-    prompt_template: null  # Uses general test execution
-    include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "IMPLEMENTATION_REVIEW" }
+        decision: { type: string, enum: ["APPROVED", "NEEDS_REVISION", "BLOCKED"] }
+        tasks_complete: { type: boolean }
+        tests_passing: { type: boolean }
+        coverage_met: { type: boolean }
+        linting_passed: { type: boolean }
+        blockers: { type: array, items: { type: string } }
+        artifacts_produced: { type: array, items: { type: string } }
+      required: ["stage", "decision", "tasks_complete", "tests_passing"]
+    max_context_tokens: 48000  # Needs to review all implementation artifacts
 
   ACCEPTANCE_TEST:
     name: Acceptance Test
@@ -360,15 +424,31 @@ stages:
       - builder
       - developer
     artifacts:
-      - acceptance_test_results.md  # → .teambot/{feature}/artifacts/acceptance_test_results.md
+      - acceptance_test_results.md
+    prerequisite_artifacts:
+      - impl_review.md
+      - feature_spec.md
     exit_criteria:
       - All acceptance test scenarios executed
       - All acceptance tests passing
       - No failures blocking completion
     optional: false
     is_acceptance_test_stage: true  # Special flag for acceptance test handling
-    prompt_template: null
+    # No prompt_template: acceptance testing is code-driven via AcceptanceTestExecutor,
+    # which builds its own validation prompt from parsed feature spec scenarios.
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "ACCEPTANCE_TEST" }
+        total_scenarios: { type: integer }
+        passed: { type: integer }
+        failed: { type: integer }
+        skipped: { type: integer }
+        status: { type: string, enum: ["ALL_PASS", "FAILURES_PRESENT", "BLOCKED"] }
+        blockers: { type: array, items: { type: string } }
+      required: ["stage", "total_scenarios", "passed", "failed", "status"]
+    max_context_tokens: 32000
 
   POST_REVIEW:
     name: Post Implementation Review
@@ -383,7 +463,9 @@ stages:
       - pm
       - reviewer
     artifacts:
-      - post_review.md  # → .teambot/{feature}/artifacts/post_review.md
+      - post_review.md
+    prerequisite_artifacts:
+      - acceptance_test_results.md
     exit_criteria:
       - All success criteria validated
       - Acceptance tests verified as passing
@@ -393,6 +475,19 @@ stages:
     requires_acceptance_tests_passed: true  # Blocks completion if acceptance tests failed
     prompt_template: .agent/commands/sdd/sdd.8-post-implementation-review.prompt.md
     include_objective: true
+    output_schema:
+      type: object
+      properties:
+        stage: { type: string, const: "POST_REVIEW" }
+        decision: { type: string, enum: ["APPROVED", "NEEDS_WORK", "BLOCKED"] }
+        all_tests_passing: { type: boolean }
+        acceptance_tests_passing: { type: boolean }
+        coverage_targets_met: { type: boolean }
+        ready_for_merge: { type: boolean }
+        blockers: { type: array, items: { type: string } }
+        artifacts_produced: { type: array, items: { type: string } }
+      required: ["stage", "decision", "all_tests_passing", "acceptance_tests_passing"]
+    max_context_tokens: 24000
 
   COMPLETE:
     name: Complete
@@ -411,16 +506,13 @@ stages:
 # Stage execution order
 stage_order:
   - SETUP
-  - BUSINESS_PROBLEM
   - SPEC
   - SPEC_REVIEW
   - RESEARCH
-  - TEST_STRATEGY
   - PLAN
   - PLAN_REVIEW
   - IMPLEMENTATION
   - IMPLEMENTATION_REVIEW
-  - TEST
   - ACCEPTANCE_TEST
   - POST_REVIEW
   - COMPLETE
@@ -429,13 +521,7 @@ stage_order:
 # after: trigger stage that must complete first
 # stages: list of stages to run in parallel
 # before: gate stage - all parallel stages must complete before this
-parallel_groups:
-  post_spec_review:
-    after: SPEC_REVIEW
-    stages:
-      - RESEARCH
-      - TEST_STRATEGY
-    before: PLAN
+# (No parallel groups configured by default)
 
 # Mapping of work stages to their review stages
 # Note: This defines NAVIGATION (which review follows which work stage).

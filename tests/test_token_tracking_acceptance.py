@@ -314,7 +314,6 @@ class TestAT006PerStageAggregation:
             ("ba", "SPEC", 200, 300),
             ("reviewer", "SPEC_REVIEW", 50, 100),
             ("builder-1", "RESEARCH", 300, 400),
-            ("builder-1", "TEST_STRATEGY", 150, 200),
             ("pm", "PLAN", 100, 150),
             ("reviewer", "PLAN_REVIEW", 50, 100),
             ("builder-1", "IMPLEMENTATION", 500, 800),
@@ -339,8 +338,8 @@ class TestAT006PerStageAggregation:
         by_agent = tracker.get_by_agent()
         # pm: 100+150 + 100+150 = 500
         assert by_agent["pm"].total_tokens == 500
-        # builder-1: (300+400) + (150+200) + (500+800) = 2350
-        assert by_agent["builder-1"].total_tokens == 2350
+        # builder-1: (300+400) + (500+800) = 2000
+        assert by_agent["builder-1"].total_tokens == 2000
         # builder-2: 400+600 = 1000
         assert by_agent["builder-2"].total_tokens == 1000
 
