@@ -1750,3 +1750,296 @@ This feature implements user authentication functionality.
         # Should complete successfully
         assert result == ExecutionResult.COMPLETE
         assert loop.current_stage == WorkflowStage.COMPLETE
+
+
+class TestContextTokenLimitEnforcement:
+    """Tests for max_context_tokens enforcement in _build_stage_context."""
+
+    def test_context_not_truncated_when_within_limit(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Context is returned unchanged when under the token budget."""
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        config = _get_default_configuration()
+        # Set a generous limit that won't be hit
+        config.stages[WorkflowStage.SPEC].max_context_tokens = 100_000
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        # No truncation notice should be present
+        assert "context truncated" not in context
+
+    def test_context_truncated_when_over_limit(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Context is truncated with a notice when it exceeds max_context_tokens."""
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        config = _get_default_configuration()
+        # Set a very small limit to force truncation (context will be well over 5 tokens)
+        config.stages[WorkflowStage.SPEC].max_context_tokens = 5
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "context truncated to fit max_context_tokens budget" in context
+
+    def test_context_truncation_respects_char_budget(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Truncated context length does not exceed max_context_tokens * 4 chars."""
+        from teambot.history.compactor import estimate_tokens
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        # Use a limit just above the truncation notice length so actual content is cut
+        config = _get_default_configuration()
+        config.stages[WorkflowStage.SPEC].max_context_tokens = 100
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        # Verify the estimate_tokens heuristic reports the context is within budget.
+        # The result may slightly exceed due to the truncation notice, but the
+        # implementation guarantees total length <= max_context_tokens * 4 chars.
+        assert len(context) <= 100 * 4  # 4 chars/token as used by estimate_tokens
+        assert estimate_tokens(context) <= 100
+
+    def test_no_truncation_when_max_context_tokens_is_none(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Context is not modified when max_context_tokens is None (default)."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        assert "context truncated" not in context
+
+
+class TestExtractJsonFromOutput:
+    """Tests for the _extract_json_from_output helper."""
+
+    def test_extracts_json_code_block(self, objective_file: Path, teambot_dir: Path) -> None:
+        """JSON inside a markdown code block is extracted."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        text = 'Here is the result:\n```json\n{"key": "value"}\n```\nDone.'
+        result = loop._extract_json_from_output(text)
+
+        assert result == '{"key": "value"}'
+
+    def test_extracts_bare_code_block(self, objective_file: Path, teambot_dir: Path) -> None:
+        """JSON inside a plain ``` code block (no language tag) is extracted."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        text = 'Result:\n```\n{"key": "value"}\n```'
+        result = loop._extract_json_from_output(text)
+
+        assert result == '{"key": "value"}'
+
+    def test_extracts_bare_json_object(self, objective_file: Path, teambot_dir: Path) -> None:
+        """Raw JSON object in plain text is extracted."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        text = 'The output is {"stage": "SETUP", "status": "PASS"} as shown.'
+        result = loop._extract_json_from_output(text)
+
+        assert result is not None
+        # The greedy regex captures from first { to last } — verify it's valid JSON
+        import json
+
+        parsed = json.loads(result)
+        assert parsed["stage"] == "SETUP"
+        assert parsed["status"] == "PASS"
+
+    def test_returns_none_for_no_json(self, objective_file: Path, teambot_dir: Path) -> None:
+        """None is returned when there is no JSON in the output."""
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+        )
+
+        result = loop._extract_json_from_output("No JSON here at all.")
+
+        assert result is None
+
+
+class TestOutputSchemaValidation:
+    """Tests for output_schema enforcement in _execute_work_stage."""
+
+    @pytest.fixture
+    def loop(self, objective_file: Path, teambot_dir: Path) -> ExecutionLoop:
+        """ExecutionLoop with a SPEC stage configured to expect JSON output."""
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        config = _get_default_configuration()
+        config.stages[WorkflowStage.SPEC].output_schema = {
+            "type": "object",
+            "properties": {
+                "stage": {"type": "string"},
+                "status": {"type": "string", "enum": ["COMPLETE", "INCOMPLETE"]},
+            },
+            "required": ["stage", "status"],
+        }
+        return ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+    @pytest.mark.asyncio
+    async def test_valid_json_output_passes_validation(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Stage completes successfully when output conforms to output_schema."""
+        valid_json = '{"stage": "SPEC", "status": "COMPLETE"}'
+        mock_sdk_client.execute_streaming.return_value = valid_json
+        loop.sdk_client = mock_sdk_client
+
+        # Should not raise
+        output = await loop._execute_work_stage(WorkflowStage.SPEC, None)
+
+        assert output == valid_json
+
+    @pytest.mark.asyncio
+    async def test_json_in_markdown_block_passes_validation(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """JSON in markdown code block is extracted and validated."""
+        output_with_block = (
+            "Here is my result:\n"
+            "```json\n"
+            '{"stage": "SPEC", "status": "COMPLETE"}\n'
+            "```\n"
+            "Work is done."
+        )
+        mock_sdk_client.execute_streaming.return_value = output_with_block
+        loop.sdk_client = mock_sdk_client
+
+        output = await loop._execute_work_stage(WorkflowStage.SPEC, None)
+
+        assert output == output_with_block
+
+    @pytest.mark.asyncio
+    async def test_non_json_output_raises_critical_failure(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """OutputSchemaValidationError is raised when output contains no JSON."""
+        from teambot.orchestration.exceptions import OutputSchemaValidationError
+
+        mock_sdk_client.execute_streaming.return_value = "Work is done, no JSON here."
+        loop.sdk_client = mock_sdk_client
+
+        with pytest.raises(OutputSchemaValidationError) as exc_info:
+            await loop._execute_work_stage(WorkflowStage.SPEC, None)
+
+        assert exc_info.value.stage == "SPEC"
+        assert "does not contain valid JSON" in exc_info.value.error
+
+    @pytest.mark.asyncio
+    async def test_schema_violation_raises_critical_failure(
+        self, loop: ExecutionLoop, mock_sdk_client: AsyncMock
+    ) -> None:
+        """OutputSchemaValidationError is raised when JSON fails schema validation."""
+        from teambot.orchestration.exceptions import OutputSchemaValidationError
+
+        # Missing required field 'status'
+        mock_sdk_client.execute_streaming.return_value = '{"stage": "SPEC"}'
+        loop.sdk_client = mock_sdk_client
+
+        with pytest.raises(OutputSchemaValidationError) as exc_info:
+            await loop._execute_work_stage(WorkflowStage.SPEC, None)
+
+        assert exc_info.value.stage == "SPEC"
+        assert "status" in exc_info.value.error
+
+    @pytest.mark.asyncio
+    async def test_schema_violation_results_in_critical_failure_run(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """run() returns CRITICAL_FAILURE when output schema validation fails."""
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        config = _get_default_configuration()
+        # Only enforce schema on SETUP so the workflow fails on first stage
+        config.stages[WorkflowStage.SETUP].output_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string"}},
+            "required": ["status"],
+        }
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+        mock_client = AsyncMock()
+        # Return plain text — no JSON, so validation fails
+        mock_client.execute_streaming.return_value = "Setup complete."
+
+        result = await loop.run(mock_client)
+
+        assert result == ExecutionResult.CRITICAL_FAILURE
+
+    @pytest.mark.asyncio
+    async def test_no_schema_configured_skips_validation(
+        self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
+    ) -> None:
+        """Stages without output_schema skip validation entirely."""
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        config = _get_default_configuration()
+        # Ensure no schema is set
+        config.stages[WorkflowStage.SPEC].output_schema = None
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+        mock_sdk_client.execute_streaming.return_value = "Just plain text output."
+        loop.sdk_client = mock_sdk_client
+
+        # Should not raise even though output is not JSON
+        output = await loop._execute_work_stage(WorkflowStage.SPEC, None)
+
+        assert output == "Just plain text output."

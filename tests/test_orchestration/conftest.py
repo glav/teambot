@@ -34,6 +34,9 @@ def _mock_load_stages_config():
         if config_path is None:
             for stage_config in config.stages.values():
                 stage_config.artifacts = []
+                # Clear output_schema so mock agents returning plain text
+                # don't trigger OutputSchemaValidationError in unrelated tests.
+                stage_config.output_schema = None
 
         return config
 
@@ -151,6 +154,9 @@ def test_stages_config():
     # Clear any artifact requirements - tests don't have all artifacts
     for stage_config in config.stages.values():
         stage_config.artifacts = []
+        # Clear output_schema so mock agents returning plain text
+        # don't trigger OutputSchemaValidationError in unrelated tests.
+        stage_config.output_schema = None
 
     return config
 
