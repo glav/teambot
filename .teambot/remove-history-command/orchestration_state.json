@@ -1,0 +1,43 @@
+{
+  "objective_file": "docs/objectives/remove-history-command.md",
+  "current_stage": "SETUP",
+  "elapsed_seconds": 38.988395630000014,
+  "max_seconds": 28800,
+  "status": "critical_failure",
+  "stages_config_source": "/workspaces/teambot/stages.yaml",
+  "feature_name": "remove-history-command",
+  "acceptance_tests_passed": false,
+  "acceptance_test_iterations": 0,
+  "acceptance_test_history": [],
+  "acceptance_test_summary": null,
+  "stage_outputs": {},
+  "parallel_group_status": {},
+  "token_tracking": {
+    "schema_version": "1.0",
+    "total": {
+      "input_tokens": 22072,
+      "output_tokens": 516,
+      "cache_read_tokens": 21191,
+      "cache_write_tokens": 0,
+      "total_tokens": 22588
+    },
+    "by_agent": {
+      "pm": {
+        "input_tokens": 22072,
+        "output_tokens": 516,
+        "cache_read_tokens": 21191,
+        "cache_write_tokens": 0,
+        "total_tokens": 22588
+      }
+    },
+    "by_stage": {
+      "SETUP": {
+        "input_tokens": 22072,
+        "output_tokens": 516,
+        "cache_read_tokens": 21191,
+        "cache_write_tokens": 0,
+        "total_tokens": 22588
+      }
+    }
+  }
+}

@@ -135,6 +135,9 @@ class ExecutionLoop:
         self.sdk_client: Any = None
         self.review_iterator: ReviewIterator | None = None
 
+        # Error tracking for critical failures
+        self.last_error_message: str | None = None
+
         # Artifact validator for pre-stage checks
         self.artifact_validator = ArtifactValidator(
             teambot_dir=teambot_dir,
@@ -263,8 +266,16 @@ class ExecutionLoop:
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
-        except (MissingArtifactError, OutputSchemaValidationError):
+        except (MissingArtifactError, OutputSchemaValidationError) as e:
             # Critical failure - missing required artifact or invalid stage output schema
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Critical failure: {e}")
+
+            # Store error message for user display
+            self.last_error_message = str(e)
+
             self._emit_completed_event(on_progress, "critical_failure")
             self._save_state(ExecutionResult.CRITICAL_FAILURE)
             return ExecutionResult.CRITICAL_FAILURE
@@ -1392,6 +1403,10 @@ class ExecutionLoop:
             "stage_outputs": {k.name: v for k, v in self.stage_outputs.items()},
             "parallel_group_status": self.parallel_group_status,
         }
+
+        # Include error message if present
+        if self.last_error_message:
+            state["error_message"] = self.last_error_message
 
         # Add token tracking data if tracker enabled
         if self._token_tracker:

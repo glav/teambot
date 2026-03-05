@@ -2150,6 +2150,52 @@ class TestOutputSchemaValidation:
         assert result == ExecutionResult.CRITICAL_FAILURE
 
     @pytest.mark.asyncio
+    async def test_critical_failure_captures_error_message(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Critical failures store detailed error message in state."""
+        import json
+
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        config = _get_default_configuration()
+        # Only enforce schema on SETUP so the workflow fails on first stage
+        config.stages[WorkflowStage.SETUP].output_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string"}},
+            "required": ["status"],
+        }
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+        mock_client = AsyncMock()
+        # Return plain text — no JSON, so validation fails
+        mock_client.execute_streaming.return_value = "Setup complete."
+
+        result = await loop.run(mock_client)
+
+        assert result == ExecutionResult.CRITICAL_FAILURE
+
+        # Verify error message is stored in the loop
+        assert loop.last_error_message is not None
+        assert "Output schema validation failed" in loop.last_error_message
+        assert "To resolve:" in loop.last_error_message
+
+        # Verify error message is persisted in state file
+        feature_name = loop.feature_name
+        state_file = teambot_dir / feature_name / "orchestration_state.json"
+        assert state_file.exists()
+
+        state = json.loads(state_file.read_text())
+        assert "error_message" in state
+        assert "Output schema validation failed" in state["error_message"]
+        assert state["status"] == "critical_failure"
+
+    @pytest.mark.asyncio
     async def test_no_schema_configured_skips_validation(
         self, objective_file: Path, teambot_dir: Path, mock_sdk_client: AsyncMock
     ) -> None:

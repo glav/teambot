@@ -1184,6 +1184,16 @@ def _run_orchestration(
         elif result == ExecutionResult.REVIEW_FAILED:
             display.print_error("Review failed after 4 iterations. See .teambot/failures/")
             return 1
+        elif result == ExecutionResult.CRITICAL_FAILURE:
+            # Display detailed error message if available
+            if hasattr(loop, "last_error_message") and loop.last_error_message:
+                display.print_error("Critical failure occurred:")
+                # Print the error message with proper formatting
+                for line in loop.last_error_message.split("\n"):
+                    display.print_error(f"  {line}")
+            else:
+                display.print_error(f"Execution ended with: {result.value}")
+            return 1
         else:
             display.print_error(f"Execution ended with: {result.value}")
             return 1
