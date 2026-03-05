@@ -1127,6 +1127,8 @@ class ExecutionLoop:
         max_chars = max_context_tokens * 4
         truncation_notice = "\n...[context truncated to fit max_context_tokens budget]"
         if max_chars <= len(truncation_notice):
+            # Limit is so small that even the notice exceeds it; return just the notice
+            # so the caller still receives a valid (albeit minimal) context string.
             return truncation_notice
         return context[: max_chars - len(truncation_notice)] + truncation_notice
 
@@ -1149,7 +1151,9 @@ class ExecutionLoop:
         if match:
             return match.group(1).strip()
 
-        # Try to find raw JSON object or array (greedy, outermost braces/brackets)
+        # Try to find raw JSON object or array (greedy — captures from the first
+        # opening brace/bracket to the last closing one, which is the outermost
+        # structure in typical single-JSON LLM responses).
         match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
         if match:
             return match.group(1)

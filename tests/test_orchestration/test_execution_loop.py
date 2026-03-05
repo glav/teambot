@@ -1802,6 +1802,7 @@ class TestContextTokenLimitEnforcement:
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
         """Truncated context length does not exceed max_context_tokens * 4 chars."""
+        from teambot.history.compactor import estimate_tokens
         from teambot.orchestration.stage_config import _get_default_configuration
 
         # Use a limit just above the truncation notice length so actual content is cut
@@ -1817,8 +1818,11 @@ class TestContextTokenLimitEnforcement:
 
         context = loop._build_stage_context(WorkflowStage.SPEC)
 
-        # Result must be at most max_context_tokens * 4 characters
-        assert len(context) <= 100 * 4
+        # Verify the estimate_tokens heuristic reports the context is within budget.
+        # The result may slightly exceed due to the truncation notice, but the
+        # implementation guarantees total length <= max_context_tokens * 4 chars.
+        assert len(context) <= 100 * 4  # 4 chars/token as used by estimate_tokens
+        assert estimate_tokens(context) <= 100
 
     def test_no_truncation_when_max_context_tokens_is_none(
         self, objective_file: Path, teambot_dir: Path
@@ -1876,7 +1880,12 @@ class TestExtractJsonFromOutput:
         result = loop._extract_json_from_output(text)
 
         assert result is not None
-        assert '"stage"' in result
+        # The greedy regex captures from first { to last } — verify it's valid JSON
+        import json
+
+        parsed = json.loads(result)
+        assert parsed["stage"] == "SETUP"
+        assert parsed["status"] == "PASS"
 
     def test_returns_none_for_no_json(self, objective_file: Path, teambot_dir: Path) -> None:
         """None is returned when there is no JSON in the output."""
