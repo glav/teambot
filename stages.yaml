@@ -30,9 +30,11 @@
 #   prompt_template   - Path to SDD prompt file (relative to repo root) (default: null)
 #   include_objective - Include objective content in agent context (default: true)
 #   output_schema     - JSON schema for structured stage output (default: null)
-#                       When set, orchestrator validates output and extracts routing decisions.
+#                       When set, orchestrator validates that agent output conforms to the schema;
+#                       raises a critical failure (OutputSchemaValidationError) if validation fails.
 #   max_context_tokens - Soft limit on context tokens for this stage (default: null)
-#                        When set, prior-stage artifacts are summarized to fit budget.
+#                        When set, context is truncated (not summarized) from the end to fit
+#                        within the token budget before being passed to the agent.
 #
 # Global Sections (at file level):
 #   stages            - Map of stage definitions (required)
