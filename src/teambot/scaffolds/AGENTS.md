@@ -114,13 +114,12 @@ uv run ruff format .
 ### Workflow Stages (12)
 
 ```
-SETUP → SPEC → SPEC_REVIEW → RESEARCH ∥ TEST_STRATEGY →
+SETUP → SPEC → SPEC_REVIEW → RESEARCH → TEST_STRATEGY →
 PLAN → PLAN_REVIEW → IMPLEMENTATION →
 IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```
 
 **Notes:**
-- `RESEARCH` and `TEST_STRATEGY` run in parallel (denoted by `∥`)
 - `IMPLEMENTATION_REVIEW` now also verifies test execution and coverage (the former standalone `TEST` stage has been merged into it)
 - Stages support `prerequisite_artifacts`, `output_schema`, `max_context_tokens`, and git checkpoints for fine-grained control
 
