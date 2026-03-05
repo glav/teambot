@@ -111,10 +111,10 @@ uv run ruff format .
 | `builder-2` | Builder (Secondary) | Implementation (parallel) |
 | `reviewer` | Reviewer | Code review, QA |
 
-### Workflow Stages (12)
+### Workflow Stages (11)
 
 ```
-SETUP → SPEC → SPEC_REVIEW → RESEARCH → TEST_STRATEGY →
+SETUP → SPEC → SPEC_REVIEW → RESEARCH →
 PLAN → PLAN_REVIEW → IMPLEMENTATION →
 IMPLEMENTATION_REVIEW → ACCEPTANCE_TEST → POST_REVIEW → COMPLETE
 ```

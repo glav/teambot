@@ -11,7 +11,7 @@ class WorkflowStage(Enum):
 
     Workflow:
     Setup → Spec → Review → Research →
-    Test Strategy → Plan → Review → Task Implementation →
+    Plan → Review → Task Implementation →
     Review → Acceptance Test → Post Implementation Review
     """
 
@@ -19,7 +19,6 @@ class WorkflowStage(Enum):
     SPEC = auto()
     SPEC_REVIEW = auto()
     RESEARCH = auto()
-    TEST_STRATEGY = auto()
     PLAN = auto()
     PLAN_REVIEW = auto()
     IMPLEMENTATION = auto()
@@ -65,21 +64,13 @@ STAGE_METADATA: dict[WorkflowStage, StageMetadata] = {
         allowed_personas=["reviewer", "project_manager", "pm"],
         required_artifacts=["spec_review.md"],
         optional=False,
-        next_stages=[WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY],
+        next_stages=[WorkflowStage.RESEARCH],
     ),
     WorkflowStage.RESEARCH: StageMetadata(
         name="Research",
         description="Research technical approaches and dependencies",
         allowed_personas=["builder", "developer", "technical_writer", "writer"],
         required_artifacts=["research.md"],
-        optional=False,
-        next_stages=[WorkflowStage.PLAN],
-    ),
-    WorkflowStage.TEST_STRATEGY: StageMetadata(
-        name="Test Strategy",
-        description="Define testing approach and criteria",
-        allowed_personas=["builder", "developer", "reviewer"],
-        required_artifacts=["test_strategy.md"],
         optional=False,
         next_stages=[WorkflowStage.PLAN],
     ),

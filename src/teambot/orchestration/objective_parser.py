@@ -5,6 +5,21 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+import frontmatter as fm
+
+
+@dataclass
+class FrontmatterData:
+    """Parsed YAML frontmatter from an objective file."""
+
+    feature_name: str | None = None
+    language: str | None = None
+    framework: str | None = None
+    test_preference: str | None = None
+    scope: str | None = None
+    acceptance_scenarios: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -26,6 +41,7 @@ class ParsedObjective:
     context: str | None = None
     raw_content: str = ""
     source_filename: str = ""  # Original filename for feature name fallback
+    frontmatter: FrontmatterData = field(default_factory=FrontmatterData)
 
     @property
     def feature_name(self) -> str:
@@ -35,11 +51,16 @@ class ParsedObjective:
         Example: "Add User Authentication with OAuth2" -> "user-authentication"
 
         Priority:
-        1. Title (if not generic like "Objective")
-        2. Source filename (e.g., "sdd-objective-shared-context.md" -> "shared-context")
-        3. First goal
-        4. Fallback to "feature"
+        1. Frontmatter feature_name (explicit, authoritative)
+        2. Title (if not generic like "Objective")
+        3. Source filename (e.g., "sdd-objective-shared-context.md" -> "shared-context")
+        4. First goal
+        5. Fallback to "feature"
         """
+        # Priority 1: frontmatter feature_name (explicit, authoritative)
+        if self.frontmatter.feature_name:
+            return self.frontmatter.feature_name
+
         # If title is meaningful, use it
         if self.title.lower() not in ("objective", "untitled", ""):
             return _derive_feature_name(self.title)
@@ -80,20 +101,26 @@ def parse_objective_file(path: Path) -> ParsedObjective:
         raise FileNotFoundError(f"Objective file not found: {path}")
 
     content = path.read_text(encoding="utf-8")
-    sections = _extract_sections(content)
+
+    # Parse YAML frontmatter; post.content is the body without frontmatter
+    post = fm.loads(content)
+    body = post.content
+    metadata = post.metadata
+
+    sections = _extract_sections(body)
 
     # Try to find goals from various formats
     goals = (
         _parse_list_section(sections.get("Goals", ""))
         or _parse_list_section(sections.get("Goal", ""))
-        or _extract_inline_goals(content)
+        or _extract_inline_goals(body)
     )
 
     # Try to find success criteria from various formats
     success_criteria = (
         _parse_criteria_section(sections.get("Success Criteria", ""))
         or _parse_criteria_section(sections.get("Success criteria", ""))
-        or _extract_inline_criteria(content)
+        or _extract_inline_criteria(body)
     )
 
     # Try to find constraints
@@ -104,14 +131,25 @@ def parse_objective_file(path: Path) -> ParsedObjective:
     # Try to find context
     context = sections.get("Context") or sections.get("Technical Context")
 
+    # Build FrontmatterData from parsed metadata
+    frontmatter_data = FrontmatterData(
+        feature_name=metadata.get("feature_name"),
+        language=metadata.get("language"),
+        framework=metadata.get("framework"),
+        test_preference=metadata.get("test_preference"),
+        scope=metadata.get("scope"),
+        acceptance_scenarios=metadata.get("acceptance_scenarios") or [],
+    )
+
     return ParsedObjective(
-        title=_extract_title(content),
+        title=_extract_title(body),
         goals=goals,
         success_criteria=success_criteria,
         constraints=constraints,
         context=context,
         raw_content=content,
         source_filename=path.name,
+        frontmatter=frontmatter_data,
     )
 
 

@@ -191,13 +191,13 @@ class TestParallelGroupProgressEvents:
 
         callback(
             "parallel_group_start",
-            {"group": "post_spec_review", "stages": ["RESEARCH", "TEST_STRATEGY"]},
+            {"group": "post_spec_review", "stages": ["RESEARCH", "PLAN"]},
         )
 
         # Should call on_stage for each stage with "parallel:" prefix
         assert on_stage_mock.call_count == 2
         on_stage_mock.assert_any_call("parallel:RESEARCH")
-        on_stage_mock.assert_any_call("parallel:TEST_STRATEGY")
+        on_stage_mock.assert_any_call("parallel:PLAN")
 
     def test_parallel_stage_start_sets_agent_running(self) -> None:
         """parallel_stage_start event sets agent to running state."""

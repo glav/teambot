@@ -118,9 +118,9 @@
 #     post_spec_review:
 #       after: SPEC_REVIEW      # Parallel stages start after SPEC_REVIEW completes
 #       stages:
-#         - RESEARCH            # These two stages run concurrently
-#         - TEST_STRATEGY
-#       before: PLAN            # PLAN waits for both RESEARCH and TEST_STRATEGY
+#         - STAGE_A             # These two stages run concurrently
+#         - STAGE_B
+#       before: PLAN            # PLAN waits for both STAGE_A and STAGE_B
 #
 # Constraints:
 #   - Parallel stages must be independent (no dependencies between them)
@@ -272,35 +272,6 @@ stages:
         blockers: { type: array, items: { type: string } }
       required: ["stage", "status", "artifacts_produced"]
     max_context_tokens: 32000  # Research can reference large codebases
-
-  TEST_STRATEGY:
-    name: Test Strategy
-    description: Define testing approach (TDD vs Code-First), coverage targets, and test patterns
-    work_agent: builder-2
-    review_agent: null
-    allowed_personas:
-      - builder
-      - developer
-      - reviewer
-    artifacts:
-      - test_strategy.md
-    prerequisite_artifacts:
-      - feature_spec.md
-    exit_criteria:
-      - Test strategy document with approach per component
-    optional: false
-    prompt_template: .agent/commands/sdd/sdd.4-determine-test-strategy.prompt.md
-    include_objective: true
-    output_schema:
-      type: object
-      properties:
-        stage: { type: string, const: "TEST_STRATEGY" }
-        status: { type: string, enum: ["COMPLETE", "INCOMPLETE"] }
-        approach: { type: string, enum: ["TDD", "CODE_FIRST", "HYBRID"] }
-        artifacts_produced: { type: array, items: { type: string } }
-        blockers: { type: array, items: { type: string } }
-      required: ["stage", "status", "approach", "artifacts_produced"]
-    max_context_tokens: 24000
 
   PLAN:
     name: Plan
@@ -465,7 +436,8 @@ stages:
       - No failures blocking completion
     optional: false
     is_acceptance_test_stage: true  # Special flag for acceptance test handling
-    prompt_template: .agent/commands/sdd/sdd.7c-acceptance-test.prompt.md
+    # No prompt_template: acceptance testing is code-driven via AcceptanceTestExecutor,
+    # which builds its own validation prompt from parsed feature spec scenarios.
     include_objective: true
     output_schema:
       type: object
@@ -539,7 +511,6 @@ stage_order:
   - SPEC
   - SPEC_REVIEW
   - RESEARCH
-  - TEST_STRATEGY
   - PLAN
   - PLAN_REVIEW
   - IMPLEMENTATION
@@ -552,13 +523,7 @@ stage_order:
 # after: trigger stage that must complete first
 # stages: list of stages to run in parallel
 # before: gate stage - all parallel stages must complete before this
-parallel_groups:
-  post_spec_review:
-    after: SPEC_REVIEW
-    stages:
-      - RESEARCH
-      - TEST_STRATEGY
-    before: PLAN
+# (No parallel groups configured by default)
 
 # Mapping of work stages to their review stages
 # Note: This defines NAVIGATION (which review follows which work stage).
