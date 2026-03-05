@@ -537,3 +537,194 @@ class TestArtifactPathResolution:
 
         result = validator.find_artifact("nonexistent.md")
         assert result is None
+
+
+class TestCrossFeatureIsolation:
+    """Tests for cross-feature artifact isolation (glob pattern safety)."""
+
+    @pytest.fixture
+    def stages_config(self) -> StagesConfiguration:
+        """Create a minimal stages configuration for testing."""
+        return StagesConfiguration(
+            stages={
+                WorkflowStage.PLAN: StageConfig(
+                    name="Plan",
+                    description="Create implementation plan",
+                    work_agent="pm",
+                    review_agent="reviewer",
+                    prerequisite_artifacts=["research.md"],
+                ),
+            },
+            stage_order=[WorkflowStage.PLAN],
+            work_to_review_mapping={},
+        )
+
+    def test_glob_filters_by_feature_name_research(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Glob patterns filter by feature name to prevent cross-feature contamination."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create research files for TWO different features
+        research_dir = tmp_path / ".agent-tracking" / "research"
+        research_dir.mkdir(parents=True)
+
+        # Feature A's research (older)
+        feature_a_file = research_dir / "20260305-feature-a-research.md"
+        feature_a_file.write_text("# Feature A Research")
+        feature_a_file.touch()  # Ensure it exists with timestamp
+
+        # Feature B's research (newer - higher mtime)
+        import time
+
+        time.sleep(0.01)  # Small delay to ensure different mtime
+        feature_b_file = research_dir / "20260305-feature-b-research.md"
+        feature_b_file.write_text("# Feature B Research")
+        feature_b_file.touch()
+
+        # Validator for Feature A
+        validator_a = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="feature-a",
+        )
+
+        # Should find Feature A's research, NOT Feature B's (even though B is newer)
+        result_a = validator_a.find_artifact("research.md")
+        assert result_a is not None
+        assert "feature-a" in result_a.name
+        assert "feature-b" not in result_a.name
+
+        # Validator for Feature B
+        validator_b = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="feature-b",
+        )
+
+        # Should find Feature B's research
+        result_b = validator_b.find_artifact("research.md")
+        assert result_b is not None
+        assert "feature-b" in result_b.name
+        assert "feature-a" not in result_b.name
+
+    def test_glob_filters_by_feature_name_plan(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Glob patterns filter plan files by feature name."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create plan files for two features
+        plans_dir = tmp_path / ".agent-tracking" / "plans"
+        plans_dir.mkdir(parents=True)
+
+        (plans_dir / "20260305-mobile-app-plan.instructions.md").write_text("# Mobile Plan")
+        (plans_dir / "20260305-web-app-plan.instructions.md").write_text("# Web Plan")
+
+        # Validator for mobile-app
+        validator_mobile = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="mobile-app",
+        )
+
+        result_mobile = validator_mobile.find_artifact("implementation_plan.md")
+        assert result_mobile is not None
+        assert "mobile-app" in result_mobile.name
+        assert "web-app" not in result_mobile.name
+
+    def test_glob_filters_by_feature_name_spec(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Glob patterns filter spec files by feature name."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create spec files for two features
+        specs_dir = tmp_path / "docs" / "feature-specs"
+        specs_dir.mkdir(parents=True)
+
+        (specs_dir / "user-authentication.md").write_text("# Auth Spec")
+        (specs_dir / "user-profile.md").write_text("# Profile Spec")
+
+        # Validator for user-authentication
+        validator_auth = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="user-authentication",
+        )
+
+        result_auth = validator_auth.find_artifact("feature_spec.md")
+        assert result_auth is not None
+        assert "authentication" in result_auth.name
+        assert "profile" not in result_auth.name
+
+    def test_glob_returns_none_without_feature_name(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Glob fallback returns None when feature_name is not set (safety check)."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create a research file
+        research_dir = tmp_path / ".agent-tracking" / "research"
+        research_dir.mkdir(parents=True)
+        (research_dir / "20260305-some-feature-research.md").write_text("# Research")
+
+        # Validator WITHOUT feature_name
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name=None,  # No feature name!
+        )
+
+        # Should NOT find artifact via glob (returns None for safety)
+        result = validator.find_artifact("research.md")
+        assert result is None
+
+    def test_glob_prefers_most_recent_within_same_feature(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """When multiple files match same feature, returns most recent."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create multiple research files for SAME feature
+        research_dir = tmp_path / ".agent-tracking" / "research"
+        research_dir.mkdir(parents=True)
+
+        import time
+
+        # Older file
+        older_file = research_dir / "20260301-my-feature-research.md"
+        older_file.write_text("# Old Research")
+        older_file.touch()
+
+        time.sleep(0.01)
+
+        # Newer file
+        newer_file = research_dir / "20260305-my-feature-research.md"
+        newer_file.write_text("# New Research")
+        newer_file.touch()
+
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="my-feature",
+        )
+
+        result = validator.find_artifact("research.md")
+        assert result is not None
+        assert "20260305" in result.name  # Should find newer file

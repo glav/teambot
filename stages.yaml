@@ -192,7 +192,9 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - feature_spec.md
+      # Note: Actual file created at docs/feature-specs/{name}.md
+      # This is a pattern/description, not exact filename
+      - docs/feature-specs/{name}.md
     prerequisite_artifacts: []  # First content stage, no prereqs
     exit_criteria:
       - Complete specification with all required sections
@@ -256,9 +258,11 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - research.md
+      # Note: Actual file created at .agent-tracking/research/YYYYMMDD-{name}-research.md
+      # This is a pattern/description, not exact filename
+      - .agent-tracking/research/{date}-{name}-research.md
     prerequisite_artifacts:
-      - feature_spec.md
+      - feature_spec.md  # Will match any .md in docs/feature-specs/ via glob
     exit_criteria:
       - Research document with implementation recommendations
     optional: false
@@ -286,9 +290,13 @@ stages:
       - builder
       - developer
     artifacts:
-      - implementation_plan.md
+      # Note: Actual files created at .agent-tracking/plans/YYYYMMDD-{name}-plan.instructions.md
+      # and .agent-tracking/details/YYYYMMDD-{name}-details.md
+      # These are patterns/descriptions, not exact filenames
+      - .agent-tracking/plans/{date}-{name}-plan.instructions.md
+      - .agent-tracking/details/{date}-{name}-details.md
     prerequisite_artifacts:
-      - research.md
+      - research.md  # Will match any *research*.md in .agent-tracking/research/ via glob
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
