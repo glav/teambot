@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from teambot.orchestration.stage_config import load_stages_config
 from teambot.workflow.stages import WorkflowStage
@@ -72,14 +73,21 @@ class TestStagesYamlAcceptanceScenarios:
     def test_at_002_inline_artifact_path_comments(self, stages_yaml_content: str) -> None:
         """AT-002: Verify all stages with artifacts have artifact definitions.
 
-        All work stages should define their artifacts list.
+        All work stages should define their artifacts list, including stages that
+        use the inline empty-list form (e.g. ``artifacts: []``).
         """
-        # Count artifact field declarations under stages
-        artifact_pattern = r"^\s+artifacts:\s*$"
-        matches = re.findall(artifact_pattern, stages_yaml_content, re.MULTILINE)
+        data = yaml.safe_load(stages_yaml_content)
+        stages_data = data.get("stages", {})
 
-        # Should find artifact declarations for most stages
-        assert len(matches) >= 9, f"Expected at least 9 artifact declarations, found {len(matches)}"
+        stages_missing_artifacts = [
+            stage_name
+            for stage_name, stage_data in stages_data.items()
+            if "artifacts" not in stage_data
+        ]
+
+        assert not stages_missing_artifacts, (
+            f"The following stages are missing the 'artifacts' key: {stages_missing_artifacts}"
+        )
 
     def test_at_003_default_values_complete(self, stages_yaml_content: str) -> None:
         """AT-003: Verify all 13 stage fields have documented defaults.
