@@ -192,7 +192,7 @@ After resolving, run this initialization step again.
 
 ### Required JSON Output
 
-After your markdown report, you MUST append a JSON code block containing:
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
 
 ```json
 {
@@ -210,7 +210,7 @@ After your markdown report, you MUST append a JSON code block containing:
 | `stage` | string | Yes | "SETUP" | Stage identifier (must be exactly "SETUP") |
 | `status` | string | Yes | "PASS", "FAIL" | Initialization outcome |
 | `environment_ready` | boolean | Yes | true, false | Whether all prerequisites are met |
-| `blockers` | array | No | Array of strings | List of issues preventing workflow start (empty if none) |
+| `blockers` | array | Yes | Array of strings | List of issues preventing workflow start. Use empty array `[]` when no blockers exist |
 
 ### Output Structure Example
 
