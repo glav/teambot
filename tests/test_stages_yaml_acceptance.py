@@ -79,6 +79,8 @@ class TestStagesYamlAcceptanceScenarios:
         data = yaml.safe_load(stages_yaml_content)
         stages_data = data.get("stages", {})
 
+        # Should find artifact declarations for most stages
+        assert len(matches) >= 8, f"Expected at least 8 artifact declarations, found {len(matches)}"
         stages_missing_artifacts = [
             stage_name
             for stage_name, stage_data in stages_data.items()
@@ -132,12 +134,12 @@ class TestStagesYamlAcceptanceScenarios:
 
         Verify the stages.yaml loads correctly and has expected structure.
         """
-        # Verify expected structure (12 stages after removing BUSINESS_PROBLEM and TEST)
-        assert len(stages_config.stages) == 12, (
-            f"Expected 12 stages, got {len(stages_config.stages)}"
+        # Verify expected structure (11 stages after removing BUSINESS_PROBLEM, TEST, TEST_STRATEGY)
+        assert len(stages_config.stages) == 11, (
+            f"Expected 11 stages, got {len(stages_config.stages)}"
         )
-        assert len(stages_config.stage_order) == 12, (
-            f"Expected 12 stages in order, got {len(stages_config.stage_order)}"
+        assert len(stages_config.stage_order) == 11, (
+            f"Expected 11 stages in order, got {len(stages_config.stage_order)}"
         )
         assert len(stages_config.review_stages) == 4, (
             f"Expected 4 review stages, got {len(stages_config.review_stages)}"

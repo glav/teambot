@@ -70,7 +70,6 @@ The implementation is mostly correct but has a potential security issue.
 ## Workflow Stages You Lead
 
 - **SPEC_REVIEW**: Review feature specifications
-- **TEST_STRATEGY**: Review testing approach
 - **PLAN_REVIEW**: Review implementation plans
 - **IMPLEMENTATION_REVIEW**: Review code changes
 - **TEST**: Validate test results

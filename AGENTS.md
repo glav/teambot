@@ -20,7 +20,7 @@ teambot/
 │   ├── messaging/            # Inter-agent messaging (multiprocessing queues)
 │   ├── prompts/              # Persona-specific prompt templates
 │   ├── visualization/        # Rich console display
-│   └── workflow/             # 12-stage workflow state machine
+│   └── workflow/             # 11-stage workflow state machine
 ├── tests/                    # Test suite (1050 tests, 80% coverage)
 ├── docs/
 │   ├── guides/               # User documentation (10 guides)

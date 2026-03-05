@@ -990,19 +990,63 @@ class TestParallelGroupExecution:
     ) -> ExecutionLoop:
         """Create ExecutionLoop with parallel groups configured."""
         from teambot.orchestration.stage_config import (
-            load_stages_config,
+            ParallelGroupConfig,
+            StageConfig,
+            StagesConfiguration,
         )
 
-        # Load default config and ensure parallel groups exist
-        config = load_stages_config()
-        assert len(config.parallel_groups) > 0, "Expected parallel groups from stages.yaml"
+        # Build a config with a parallel group for testing
+        # Uses RESEARCH (builder-1) and PLAN_REVIEW (builder-2) as parallel stages
+        base_config = StagesConfiguration(
+            stages={
+                WorkflowStage.SPEC_REVIEW: StageConfig(
+                    name="Spec Review",
+                    description="Review spec",
+                    work_agent="reviewer",
+                    review_agent=None,
+                ),
+                WorkflowStage.RESEARCH: StageConfig(
+                    name="Research",
+                    description="Research",
+                    work_agent="builder-1",
+                    review_agent=None,
+                ),
+                WorkflowStage.PLAN_REVIEW: StageConfig(
+                    name="Plan Review",
+                    description="Plan review",
+                    work_agent="builder-2",
+                    review_agent=None,
+                ),
+                WorkflowStage.PLAN: StageConfig(
+                    name="Plan",
+                    description="Plan",
+                    work_agent="pm",
+                    review_agent=None,
+                ),
+            },
+            stage_order=[
+                WorkflowStage.SPEC_REVIEW,
+                WorkflowStage.RESEARCH,
+                WorkflowStage.PLAN_REVIEW,
+                WorkflowStage.PLAN,
+            ],
+            work_to_review_mapping={},
+            parallel_groups=[
+                ParallelGroupConfig(
+                    name="post_spec_review",
+                    after=WorkflowStage.SPEC_REVIEW,
+                    stages=[WorkflowStage.RESEARCH, WorkflowStage.PLAN_REVIEW],
+                    before=WorkflowStage.PLAN,
+                )
+            ],
+        )
 
         return ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir_with_spec,
             max_hours=8.0,
-            stages_config=config,
+            stages_config=base_config,
         )
 
     def test_get_parallel_group_for_stage_returns_group(
@@ -1015,14 +1059,14 @@ class TestParallelGroupExecution:
         assert group is not None
         assert group.name == "post_spec_review"
         assert WorkflowStage.RESEARCH in group.stages
-        assert WorkflowStage.TEST_STRATEGY in group.stages
+        assert WorkflowStage.PLAN_REVIEW in group.stages
 
     def test_get_parallel_group_for_stage_returns_none_for_non_first(
         self, loop_with_parallel_groups: ExecutionLoop
     ) -> None:
         """Returns None for stages that are not first in parallel group."""
-        # TEST_STRATEGY is second in the group, should not trigger parallel execution
-        group = loop_with_parallel_groups._get_parallel_group_for_stage(WorkflowStage.TEST_STRATEGY)
+        # PLAN_REVIEW is second in the group, should not trigger parallel execution
+        group = loop_with_parallel_groups._get_parallel_group_for_stage(WorkflowStage.PLAN_REVIEW)
 
         assert group is None
 
@@ -1053,7 +1097,7 @@ class TestParallelGroupExecution:
         assert success is True
         # Both stages should have outputs
         assert WorkflowStage.RESEARCH in loop_with_parallel_groups.stage_outputs
-        assert WorkflowStage.TEST_STRATEGY in loop_with_parallel_groups.stage_outputs
+        assert WorkflowStage.PLAN_REVIEW in loop_with_parallel_groups.stage_outputs
 
     @pytest.mark.asyncio
     async def test_execute_parallel_group_reports_progress(
@@ -1174,7 +1218,7 @@ class TestStatePersistenceWithParallelGroups:
             "post_spec_review": {
                 "stages": {
                     "RESEARCH": {"status": "completed", "error": None},
-                    "TEST_STRATEGY": {"status": "in_progress", "error": None},
+                    "PLAN_REVIEW": {"status": "in_progress", "error": None},
                 }
             }
         }
@@ -1187,7 +1231,7 @@ class TestStatePersistenceWithParallelGroups:
         assert "parallel_group_status" in state
         pgs = state["parallel_group_status"]["post_spec_review"]["stages"]
         assert pgs["RESEARCH"]["status"] == "completed"
-        assert pgs["TEST_STRATEGY"]["status"] == "in_progress"
+        assert pgs["PLAN_REVIEW"]["status"] == "in_progress"
 
     def test_resume_loads_parallel_group_status(
         self, objective_file: Path, teambot_dir: Path
@@ -1211,7 +1255,7 @@ class TestStatePersistenceWithParallelGroups:
                         "post_spec_review": {
                             "stages": {
                                 "RESEARCH": {"status": "completed", "error": None},
-                                "TEST_STRATEGY": {"status": "completed", "error": None},
+                                "PLAN_REVIEW": {"status": "completed", "error": None},
                             }
                         }
                     },
@@ -1226,7 +1270,7 @@ class TestStatePersistenceWithParallelGroups:
             "post_spec_review": {
                 "stages": {
                     "RESEARCH": {"status": "completed", "error": None},
-                    "TEST_STRATEGY": {"status": "completed", "error": None},
+                    "PLAN_REVIEW": {"status": "completed", "error": None},
                 }
             }
         }
@@ -1265,9 +1309,13 @@ class TestStatePersistenceWithParallelGroups:
         self, objective_file: Path, teambot_dir_with_spec: Path, mock_sdk_client: AsyncMock
     ) -> None:
         """Resume mid-parallel-group only re-runs incomplete stages."""
-        from teambot.orchestration.stage_config import load_stages_config
+        from teambot.orchestration.stage_config import (
+            ParallelGroupConfig,
+            StageConfig,
+            StagesConfiguration,
+        )
 
-        # Create state where RESEARCH is complete but TEST_STRATEGY is not
+        # Create state where RESEARCH is complete but PLAN_REVIEW is not
         feature_dir = teambot_dir_with_spec / "user-authentication"
         feature_dir.mkdir(parents=True, exist_ok=True)
         (feature_dir / "artifacts").mkdir(exist_ok=True)
@@ -1286,7 +1334,7 @@ class TestStatePersistenceWithParallelGroups:
                         "post_spec_review": {
                             "stages": {
                                 "RESEARCH": {"status": "completed", "error": None},
-                                # TEST_STRATEGY not present = not completed
+                                # PLAN_REVIEW not present = not completed
                             }
                         }
                     },
@@ -1296,14 +1344,59 @@ class TestStatePersistenceWithParallelGroups:
         )
 
         loop = ExecutionLoop.resume(teambot_dir_with_spec, {})
-        loop.stages_config = load_stages_config()
 
-        # Check that filter_incomplete_stages correctly identifies TEST_STRATEGY
+        # Build a custom stages config with RESEARCH and PLAN_REVIEW in a parallel group
+        custom_config = StagesConfiguration(
+            stages={
+                WorkflowStage.SPEC_REVIEW: StageConfig(
+                    name="Spec Review",
+                    description="Review spec",
+                    work_agent="reviewer",
+                    review_agent=None,
+                ),
+                WorkflowStage.RESEARCH: StageConfig(
+                    name="Research",
+                    description="Research",
+                    work_agent="builder-1",
+                    review_agent=None,
+                ),
+                WorkflowStage.PLAN_REVIEW: StageConfig(
+                    name="Plan Review",
+                    description="Plan review",
+                    work_agent="builder-2",
+                    review_agent=None,
+                ),
+                WorkflowStage.PLAN: StageConfig(
+                    name="Plan",
+                    description="Plan",
+                    work_agent="pm",
+                    review_agent=None,
+                ),
+            },
+            stage_order=[
+                WorkflowStage.SPEC_REVIEW,
+                WorkflowStage.RESEARCH,
+                WorkflowStage.PLAN_REVIEW,
+                WorkflowStage.PLAN,
+            ],
+            work_to_review_mapping={},
+            parallel_groups=[
+                ParallelGroupConfig(
+                    name="post_spec_review",
+                    after=WorkflowStage.SPEC_REVIEW,
+                    stages=[WorkflowStage.RESEARCH, WorkflowStage.PLAN_REVIEW],
+                    before=WorkflowStage.PLAN,
+                )
+            ],
+        )
+        loop.stages_config = custom_config
+
+        # Check that filter_incomplete_stages correctly identifies PLAN_REVIEW
         group = loop.stages_config.parallel_groups[0]
         incomplete = loop._filter_incomplete_stages(group)
 
         assert len(incomplete) == 1
-        assert WorkflowStage.TEST_STRATEGY in incomplete
+        assert WorkflowStage.PLAN_REVIEW in incomplete
         assert WorkflowStage.RESEARCH not in incomplete  # Already completed
 
 

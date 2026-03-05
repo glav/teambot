@@ -21,7 +21,6 @@ class TestWorkflowStage:
             "SPEC",
             "SPEC_REVIEW",
             "RESEARCH",
-            "TEST_STRATEGY",
             "PLAN",
             "PLAN_REVIEW",
             "IMPLEMENTATION",
@@ -35,7 +34,7 @@ class TestWorkflowStage:
 
     def test_stage_count(self):
         """Test correct number of stages."""
-        assert len(WorkflowStage) == 12
+        assert len(WorkflowStage) == 11
 
 
 class TestStageMetadata:
@@ -180,22 +179,16 @@ class TestGetNextStages:
         assert current == WorkflowStage.COMPLETE
 
 
-class TestParallelStageTransitions:
-    """Tests for parallel stage group transitions."""
+class TestStageTransitions:
+    """Tests for stage transitions."""
 
-    def test_spec_review_next_stages_includes_both_parallel_stages(self):
-        """SPEC_REVIEW.next_stages includes both RESEARCH and TEST_STRATEGY."""
+    def test_spec_review_next_stage_is_research(self):
+        """SPEC_REVIEW.next_stages includes only RESEARCH."""
         next_stages = get_next_stages(WorkflowStage.SPEC_REVIEW)
         assert WorkflowStage.RESEARCH in next_stages
-        assert WorkflowStage.TEST_STRATEGY in next_stages
-        assert len(next_stages) == 2
+        assert len(next_stages) == 1
 
     def test_research_converges_at_plan(self):
         """RESEARCH converges at PLAN."""
         next_stages = get_next_stages(WorkflowStage.RESEARCH)
-        assert WorkflowStage.PLAN in next_stages
-
-    def test_test_strategy_converges_at_plan(self):
-        """TEST_STRATEGY converges at PLAN."""
-        next_stages = get_next_stages(WorkflowStage.TEST_STRATEGY)
         assert WorkflowStage.PLAN in next_stages

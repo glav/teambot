@@ -63,13 +63,13 @@ class TestParallelStageExecutor:
         from teambot.orchestration.parallel_stage_executor import ParallelStageExecutor
 
         executor = ParallelStageExecutor(max_concurrent=2)
-        stages = [WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY]
+        stages = [WorkflowStage.RESEARCH, WorkflowStage.PLAN]
 
         results = await executor.execute_parallel(stages, mock_execution_loop)
 
         assert len(results) == 2
         assert results[WorkflowStage.RESEARCH].success is True
-        assert results[WorkflowStage.TEST_STRATEGY].success is True
+        assert results[WorkflowStage.PLAN].success is True
         assert mock_execution_loop._execute_work_stage.call_count == 2
 
     @pytest.mark.asyncio
@@ -84,7 +84,7 @@ class TestParallelStageExecutor:
         ]
 
         executor = ParallelStageExecutor(max_concurrent=2)
-        stages = [WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY]
+        stages = [WorkflowStage.RESEARCH, WorkflowStage.PLAN]
 
         results = await executor.execute_parallel(stages, mock_execution_loop)
 
@@ -147,7 +147,7 @@ class TestParallelStageExecutor:
         mock_execution_loop._execute_work_stage = track_concurrency
 
         executor = ParallelStageExecutor(max_concurrent=1)  # Limit to 1
-        stages = [WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY]
+        stages = [WorkflowStage.RESEARCH, WorkflowStage.PLAN]
 
         await executor.execute_parallel(stages, mock_execution_loop)
 
@@ -166,7 +166,7 @@ class TestParallelStageExecutor:
             events.append((event_type, data))
 
         executor = ParallelStageExecutor(max_concurrent=2)
-        stages = [WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY]
+        stages = [WorkflowStage.RESEARCH, WorkflowStage.PLAN]
 
         await executor.execute_parallel(stages, mock_execution_loop, on_progress)
 
@@ -205,7 +205,7 @@ class TestParallelStageExecutor:
         ]
 
         executor = ParallelStageExecutor(max_concurrent=2)
-        stages = [WorkflowStage.RESEARCH, WorkflowStage.TEST_STRATEGY]
+        stages = [WorkflowStage.RESEARCH, WorkflowStage.PLAN]
 
         await executor.execute_parallel(stages, mock_execution_loop, on_progress)
 
@@ -222,7 +222,7 @@ class TestParallelStageExecutor:
         assert len(failed_events) == 1
 
         # Verify the failed event has correct stage info
-        assert failed_events[0][1]["stage"] in ["RESEARCH", "TEST_STRATEGY"]
+        assert failed_events[0][1]["stage"] in ["RESEARCH", "PLAN"]
 
 
 class TestStageResult:
