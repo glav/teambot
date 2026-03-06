@@ -452,7 +452,7 @@ class ExecutionLoop:
         """Execute acceptance test stage via code-level validation.
 
         This stage:
-        1. Finds the feature spec (from artifacts or docs/feature-specs/)
+        1. Finds the feature spec (from artifacts or .agent-tracking/specs/)
         2. Parses acceptance test scenarios from the spec
         3. Asks the builder to write and run pytest tests for each scenario
         4. Parses results and reports pass/fail status
@@ -852,19 +852,21 @@ class ExecutionLoop:
 
         Searches in order:
         1. .teambot/{feature}/artifacts/feature_spec.md
-        2. docs/feature-specs/*.md (matching feature name)
+        2. .agent-tracking/specs/*.md (matching feature name)
         """
         # Check artifacts directory first
         artifacts_spec = self.teambot_dir / "artifacts" / "feature_spec.md"
         if artifacts_spec.exists():
             return artifacts_spec.read_text(encoding="utf-8")
 
-        # Check docs/feature-specs/
-        feature_specs_dir = self.teambot_dir.parent.parent / "docs" / "feature-specs"
-        if feature_specs_dir.exists():
+        # Check .agent-tracking/specs/ (preferred SDD spec location)
+        # .agent-tracking is always colocated with .teambot, so use .teambot's parent
+        # rather than _resolve_project_root() which follows stages.yaml location.
+        agent_tracking_specs_dir = self.teambot_dir.parent.parent / ".agent-tracking" / "specs"
+        if agent_tracking_specs_dir.exists():
             # Normalize feature name for case-insensitive matching
             normalized_feature = self.feature_name.replace("-", "").lower()
-            for spec_file in feature_specs_dir.glob("*.md"):
+            for spec_file in agent_tracking_specs_dir.glob("*.md"):
                 # Case-insensitive matching with hyphens removed
                 normalized_spec = spec_file.stem.replace("-", "").lower()
                 if normalized_feature in normalized_spec:
@@ -1083,27 +1085,29 @@ class ExecutionLoop:
                 parts.extend(["", "## Project Configuration"] + config_parts)
 
         # Add working directory information
-        # Compute repository root (parent of .teambot)
-        # Note: self.teambot_dir is .teambot/{feature}, so parent.parent gets repo root
-        repo_root = self.teambot_dir.parent.parent
+        # Use _resolve_project_root() to get the canonical project root rather than
+        # relying on a fixed parent.parent traversal that may not match runtime cwd.
+        project_root = self._resolve_project_root()
         parts.extend(
             [
                 "",
-                "## Working Directory",
-                f"**Your current working directory is the repository root**: `{repo_root}`",
+                "## Repository Root",
+                f"**Repository root**: `{project_root}`",
+                "To confirm the root at runtime you can also run: `git rev-parse --show-toplevel`",
                 "",
                 "## Artifact Locations",
+                "All paths below are **relative to the repository root** shown above.",
                 "- **SDD artifacts** (specs, research, plans): Write to "
                 "`.agent-tracking/{type}/` subdirectories "
-                "(research, plans, specs, test-strategies)",
+                "(specs, research, plans, test-strategies)",
                 f"- **Feature working files** (temporary/transient): "
-                f"`{self.teambot_dir / 'artifacts'}`",
+                f"`.teambot/{self.feature_name}/artifacts/`",
                 "",
                 "**CRITICAL for PLAN stage**: Plan and details files MUST be written to:",
                 "- Plans: `.agent-tracking/plans/YYYYMMDD-{feature}-plan.instructions.md`",
                 "- Details: `.agent-tracking/details/YYYYMMDD-{feature}-details.md`",
                 "",
-                "These paths are RELATIVE TO THE REPOSITORY ROOT (your current working directory).",
+                "These paths are relative to the repository root shown above.",
             ]
         )
 

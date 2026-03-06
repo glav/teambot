@@ -35,12 +35,12 @@ class ArtifactValidator:
     2. .agent-tracking/plans/ (exact match for *plan*.md)
     3. .agent-tracking/research/ (exact match for *research*.md)
     4. .agent-tracking/test-strategies/ (exact match for *test_strategy*.md)
-    5. docs/feature-specs/ (exact match for *spec*.md)
+    5. .agent-tracking/specs/ (exact match for *spec*.md)
     6. Glob patterns in .agent-tracking subdirectories (handles dated filenames):
        - .agent-tracking/research/*research*.md
        - .agent-tracking/plans/*plan*.md
        - .agent-tracking/test-strategies/*test*strategy*.md
-       - docs/feature-specs/*.md
+       - .agent-tracking/specs/*.md
 
     Note: Glob patterns return the most recently modified file when multiple matches exist.
     """
@@ -140,8 +140,7 @@ class ArtifactValidator:
             locations.append(self._agent_tracking_dir / "test-strategies" / artifact_name)
 
         if "spec" in artifact_lower:
-            # Check both docs/feature-specs and .agent-tracking/specs
-            locations.append(self.teambot_dir.parent / "docs" / "feature-specs" / artifact_name)
+            # Check .agent-tracking/specs (preferred SDD spec location)
             locations.append(self._agent_tracking_dir / "specs" / artifact_name)
 
         return locations
@@ -189,10 +188,10 @@ class ArtifactValidator:
             glob_patterns.append((self._agent_tracking_dir / "test-strategies", pattern))
 
         if "spec" in artifact_lower or "feature_spec" in artifact_lower:
-            # Look for spec files containing feature name in docs/feature-specs/
+            # Look for spec files containing feature name in .agent-tracking/specs/
             # Note: SPEC prompts create files like {name}.md, not feature_spec.md
             pattern = f"*{self.feature_name}*.md"
-            glob_patterns.append((self.teambot_dir.parent / "docs" / "feature-specs", pattern))
+            glob_patterns.append((self._agent_tracking_dir / "specs", pattern))
 
         # Search each location with its pattern
         candidates = []

@@ -53,9 +53,7 @@ class TestHistoryRemovalAcceptanceScenarios:
         result = handle_help([])
 
         # Verify /history is NOT in the output
-        assert "/history" not in result.output, (
-            "Help text still contains /history reference"
-        )
+        assert "/history" not in result.output, "Help text still contains /history reference"
 
         # Verify other commands ARE present (sanity check)
         assert "/help" in result.output
@@ -205,5 +203,6 @@ class TestHistoryRemovalAcceptanceScenarios:
                 text=True,
             )
             assert result_format.returncode == 0, (
-                f"Formatting check failed for {file_path}:\n{result_format.stdout}\n{result_format.stderr}"
+                f"Formatting check failed for {file_path}:\n"
+                f"{result_format.stdout}\n{result_format.stderr}"
             )
