@@ -12,6 +12,32 @@ import pytest
 from teambot.repl.commands import SystemCommands, handle_help
 
 
+def _search_files(directory: Path, pattern: str, glob: str = "**/*") -> list[str]:
+    """Walk directory tree and return matching lines as 'path:lineno: content' strings.
+
+    Args:
+        directory: Root directory to search recursively.
+        pattern: Substring to search for within each file's lines.
+        glob: Glob pattern used to filter files (default matches all files).
+
+    Returns:
+        List of strings in the format 'path:lineno: line_content' for each match.
+        Binary files and unreadable files are silently skipped.
+    """
+    matches = []
+    for path in sorted(directory.glob(glob)):
+        if not path.is_file():
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, PermissionError):
+            continue
+        for lineno, line in enumerate(content.splitlines(), 1):
+            if pattern in line:
+                matches.append(f"{path}:{lineno}: {line}")
+    return matches
+
+
 class TestHistoryRemovalAcceptanceScenarios:
     """Acceptance tests for /history command removal feature."""
 
@@ -20,27 +46,18 @@ class TestHistoryRemovalAcceptanceScenarios:
         repo_root = Path(__file__).parent.parent
 
         # Check for handle_history in source
-        result_handle = subprocess.run(
-            ["grep", "-r", "handle_history", "src/teambot/repl/"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
+        handle_history_matches = _search_files(
+            repo_root / "src" / "teambot" / "repl", "handle_history", "**/*.py"
         )
-        # grep returns exit code 1 when no matches found (expected)
-        assert result_handle.returncode == 1, (
-            f"Found handle_history references in source: {result_handle.stdout}"
+        assert len(handle_history_matches) == 0, (
+            f"Found handle_history references in source: {handle_history_matches}"
         )
 
         # Check for def history method in commands.py
-        result_method = subprocess.run(
-            ["grep", "-n", "def history", "src/teambot/repl/commands.py"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-        )
-        # grep returns exit code 1 when no matches found (expected)
-        assert result_method.returncode == 1, (
-            f"Found 'def history' in commands.py: {result_method.stdout}"
+        commands_file = repo_root / "src" / "teambot" / "repl" / "commands.py"
+        commands_content = commands_file.read_text(encoding="utf-8")
+        assert "def history" not in commands_content, (
+            "Found 'def history' in commands.py"
         )
 
         # Verify the function is not importable
@@ -144,35 +161,23 @@ class TestHistoryRemovalAcceptanceScenarios:
         repo_root = Path(__file__).parent.parent
 
         # Search for /history in documentation
-        result = subprocess.run(
-            ["grep", "-r", "/history", "docs/"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
+        all_matches = _search_files(repo_root / "docs", "/history")
+
+        # Filter out acceptable references
+        unacceptable = []
+        for ref in all_matches:
+            # Allow references in objective and feature spec for this task
+            if "remove-history-command" in ref:
+                continue
+            # Allow .teambot/history/ path references (directory, not command)
+            if ".teambot" in ref and "history/" in ref:
+                continue
+            # Anything else is unacceptable
+            unacceptable.append(ref)
+
+        assert len(unacceptable) == 0, (
+            "Found unacceptable /history references in docs:\n" + "\n".join(unacceptable)
         )
-
-        # Check the output
-        if result.returncode == 0:
-            # Found some matches - verify they're acceptable
-            lines = result.stdout.strip().split("\n")
-
-            # Filter out acceptable references
-            unacceptable = []
-            for line in lines:
-                # Allow references in objective and feature spec for this task
-                if "remove-history-command" in line:
-                    continue
-                # Allow .teambot/history/ path references (directory, not command)
-                if ".teambot" in line and "history/" in line:
-                    continue
-                # Anything else is unacceptable
-                unacceptable.append(line)
-
-            assert len(unacceptable) == 0, (
-                f"Found unacceptable /history references in docs:\n"
-                + "\n".join(unacceptable)
-            )
-        # If returncode == 1, no matches found at all (acceptable)
 
     def test_at_007_linting_and_formatting_pass(self):
         """AT-007: Verify code follows repository standards after changes."""
