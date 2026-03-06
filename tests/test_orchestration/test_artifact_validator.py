@@ -728,3 +728,160 @@ class TestCrossFeatureIsolation:
         result = validator.find_artifact("research.md")
         assert result is not None
         assert "20260305" in result.name  # Should find newer file
+
+
+class TestSearchOrderAndPrecedence:
+    """Tests for artifact search order and precedence rules."""
+
+    @pytest.fixture
+    def stages_config(self) -> StagesConfiguration:
+        """Create a minimal stages configuration for testing."""
+        return StagesConfiguration(
+            stages={
+                WorkflowStage.PLAN: StageConfig(
+                    name="Plan",
+                    description="Create implementation plan",
+                    work_agent="pm",
+                    review_agent="reviewer",
+                    prerequisite_artifacts=["research.md", "implementation_plan.md"],
+                ),
+            },
+            stage_order=[WorkflowStage.PLAN],
+            work_to_review_mapping={},
+        )
+
+    def test_search_order_prioritizes_feature_artifacts(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Search order: 1. Feature artifacts, 2. .agent-tracking subdirs."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create research.md in BOTH locations with different content
+        # Primary location (should win)
+        feature_dir = teambot_dir / "my-feature" / "artifacts"
+        feature_dir.mkdir(parents=True)
+        (feature_dir / "research.md").write_text("# Primary Research")
+
+        # Fallback location (should be ignored)
+        research_dir = tmp_path / ".agent-tracking" / "research"
+        research_dir.mkdir(parents=True)
+        (research_dir / "research.md").write_text("# Fallback Research")
+
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="my-feature",
+        )
+
+        result = validator.find_artifact("research.md")
+        assert result is not None
+        # Should find in feature artifacts first
+        assert "my-feature/artifacts" in result.as_posix()
+        # Verify content to confirm correct file
+        assert "Primary Research" in result.read_text()
+
+    def test_search_locations_documented_order(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """_get_search_locations returns paths in documented precedence order."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="my-feature",
+        )
+
+        locations = validator._get_search_locations("research.md")
+
+        # First location should be feature artifacts directory
+        assert locations[0] == teambot_dir / "my-feature" / "artifacts" / "research.md"
+
+        # Second location should be .agent-tracking/research/
+        assert any(".agent-tracking/research" in str(loc) for loc in locations)
+
+    def test_case_sensitivity_matches_filesystem(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Artifact names respect filesystem case sensitivity."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create artifact with specific case
+        feature_dir = teambot_dir / "my-feature" / "artifacts"
+        feature_dir.mkdir(parents=True)
+        (feature_dir / "Research.md").write_text("# Research")  # Capital R
+
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="my-feature",
+        )
+
+        # Search with lowercase (common case)
+        result = validator.find_artifact("research.md")
+
+        # On case-insensitive filesystems (Windows, macOS), this may find it
+        # On case-sensitive filesystems (Linux), this will NOT find it
+        # We document this behavior rather than enforce a specific outcome
+        import platform
+
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            # Case-insensitive filesystem - may find it
+            if result:
+                assert result.exists()
+        else:
+            # Case-sensitive filesystem (Linux) - should NOT find it with wrong case
+            assert result is None
+
+        # Searching with correct case should ALWAYS work
+        correct_result = validator.find_artifact("Research.md")  # Exact case
+        assert correct_result is not None
+        assert correct_result.exists()
+
+    def test_precedence_with_multiple_artifact_types(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Precedence works consistently across different artifact types."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        # Create artifacts in feature dir (primary)
+        feature_dir = teambot_dir / "my-feature" / "artifacts"
+        feature_dir.mkdir(parents=True)
+        (feature_dir / "research.md").write_text("# Feature Research")
+        (feature_dir / "implementation_plan.md").write_text("# Feature Plan")
+
+        # Create same artifacts in fallback locations
+        research_dir = tmp_path / ".agent-tracking" / "research"
+        research_dir.mkdir(parents=True)
+        (research_dir / "20260305-my-feature-research.md").write_text("# Fallback Research")
+
+        plans_dir = tmp_path / ".agent-tracking" / "plans"
+        plans_dir.mkdir(parents=True)
+        (plans_dir / "20260305-my-feature-plan.instructions.md").write_text("# Fallback Plan")
+
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="my-feature",
+        )
+
+        # Both should find in feature artifacts (primary location)
+        research_result = validator.find_artifact("research.md")
+        plan_result = validator.find_artifact("implementation_plan.md")
+
+        assert research_result is not None
+        assert plan_result is not None
+        assert "my-feature/artifacts" in research_result.as_posix()
+        assert "my-feature/artifacts" in plan_result.as_posix()
