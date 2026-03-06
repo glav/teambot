@@ -132,12 +132,25 @@ class ArtifactValidator:
         # 2. Fallback locations based on artifact type
         if "plan" in artifact_lower:
             locations.append(self._agent_tracking_dir / "plans" / artifact_name)
+            # FALLBACK: Check if agent created it in wrong location
+            if self._primary_artifacts_dir:
+                locations.append(self._primary_artifacts_dir / ".agent-tracking" / "plans" / artifact_name)
 
         if "research" in artifact_lower:
             locations.append(self._agent_tracking_dir / "research" / artifact_name)
+            # FALLBACK: Check if agent created it in wrong location
+            if self._primary_artifacts_dir:
+                locations.append(
+                    self._primary_artifacts_dir / ".agent-tracking" / "research" / artifact_name
+                )
 
         if "test_strategy" in artifact_lower or "test-strategy" in artifact_lower:
             locations.append(self._agent_tracking_dir / "test-strategies" / artifact_name)
+            # FALLBACK: Check if agent created it in wrong location
+            if self._primary_artifacts_dir:
+                locations.append(
+                    self._primary_artifacts_dir / ".agent-tracking" / "test-strategies" / artifact_name
+                )
 
         if "spec" in artifact_lower:
             # Check both docs/feature-specs and .agent-tracking/specs
