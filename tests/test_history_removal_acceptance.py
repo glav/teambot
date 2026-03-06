@@ -70,9 +70,7 @@ class TestHistoryRemovalAcceptanceScenarios:
         result = handle_help([])
 
         # Verify /history is NOT in the output
-        assert "/history" not in result.output, (
-            "Help text still contains /history reference"
-        )
+        assert "/history" not in result.output, "Help text still contains /history reference"
 
         # Verify other commands ARE present (sanity check)
         assert "/help" in result.output
@@ -179,6 +177,29 @@ class TestHistoryRemovalAcceptanceScenarios:
             "Found unacceptable /history references in docs:\n" + "\n".join(unacceptable)
         )
 
+        # Check the output
+        if result.returncode == 0:
+            # Found some matches - verify they're acceptable
+            lines = result.stdout.strip().split("\n")
+
+            # Filter out acceptable references
+            unacceptable = []
+            for line in lines:
+                # Allow references in objective and feature spec for this task
+                if "remove-history-command" in line:
+                    continue
+                # Allow .teambot/history/ path references (directory, not command)
+                if ".teambot" in line and "history/" in line:
+                    continue
+                # Anything else is unacceptable
+                unacceptable.append(line)
+
+            assert len(unacceptable) == 0, (
+                "Found unacceptable /history references in docs:\n"
+                + "\n".join(unacceptable)
+            )
+        # If returncode == 1, no matches found at all (acceptable)
+
     def test_at_007_linting_and_formatting_pass(self):
         """AT-007: Verify code follows repository standards after changes."""
         repo_root = Path(__file__).parent.parent
@@ -210,5 +231,6 @@ class TestHistoryRemovalAcceptanceScenarios:
                 text=True,
             )
             assert result_format.returncode == 0, (
-                f"Formatting check failed for {file_path}:\n{result_format.stdout}\n{result_format.stderr}"
+                f"Formatting check failed for {file_path}:\n"
+                f"{result_format.stdout}\n{result_format.stderr}"
             )
