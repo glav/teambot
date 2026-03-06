@@ -175,7 +175,6 @@ From `src/teambot/repl/commands.py`, the `/help` command displays:
 | `/task <id>` | ✅ Active | Views task details |
 | `/cancel <id>` | ✅ Active | Cancels pending task |
 | `/overlay` | ✅ Active | **Fully implemented** - toggles status overlay |
-| `/history` | ✅ Active | Shows command history |
 | `/quit` | ✅ Active | Exits interactive mode |
 
 ### Analysis

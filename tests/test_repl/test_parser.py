@@ -110,12 +110,12 @@ class TestParseSystemCommands:
         assert result.command == "status"
         assert result.args == []
 
-    def test_parse_history_command(self):
-        """Test parsing /history command."""
-        result = parse_command("/history")
+    def test_parse_quit_command_basic(self):
+        """Test parsing /quit command."""
+        result = parse_command("/quit")
 
         assert result.type == CommandType.SYSTEM
-        assert result.command == "history"
+        assert result.command == "quit"
         assert result.args == []
 
     def test_parse_quit_command(self):
@@ -134,19 +134,19 @@ class TestParseSystemCommands:
 
     def test_parse_command_with_args(self):
         """Test parsing system command with arguments."""
-        result = parse_command("/history pm")
+        result = parse_command("/status pm")
 
         assert result.type == CommandType.SYSTEM
-        assert result.command == "history"
+        assert result.command == "status"
         assert result.args == ["pm"]
 
     def test_parse_command_with_multiple_args(self):
         """Test parsing system command with multiple args."""
-        result = parse_command("/history pm 10")
+        result = parse_command("/status pm builder-1")
 
         assert result.type == CommandType.SYSTEM
-        assert result.command == "history"
-        assert result.args == ["pm", "10"]
+        assert result.command == "status"
+        assert result.args == ["pm", "builder-1"]
 
     def test_parse_unknown_system_command(self):
         """Test parsing unknown system command passes through."""

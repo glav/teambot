@@ -26,7 +26,6 @@ class TestHelpCommand:
         assert "@agent" in result.output
         assert "/help" in result.output
         assert "/status" in result.output
-        assert "/history" in result.output
         assert "/quit" in result.output
 
     def test_help_agent_topic(self):
@@ -98,60 +97,6 @@ class TestStatusCommand:
         assert "session override" in result.output
 
 
-class TestHistoryCommand:
-    """Tests for /history command."""
-
-    def test_history_empty(self):
-        """Test /history with no history."""
-        commands = SystemCommands()
-        commands._history = []
-
-        result = commands.history([])
-
-        assert result.success is True
-        assert "No" in result.output or "empty" in result.output.lower()
-
-    def test_history_with_entries(self):
-        """Test /history with entries."""
-        commands = SystemCommands()
-        commands._history = [
-            {"agent_id": "pm", "content": "Task 1"},
-            {"agent_id": "ba", "content": "Task 2"},
-        ]
-
-        result = commands.history([])
-
-        assert result.success is True
-        assert "pm" in result.output
-        assert "ba" in result.output
-
-    def test_history_filter_by_agent(self):
-        """Test /history pm filters to agent."""
-        commands = SystemCommands()
-        commands._history = [
-            {"agent_id": "pm", "content": "Task 1"},
-            {"agent_id": "ba", "content": "Task 2"},
-            {"agent_id": "pm", "content": "Task 3"},
-        ]
-
-        result = commands.history(["pm"])
-
-        assert result.success is True
-        assert "pm" in result.output
-        # BA entries should be filtered out or less prominent
-        assert result.output.count("pm") >= 2
-
-    def test_history_limit_entries(self):
-        """Test /history limits output."""
-        commands = SystemCommands()
-        commands._history = [{"agent_id": "pm", "content": f"Task {i}"} for i in range(50)]
-
-        result = commands.history([])
-
-        assert result.success is True
-        # Should limit display (not all 50)
-
-
 class TestQuitCommand:
     """Tests for /quit command."""
 
@@ -202,13 +147,6 @@ class TestSystemCommandsDispatch:
         """Test dispatching /status."""
         commands = SystemCommands()
         result = await commands.dispatch("status", [])
-
-        assert result.success is True
-
-    async def test_dispatch_history(self):
-        """Test dispatching /history."""
-        commands = SystemCommands()
-        result = await commands.dispatch("history", [])
 
         assert result.success is True
 

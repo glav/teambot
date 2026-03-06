@@ -76,7 +76,7 @@ This feature also pivots from wrapping the Copilot CLI to using the **GitHub Cop
 | Copilot SDK Integration | Replace CLI wrapper with SDK client | P0 |
 | Basic REPL | Command prompt with input loop | P0 |
 | `@agent` Commands | Direct commands to specific agents | P0 |
-| System Commands | `/help`, `/status`, `/history`, `/quit` | P0 |
+| System Commands | `/help`, `/status`, `/quit` | P0 |
 | Single Agent Execution | One agent processes at a time | P0 |
 | Status Display | Show agent table with current status | P0 |
 | Unified Mode | Support both file + interactive in same session | P0 |
@@ -162,8 +162,6 @@ async for chunk in response:
 | `@<agent> <task>` | Direct task to agent | `@pm create a plan for login feature` |
 | `/help` | Show available commands | `/help` |
 | `/status` | Show agent status table | `/status` |
-| `/history` | Show recent actions | `/history` |
-| `/history <agent>` | Show agent-specific history | `/history builder-1` |
 | `/stop` | Stop current execution | `/stop` |
 | `/stop <agent>` | Stop specific agent | `/stop builder-1` |
 | `/pause` | Pause all agents | `/pause` |
@@ -182,7 +180,7 @@ async for chunk in response:
 | FR-IM-001 | Copilot SDK Client | Replace CopilotClient with SDK-based implementation | P0 | SDK client connects to Copilot CLI server |
 | FR-IM-002 | REPL Loop | Interactive command loop that doesn't exit | P0 | `teambot run` stays running until `/quit` |
 | FR-IM-003 | Agent Commands | Parse and route `@agent` commands | P0 | `@pm <task>` routes to PM agent |
-| FR-IM-004 | System Commands | Implement `/help`, `/status`, `/history`, `/quit` | P0 | All commands work as documented |
+| FR-IM-004 | System Commands | Implement `/help`, `/status`, `/quit` | P0 | All commands work as documented |
 | FR-IM-005 | Status Display | Show agent table with status updates | P0 | Table updates after each command |
 | FR-IM-006 | Task Execution | Execute task via SDK and display result | P0 | Agent receives task, executes, returns result |
 | FR-IM-007 | Unified Mode | Load objective file if provided, then enter REPL | P0 | `teambot run obj.md` loads then prompts |
@@ -301,8 +299,6 @@ async for chunk in response:
 ```
 /help                - Show this help
 /status              - Show agent status table
-/history             - Show recent actions (all agents)
-/history <agent>     - Show history for specific agent
 /stop                - Stop all running tasks
 /stop <agent>        - Stop specific agent's task
 /pause               - Pause all agents
