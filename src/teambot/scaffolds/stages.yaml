@@ -70,19 +70,36 @@
 # ARTIFACT STORAGE
 # =============================================================================
 #
-# Artifacts listed in the 'artifacts' field are stored at:
+# Artifacts listed in the 'artifacts' field can be:
 #
-#   {teambot_dir}/{feature_name}/artifacts/{artifact_filename}
+# 1. Simple filenames (no directory separators):
+#    Stored at: {teambot_dir}/{feature_name}/artifacts/{artifact_filename}
+#
+#    Example:
+#      Artifact: feature_spec.md
+#      Full path: .teambot/add-user-login/artifacts/feature_spec.md
+#
+# 2. Directory-based paths (contains /):
+#    Treated as repository-root-relative paths.
+#    All SDD artifacts (specs, research, plans, test strategies) use this format.
+#
+#    Examples:
+#      Artifact: .agent-tracking/specs/{name}.md
+#      Full path: .agent-tracking/specs/{name}.md (relative to repo root)
+#
+#      Artifact: .agent-tracking/research/{date}-{name}-research.md
+#      Full path: .agent-tracking/research/{date}-{name}-research.md (relative to repo root)
 #
 # Where:
 #   teambot_dir  = .teambot (or custom path from teambot.json "teambot_dir")
 #   feature_name = Derived from objective file (## Feature Name or filename)
 #
-# Example:
-#   Objective: objectives/add-user-login.md
-#   Feature name: add-user-login
-#   Artifact: feature_spec.md
-#   Full path: .teambot/add-user-login/artifacts/feature_spec.md
+# Note: The 'artifacts' field defines display paths shown to agents.
+#       The ArtifactValidator handles finding files in multiple locations.
+#
+# Path Rendering: When displaying artifacts to agents, simple filenames are
+#                 rendered relative to the project root. If relative path
+#                 calculation fails, absolute paths are used as a fallback.
 #
 # =============================================================================
 # REVIEW STAGE MAPPING
@@ -192,9 +209,9 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      # Note: Actual file created at docs/feature-specs/{name}.md
+      # Note: Actual file created at .agent-tracking/specs/{name}.md
       # This is a pattern/description, not exact filename
-      - docs/feature-specs/{name}.md
+      - .agent-tracking/specs/{name}.md
       - feature_spec.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts: []  # First content stage, no prereqs
     exit_criteria:

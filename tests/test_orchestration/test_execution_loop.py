@@ -566,6 +566,40 @@ class TestExecutionLoopContextBuilding:
         assert "Work to Review" in context
         assert "This is the spec content" in context
 
+    def test_build_stage_context_artifact_paths(
+        self, objective_file: Path, teambot_dir: Path
+    ) -> None:
+        """Artifact paths are rendered correctly based on directory separators."""
+        from teambot.orchestration.stage_config import _get_default_configuration
+
+        # Start with default configuration
+        config = _get_default_configuration()
+
+        # Update SPEC stage artifacts to test both simple and directory-based paths
+        spec_stage = config.stages[WorkflowStage.SPEC]
+        spec_stage.artifacts = [
+            "simple_artifact.md",  # Simple filename
+            ".agent-tracking/specs/{name}.md",  # Directory-based path (consistent with SDD)
+            ".agent-tracking/research/{date}-{name}-research.md",  # Another dir path
+        ]
+
+        loop = ExecutionLoop(
+            objective_path=objective_file,
+            config={},
+            teambot_dir=teambot_dir,
+            stages_config=config,
+        )
+
+        context = loop._build_stage_context(WorkflowStage.SPEC)
+
+        # Simple filename should be prepended with .teambot/{feature}/artifacts/
+        # In this case feature is "user-authentication" from the objective
+        assert "`.teambot/user-authentication/artifacts/simple_artifact.md`" in context
+
+        # Directory-based paths should be displayed as-is (repo-root-relative)
+        assert "`.agent-tracking/specs/{name}.md`" in context
+        assert "`.agent-tracking/research/{date}-{name}-research.md`" in context
+
 
 class TestExecutionLoopReviewOutputs:
     """Tests for review stage output storage."""

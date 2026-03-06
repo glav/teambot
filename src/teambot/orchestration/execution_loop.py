@@ -1126,8 +1126,27 @@ class ExecutionLoop:
             stage_config = self.stages_config.stages.get(stage)
             if stage_config and stage_config.artifacts:
                 parts.extend(["", "## Required Artifacts for This Stage"])
+                project_root = self._resolve_project_root()
                 for artifact in stage_config.artifacts:
-                    parts.append(f"- `{self.teambot_dir / 'artifacts' / artifact}`")
+                    # If artifact contains path separators, treat as repo-root-relative
+                    # Otherwise, treat as simple filename under .teambot/{feature}/artifacts/
+                    # Note: Uses forward slash check as all artifact paths use
+                    # Unix-style conventions
+                    if "/" in artifact:
+                        # Directory-based path (e.g., docs/feature-specs/{name}.md)
+                        # Display as repo-root-relative path
+                        artifact_path = artifact
+                    else:
+                        # Simple filename (e.g., feature_spec.md)
+                        # Render relative to project root
+                        full_path = self.teambot_dir / "artifacts" / artifact
+                        try:
+                            artifact_path = str(full_path.relative_to(project_root))
+                        except ValueError:
+                            # If relative_to fails (e.g., paths on different drives),
+                            # fall back to absolute path as a safety mechanism
+                            artifact_path = str(full_path)
+                    parts.append(f"- `{artifact_path}`")
 
             # Add exit criteria from config
             if stage_config and stage_config.exit_criteria:
