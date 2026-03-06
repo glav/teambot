@@ -827,21 +827,22 @@ class TestSearchOrderAndPrecedence:
             feature_name="my-feature",
         )
 
+        # Detect filesystem case sensitivity at runtime instead of relying on OS name,
+        # because e.g. macOS APFS can be case-sensitive and Windows dirs can be too.
+        probe_file = tmp_path / "CaseSensitivityProbe.tmp"
+        probe_file.write_text("")
+        is_case_sensitive = not (tmp_path / "casesensitivityprobe.tmp").exists()
+
         # Search with lowercase (common case)
         result = validator.find_artifact("research.md")
 
-        # On case-insensitive filesystems (Windows, macOS), this may find it
-        # On case-sensitive filesystems (Linux), this will NOT find it
-        # We document this behavior rather than enforce a specific outcome
-        import platform
-
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            # Case-insensitive filesystem - may find it
-            if result:
-                assert result.exists()
-        else:
-            # Case-sensitive filesystem (Linux) - should NOT find it with wrong case
+        if is_case_sensitive:
+            # Case-sensitive filesystem - should NOT find it with wrong case
             assert result is None
+        else:
+            # Case-insensitive filesystem - may find it
+            if result is not None:
+                assert result.exists()
 
         # Searching with correct case should ALWAYS work
         correct_result = validator.find_artifact("Research.md")  # Exact case
