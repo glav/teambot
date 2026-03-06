@@ -1141,11 +1141,11 @@ class ExecutionLoop:
                         # Render relative to project root
                         full_path = self.teambot_dir / "artifacts" / artifact
                         try:
-                            artifact_path = str(full_path.relative_to(project_root))
+                            artifact_path = full_path.relative_to(project_root).as_posix()
                         except ValueError:
                             # If relative_to fails (e.g., paths on different drives),
                             # fall back to absolute path as a safety mechanism
-                            artifact_path = str(full_path)
+                            artifact_path = full_path.as_posix()
                     parts.append(f"- `{artifact_path}`")
 
             # Add exit criteria from config
