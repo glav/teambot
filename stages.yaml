@@ -262,7 +262,7 @@ stages:
       # This is a pattern/description, not exact filename
       - .agent-tracking/research/{date}-{name}-research.md
     prerequisite_artifacts:
-      - feature_spec.md  # Will match any .md in docs/feature-specs/ via glob
+      - feature_spec.md  # Will match *{feature_name}*.md in docs/feature-specs/ via feature-scoped glob
     exit_criteria:
       - Research document with implementation recommendations
     optional: false
@@ -296,7 +296,7 @@ stages:
       - .agent-tracking/plans/{date}-{name}-plan.instructions.md
       - .agent-tracking/details/{date}-{name}-details.md
     prerequisite_artifacts:
-      - research.md  # Will match any *research*.md in .agent-tracking/research/ via glob
+      - research.md  # Will match *{feature_name}*research*.md in .agent-tracking/research/ via feature-scoped glob
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
