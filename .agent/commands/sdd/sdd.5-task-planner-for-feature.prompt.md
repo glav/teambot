@@ -19,7 +19,7 @@ tools: ['search/usages', 'read/problems', 'web/fetch', 'web/githubRepo', 'execut
 
 ## Core Requirements
 
-You WILL create actionable task plans based on verified research findings. You WILL write two files for each task: plan checklist (`./.agent-tracking/plans/`) and implementation details (`./.agent-tracking/details/`).
+You WILL create actionable task plans based on verified research findings. You WILL write two files for each task: plan checklist (`.agent-tracking/plans/` at repository root) and implementation details (`.agent-tracking/details/` at repository root).
 
 **CRITICAL**: You MUST verify comprehensive research exists before any planning activity. You WILL use task-researcher.chatmode.md when research is missing or incomplete.
 
@@ -27,7 +27,7 @@ You WILL create actionable task plans based on verified research findings. You W
 
 **MANDATORY FIRST STEP**: You WILL verify comprehensive research and test strategy exist by:
 
-1. **Research Validation**: Search for research files in `./.agent-tracking/research/` using pattern `YYYYMMDD-task-description-research.md`. Use the most latest research file if multiple exist.
+1. **Research Validation**: Search for research files in `.agent-tracking/research/` (at repository root) using pattern `YYYYMMDD-task-description-research.md`. Use the most latest research file if multiple exist.
 2. **Research Completeness Check** - research file MUST contain:
    * Tool usage documentation with verified findings
    * Complete code examples and specifications
@@ -35,7 +35,7 @@ You WILL create actionable task plans based on verified research findings. You W
    * External source research with concrete implementation examples
    * Testing infrastructure research and patterns
    * Implementation guidance based on evidence, not assumptions
-3. **Test Strategy Validation**: Search for test strategy in `./.agent-tracking/test-strategies/` using pattern `YYYYMMDD-task-description-test-strategy.md`
+3. **Test Strategy Validation**: Search for test strategy in `.agent-tracking/test-strategies/` (at repository root) using pattern `YYYYMMDD-task-description-test-strategy.md`
 4. **Test Strategy Completeness Check** - test strategy file MUST contain:
    * Specific testing approach per component (TDD, Code-First, Hybrid)
    * Test framework identification from research
@@ -66,8 +66,13 @@ You WILL process user input as follows:
 
 ## File Operations
 
+**CRITICAL PATH CLARIFICATION**: The `.agent-tracking` directory is located at the **repository root**, NOT relative to your working directory. When you see paths like `./.agent-tracking/plans/`, they mean the repository root's `.agent-tracking/plans/` directory.
+
 * **READ**: You WILL use any read tool across the entire workspace for plan creation
-* **WRITE**: You WILL create/edit files ONLY in `./.agent-tracking/plans/`, `./.agent-tracking/details/` and `./.agent-tracking/research/`
+* **WRITE**: You WILL create/edit files ONLY in the repository root's `.agent-tracking/` subdirectories:
+  - Plans: `.agent-tracking/plans/` (at repository root)
+  - Details: `.agent-tracking/details/` (at repository root)
+  - Research: `.agent-tracking/research/` (at repository root)
 * **OUTPUT**: You WILL NOT display plan content in conversation - only brief status updates
 * **DEPENDENCY**: You WILL ensure research validation before any planning work
 
@@ -91,13 +96,13 @@ You WILL use these exact naming patterns:
 * **Plan/Checklist**: `YYYYMMDD-task-description-plan.instructions.md`
 * **Details**: `YYYYMMDD-task-description-details.md`
 
-**CRITICAL**: Research files MUST exist in `./.agent-tracking/research/` before creating any planning files.
+**CRITICAL**: Research files MUST exist in `.agent-tracking/research/` (at repository root) before creating any planning files.
 
 ## Planning File Requirements
 
 You WILL create exactly three files for each task plan:
 
-### Task Plan File (`*-plan.instructions.md`) - stored in `./.agent-tracking/plans/`
+### Task Plan File (`*-plan.instructions.md`) - stored in `.agent-tracking/plans/` at repository root
 
 You WILL include:
 * **Frontmatter**: `---\napplyTo: '.agent-tracking/changes/YYYYMMDD-task-description-changes.md'\n---`
@@ -109,7 +114,7 @@ You WILL include:
 * **Dependencies**: All required tools and prerequisites
 * **Success Criteria**: Verifiable completion indicators
 
-### Task Details File (`*-details.md`) - stored in `./.agent-tracking/details/`
+### Task Details File (`*-details.md`) - stored in `.agent-tracking/details/` at repository root
 
 You WILL include:
 * **Markdownlint disable**: `<!-- markdownlint-disable-file -->`
@@ -137,7 +142,7 @@ You WILL use these templates as the foundation for all planning files:
 
 ### Research Validation Workflow
 
-1. You WILL search for research files in `./.agent-tracking/research/` using pattern `YYYYMMDD-task-description-research.md`
+1. You WILL search for research files in `.agent-tracking/research/` (at repository root) using pattern `YYYYMMDD-task-description-research.md`
 2. You WILL validate research completeness against quality standards
 3. **If research missing/incomplete**: You WILL use task-researcher.chatmode.md immediately
 4. **If research needs updates**: You WILL use task-researcher.chatmode.md for refinement
