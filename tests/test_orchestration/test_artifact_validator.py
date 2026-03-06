@@ -885,3 +885,35 @@ class TestSearchOrderAndPrecedence:
         assert plan_result is not None
         assert "my-feature/artifacts" in research_result.as_posix()
         assert "my-feature/artifacts" in plan_result.as_posix()
+
+    def test_path_calculation_stable_across_directory_depths(
+        self, tmp_path: Path, stages_config: StagesConfiguration
+    ) -> None:
+        """Path calculation works correctly regardless of directory depth."""
+        from teambot.orchestration.artifact_validator import ArtifactValidator
+
+        # Test case 1: Normal depth (.teambot/feature)
+        teambot_dir = tmp_path / ".teambot"
+        teambot_dir.mkdir()
+
+        validator = ArtifactValidator(
+            teambot_dir=teambot_dir,
+            stages_config=stages_config,
+            feature_name="my-feature",
+        )
+
+        # Verify _agent_tracking_dir resolves to repository root
+        assert validator._agent_tracking_dir == tmp_path / ".agent-tracking"
+
+        # Test case 2: Deeper nesting (simulating worktree or nested project)
+        nested_teambot_dir = tmp_path / "subproject" / ".teambot"
+        nested_teambot_dir.mkdir(parents=True)
+
+        nested_validator = ArtifactValidator(
+            teambot_dir=nested_teambot_dir,
+            stages_config=stages_config,
+            feature_name="nested-feature",
+        )
+
+        # Should resolve relative to the base teambot dir's parent
+        assert nested_validator._agent_tracking_dir == tmp_path / "subproject" / ".agent-tracking"

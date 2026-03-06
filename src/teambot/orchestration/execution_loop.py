@@ -1084,6 +1084,7 @@ class ExecutionLoop:
 
         # Add working directory information
         # Compute repository root (parent of .teambot)
+        # Note: self.teambot_dir is .teambot/{feature}, so parent.parent gets repo root
         repo_root = self.teambot_dir.parent.parent
         parts.extend(
             [
