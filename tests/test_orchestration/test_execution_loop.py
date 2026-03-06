@@ -884,23 +884,23 @@ class TestFeatureSpecFinding:
         assert spec_content is not None
         assert "User Authentication" in spec_content
 
-    def test_find_feature_spec_from_docs_case_insensitive(
+    def test_find_feature_spec_from_agent_tracking_case_insensitive(
         self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
     ) -> None:
-        """Feature spec is found with case-insensitive matching."""
+        """Feature spec is found with case-insensitive matching in .agent-tracking/specs/."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir,
         )
 
-        # Create docs/feature-specs directory with various case variations
-        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
-        docs_dir.mkdir(parents=True)
+        # Create .agent-tracking/specs/ directory with various case variations
+        specs_dir = teambot_dir.parent / ".agent-tracking" / "specs"
+        specs_dir.mkdir(parents=True)
 
         # Feature name is "user-authentication" from objective
         # Test with uppercase variation
-        (docs_dir / "User-Authentication-Spec.md").write_text(
+        (specs_dir / "User-Authentication-Spec.md").write_text(
             sample_feature_spec_content, encoding="utf-8"
         )
 
@@ -909,23 +909,23 @@ class TestFeatureSpecFinding:
         assert spec_content is not None
         assert "User Authentication" in spec_content
 
-    def test_find_feature_spec_from_docs_hyphen_variations(
+    def test_find_feature_spec_from_agent_tracking_hyphen_variations(
         self, objective_file: Path, teambot_dir: Path, sample_feature_spec_content: str
     ) -> None:
-        """Feature spec matching ignores hyphens."""
+        """Feature spec matching ignores hyphens in .agent-tracking/specs/."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir,
         )
 
-        # Create docs/feature-specs directory
-        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
-        docs_dir.mkdir(parents=True)
+        # Create .agent-tracking/specs/ directory
+        specs_dir = teambot_dir.parent / ".agent-tracking" / "specs"
+        specs_dir.mkdir(parents=True)
 
         # Feature name is "user-authentication"
         # Test with different hyphenation
-        (docs_dir / "userauthentication-spec.md").write_text(
+        (specs_dir / "userauthentication-spec.md").write_text(
             sample_feature_spec_content, encoding="utf-8"
         )
 
@@ -934,26 +934,28 @@ class TestFeatureSpecFinding:
         assert spec_content is not None
         assert "User Authentication" in spec_content
 
-    def test_find_feature_spec_prefers_artifacts_over_docs(
+    def test_find_feature_spec_prefers_artifacts_over_agent_tracking(
         self, objective_file: Path, teambot_dir: Path
     ) -> None:
-        """Artifacts directory is checked before docs directory."""
+        """Artifacts directory is checked before .agent-tracking/specs/ directory."""
         loop = ExecutionLoop(
             objective_path=objective_file,
             config={},
             teambot_dir=teambot_dir,
         )
 
-        # Create both artifacts and docs specs with different content
+        # Create both artifacts and .agent-tracking/specs specs with different content
         feature_dir = teambot_dir / loop.feature_name
         feature_dir.mkdir(exist_ok=True)
         artifacts_dir = feature_dir / "artifacts"
         artifacts_dir.mkdir(exist_ok=True)
         (artifacts_dir / "feature_spec.md").write_text("Artifacts spec content", encoding="utf-8")
 
-        docs_dir = teambot_dir.parent / "docs" / "feature-specs"
-        docs_dir.mkdir(parents=True)
-        (docs_dir / "user-authentication.md").write_text("Docs spec content", encoding="utf-8")
+        specs_dir = teambot_dir.parent / ".agent-tracking" / "specs"
+        specs_dir.mkdir(parents=True)
+        (specs_dir / "user-authentication.md").write_text(
+            "Agent tracking spec content", encoding="utf-8"
+        )
 
         spec_content = loop._find_feature_spec_content()
 
