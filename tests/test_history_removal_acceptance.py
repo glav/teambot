@@ -167,7 +167,8 @@ class TestHistoryRemovalAcceptanceScenarios:
                 unacceptable.append(line)
 
             assert len(unacceptable) == 0, (
-                "Found unacceptable /history references in docs:\n" + "\n".join(unacceptable)
+                "Found unacceptable /history references in docs:\n"
+                + "\n".join(unacceptable)
             )
         # If returncode == 1, no matches found at all (acceptable)
 

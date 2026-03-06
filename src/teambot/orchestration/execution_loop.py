@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
@@ -27,6 +28,8 @@ from teambot.workflow.stages import STAGE_METADATA, WorkflowStage
 
 if TYPE_CHECKING:
     from teambot.tokens.tracker import TokenTracker
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionResult(Enum):
@@ -268,10 +271,7 @@ class ExecutionLoop:
 
         except (MissingArtifactError, OutputSchemaValidationError) as e:
             # Critical failure - missing required artifact or invalid stage output schema
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Critical failure: {e}")
+            logger.exception("Critical failure: %s", e)
 
             # Store error message for user display
             self.last_error_message = str(e)
@@ -1184,11 +1184,7 @@ class ExecutionLoop:
         Returns:
             The (possibly truncated) context string.
         """
-        import logging
-
         from teambot.history.compactor import estimate_tokens
-
-        logger = logging.getLogger(__name__)
 
         estimated = estimate_tokens(context)
         if estimated <= max_context_tokens:
@@ -1271,11 +1267,8 @@ class ExecutionLoop:
                 fails schema validation.
         """
         import json
-        import logging
 
         import jsonschema
-
-        logger = logging.getLogger(__name__)
 
         json_str = self._extract_json_from_output(output)
         if json_str is None:
@@ -1439,10 +1432,7 @@ class ExecutionLoop:
         Failures are logged but do not halt the workflow.
         Only runs when git_checkpoints is enabled in config.
         """
-        import logging
         import subprocess
-
-        logger = logging.getLogger(__name__)
 
         # Only create checkpoints when explicitly enabled
         if not self.config.get("git_checkpoints", False):
