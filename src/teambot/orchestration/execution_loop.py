@@ -1090,17 +1090,20 @@ class ExecutionLoop:
             [
                 "",
                 "## Working Directory",
-                f"- **Repository root**: `{repo_root}`",
-                f"- **SDD tracking directory**: `{repo_root / '.agent-tracking'}` "
-                "(research, plans, specs at repository root)",
-                f"- **Feature artifacts**: `{self.teambot_dir / 'artifacts'}`",
+                f"**Your current working directory is the repository root**: `{repo_root}`",
                 "",
-                "When reading prerequisite artifacts (research, plans, specs), they are located in "
-                f"`.agent-tracking/` at the repository root (`{repo_root / '.agent-tracking'}`), "
-                "NOT relative to the feature artifacts directory.",
-                "",
-                f"All new artifacts for this objective should be saved to: "
+                "## Artifact Locations",
+                "- **SDD artifacts** (specs, research, plans): Write to "
+                "`.agent-tracking/{type}/` subdirectories "
+                "(research, plans, specs, test-strategies)",
+                f"- **Feature working files** (temporary/transient): "
                 f"`{self.teambot_dir / 'artifacts'}`",
+                "",
+                "**CRITICAL for PLAN stage**: Plan and details files MUST be written to:",
+                "- Plans: `.agent-tracking/plans/YYYYMMDD-{feature}-plan.instructions.md`",
+                "- Details: `.agent-tracking/details/YYYYMMDD-{feature}-details.md`",
+                "",
+                "These paths are RELATIVE TO THE REPOSITORY ROOT (your current working directory).",
             ]
         )
 
