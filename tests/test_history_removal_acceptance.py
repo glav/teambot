@@ -57,9 +57,7 @@ class TestHistoryRemovalAcceptanceScenarios:
         # Check for def history method in commands.py
         commands_file = repo_root / "src" / "teambot" / "repl" / "commands.py"
         commands_content = commands_file.read_text(encoding="utf-8")
-        assert "def history" not in commands_content, (
-            "Found 'def history' in commands.py"
-        )
+        assert "def history" not in commands_content, "Found 'def history' in commands.py"
 
         # Verify the function is not importable
         with pytest.raises(ImportError):
@@ -181,29 +179,6 @@ class TestHistoryRemovalAcceptanceScenarios:
         assert len(unacceptable) == 0, (
             "Found unacceptable /history references in docs:\n" + "\n".join(unacceptable)
         )
-
-        # Check the output
-        if result.returncode == 0:
-            # Found some matches - verify they're acceptable
-            lines = result.stdout.strip().split("\n")
-
-            # Filter out acceptable references
-            unacceptable = []
-            for line in lines:
-                # Allow references in objective and feature spec for this task
-                if "remove-history-command" in line:
-                    continue
-                # Allow .teambot/history/ path references (directory, not command)
-                if ".teambot" in line and "history/" in line:
-                    continue
-                # Anything else is unacceptable
-                unacceptable.append(line)
-
-            assert len(unacceptable) == 0, (
-                "Found unacceptable /history references in docs:\n"
-                + "\n".join(unacceptable)
-            )
-        # If returncode == 1, no matches found at all (acceptable)
 
     def test_at_007_linting_and_formatting_pass(self):
         """AT-007: Verify code follows repository standards after changes."""

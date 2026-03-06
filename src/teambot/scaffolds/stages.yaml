@@ -195,6 +195,7 @@ stages:
       # Note: Actual file created at docs/feature-specs/{name}.md
       # This is a pattern/description, not exact filename
       - docs/feature-specs/{name}.md
+      - feature_spec.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts: []  # First content stage, no prereqs
     exit_criteria:
       - Complete specification with all required sections
@@ -261,6 +262,7 @@ stages:
       # Note: Actual file created at .agent-tracking/research/YYYYMMDD-{name}-research.md
       # This is a pattern/description, not exact filename
       - .agent-tracking/research/{date}-{name}-research.md
+      - research.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts:
       - feature_spec.md  # Will match *{feature_name}*.md in docs/feature-specs/ via feature-scoped glob
     exit_criteria:
@@ -295,6 +297,7 @@ stages:
       # These are patterns/descriptions, not exact filenames
       - .agent-tracking/plans/{date}-{name}-plan.instructions.md
       - .agent-tracking/details/{date}-{name}-details.md
+      - implementation_plan.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts:
       - research.md  # Will match *{feature_name}*research*.md in .agent-tracking/research/ via feature-scoped glob
     exit_criteria:
