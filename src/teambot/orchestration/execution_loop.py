@@ -1083,13 +1083,21 @@ class ExecutionLoop:
                 parts.extend(["", "## Project Configuration"] + config_parts)
 
         # Add working directory information
+        # Compute repository root (parent of .teambot)
+        repo_root = self.teambot_dir.parent.parent
         parts.extend(
             [
                 "",
                 "## Working Directory",
-                f"All artifacts for this objective should be saved to: `{self.teambot_dir}`",
-                f"- Artifacts directory: `{self.teambot_dir / 'artifacts'}`",
-                f"- Example: `{self.teambot_dir / 'artifacts' / 'feature_spec.md'}`",
+                f"- **Repository root**: `{repo_root}`",
+                f"- **SDD tracking directory**: `{repo_root / '.agent-tracking'}` (research, plans, specs at repository root)",
+                f"- **Feature artifacts**: `{self.teambot_dir / 'artifacts'}`",
+                "",
+                "When reading prerequisite artifacts (research, plans, specs), they are located in "
+                f"`.agent-tracking/` at the repository root (`{repo_root / '.agent-tracking'}`), "
+                "NOT relative to the feature artifacts directory.",
+                "",
+                f"All new artifacts for this objective should be saved to: `{self.teambot_dir / 'artifacts'}`",
             ]
         )
 
