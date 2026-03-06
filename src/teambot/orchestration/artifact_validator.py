@@ -98,19 +98,21 @@ class ArtifactValidator:
 
         for location in search_locations:
             if location.exists():
-                logger.debug(f"Found artifact '{artifact_name}' at exact path: {location}")
+                logger.debug("Found artifact '%s' at exact path: %s", artifact_name, location)
                 return location
 
         # If not found with exact name, try glob patterns in .agent-tracking subdirectories
         glob_result = self._find_artifact_with_glob(artifact_name)
         if glob_result:
             logger.debug(
-                f"Found artifact '{artifact_name}' via glob pattern: {glob_result} "
-                f"(feature: {self.feature_name})"
+                "Found artifact '%s' via glob pattern: %s (feature: %s)",
+                artifact_name,
+                glob_result,
+                self.feature_name,
             )
             return glob_result
 
-        logger.debug(f"Artifact '{artifact_name}' not found (feature: {self.feature_name})")
+        logger.debug("Artifact '%s' not found (feature: %s)", artifact_name, self.feature_name)
         return None
 
     def _get_search_locations(self, artifact_name: str) -> list[Path]:
