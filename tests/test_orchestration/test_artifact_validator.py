@@ -572,18 +572,19 @@ class TestCrossFeatureIsolation:
         research_dir = tmp_path / ".agent-tracking" / "research"
         research_dir.mkdir(parents=True)
 
+        import os
+
+        base_time = 1_000_000.0
+
         # Feature A's research (older)
         feature_a_file = research_dir / "20260305-feature-a-research.md"
         feature_a_file.write_text("# Feature A Research")
-        feature_a_file.touch()  # Ensure it exists with timestamp
+        os.utime(feature_a_file, (base_time, base_time))
 
         # Feature B's research (newer - higher mtime)
-        import time
-
-        time.sleep(0.01)  # Small delay to ensure different mtime
         feature_b_file = research_dir / "20260305-feature-b-research.md"
         feature_b_file.write_text("# Feature B Research")
-        feature_b_file.touch()
+        os.utime(feature_b_file, (base_time + 1.0, base_time + 1.0))
 
         # Validator for Feature A
         validator_a = ArtifactValidator(
@@ -705,19 +706,19 @@ class TestCrossFeatureIsolation:
         research_dir = tmp_path / ".agent-tracking" / "research"
         research_dir.mkdir(parents=True)
 
-        import time
+        import os
+
+        base_time = 1_000_000.0
 
         # Older file
         older_file = research_dir / "20260301-my-feature-research.md"
         older_file.write_text("# Old Research")
-        older_file.touch()
-
-        time.sleep(0.01)
+        os.utime(older_file, (base_time, base_time))
 
         # Newer file
         newer_file = research_dir / "20260305-my-feature-research.md"
         newer_file.write_text("# New Research")
-        newer_file.touch()
+        os.utime(newer_file, (base_time + 1.0, base_time + 1.0))
 
         validator = ArtifactValidator(
             teambot_dir=teambot_dir,
