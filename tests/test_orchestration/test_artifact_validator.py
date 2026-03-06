@@ -392,20 +392,20 @@ class TestArtifactPathResolution:
         assert result is not None
         assert result == feature_dir / "feature_spec.md"
 
-    def test_finds_spec_in_docs_feature_specs(
+    def test_finds_spec_in_agent_tracking_specs(
         self, tmp_path: Path, stages_config: StagesConfiguration
     ) -> None:
-        """Falls back to docs/feature-specs/ for spec artifacts."""
+        """Falls back to .agent-tracking/specs/ for spec artifacts."""
         from teambot.orchestration.artifact_validator import ArtifactValidator
 
         # Create teambot directory (but NO artifact in primary location)
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()
 
-        # Create artifact in fallback location
-        docs_dir = tmp_path / "docs" / "feature-specs"
-        docs_dir.mkdir(parents=True)
-        (docs_dir / "feature_spec.md").write_text("# Feature Spec")
+        # Create artifact in .agent-tracking/specs/ (preferred SDD spec location)
+        specs_dir = tmp_path / ".agent-tracking" / "specs"
+        specs_dir.mkdir(parents=True)
+        (specs_dir / "feature_spec.md").write_text("# Feature Spec")
 
         validator = ArtifactValidator(
             teambot_dir=teambot_dir,
@@ -415,7 +415,7 @@ class TestArtifactPathResolution:
 
         result = validator.find_artifact("feature_spec.md")
         assert result is not None
-        assert "docs/feature-specs" in result.as_posix()
+        assert ".agent-tracking/specs" in result.as_posix()
 
     def test_finds_research_in_agent_tracking(
         self, tmp_path: Path, stages_config: StagesConfiguration
@@ -648,8 +648,8 @@ class TestCrossFeatureIsolation:
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()
 
-        # Create spec files for two features
-        specs_dir = tmp_path / "docs" / "feature-specs"
+        # Create spec files for two features in .agent-tracking/specs/
+        specs_dir = tmp_path / ".agent-tracking" / "specs"
         specs_dir.mkdir(parents=True)
 
         (specs_dir / "user-authentication.md").write_text("# Auth Spec")
