@@ -1,6 +1,6 @@
 {
-  "specFile": ".teambot/remove-history-command/artifacts/feature_spec.md",
-  "lastAccessed": "2026-03-05T23:00:25Z",
+  "specFile": "docs/feature-specs/remove-history-command.md",
+  "lastAccessed": "2026-03-06T01:55:26Z",
   "currentPhase": "complete",
   "questionsAsked": [
     "product-name",

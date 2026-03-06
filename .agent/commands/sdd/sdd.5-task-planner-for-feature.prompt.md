@@ -25,7 +25,7 @@ You WILL create actionable task plans based on verified research findings. You W
 
 ## Research and Test Strategy Validation
 
-**MANDATORY FIRST STEP**: You WILL verify comprehensive research and test strategy exist by:
+**MANDATORY FIRST STEP**: You WILL verify comprehensive research exists:
 
 1. **Research Validation**: Search for research files in `.agent-tracking/research/` using pattern `YYYYMMDD-task-description-research.md`. Use the most latest research file if multiple exist.
 2. **Research Completeness Check** - research file MUST contain:
@@ -35,20 +35,13 @@ You WILL create actionable task plans based on verified research findings. You W
    * External source research with concrete implementation examples
    * Testing infrastructure research and patterns
    * Implementation guidance based on evidence, not assumptions
-3. **Test Strategy Validation**: Search for test strategy in `.agent-tracking/test-strategies/` using pattern `YYYYMMDD-task-description-test-strategy.md`
-4. **Test Strategy Completeness Check** - test strategy file MUST contain:
-   * Specific testing approach per component (TDD, Code-First, Hybrid)
-   * Test framework identification from research
-   * Coverage targets with rationale
-   * Critical test scenarios listed
-   * Example test patterns from codebase
-5. **Validation Actions**:
+3. **Test Strategy (Optional)**: If a test strategy exists in `.agent-tracking/test-strategies/`, incorporate its recommendations into the plan. If missing, infer testing approach from research.
+4. **Validation Actions**:
    * **If research missing/incomplete**: Notify user to run **Step 3** (`sdd.3-research-feature.prompt.md`) immediately
-   * **If test strategy missing**: Notify user to run **Step 4** (`sdd.4-determine-test-strategy.prompt.md`) immediately
    * **If research needs updates**: Use **Step 3** (`sdd.3-research-feature.prompt.md`) for refinement
-   * You WILL proceed to planning ONLY after both research and test strategy validation
+   * You WILL proceed to planning ONLY after research validation
 
-**CRITICAL**: If research or test strategy do not meet these standards, you WILL NOT proceed with planning.
+**CRITICAL**: If research does not meet these standards, you WILL NOT proceed with planning.
 
 ## User Input Processing
 
@@ -183,17 +176,16 @@ You WILL ensure all planning files meet these standards:
 * You WILL include exact file paths when known
 * You WILL ensure success criteria are measurable and verifiable
 * You WILL organize phases to build logically on each other
-* You WILL integrate test implementation phases based on test strategy
+* You WILL integrate test implementation phases based on research or test strategy (if available)
 
 ### Test Integration Requirements (MANDATORY)
 * You MUST include test implementation tasks for all code-related features
-* You WILL follow the testing approach from test strategy document (TDD vs Code-First)
-* You WILL structure test tasks according to approach:
+* You WILL infer testing approach from research (or use test strategy if available):
   * **TDD**: Test tasks BEFORE corresponding implementation tasks
   * **Code-First**: Test tasks AFTER corresponding implementation tasks
-  * **Hybrid**: Mixed based on component-level strategy
+  * **Hybrid**: Mixed based on component-level analysis
 * You WILL include coverage validation tasks
-* You WILL reference test strategy document in plan and details
+* You WILL reference research findings on testing infrastructure
 
 ### Dependency Graph Requirement (MANDATORY for >5 tasks)
 
