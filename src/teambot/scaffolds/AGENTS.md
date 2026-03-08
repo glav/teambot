@@ -167,7 +167,6 @@ A sequential workflow with quality gates for taking a feature from specification
 | `commands/sdd/sdd.5-review-plan.prompt.md` | Reviews and validates implementation plans before execution. |
 | `commands/sdd/sdd.6-task-implementer-for-feature.prompt.md` | Implements task plans with progressive tracking and change records. |
 | `commands/sdd/sdd.6b-implementation-review.prompt.md` | Reviews implementation changes, verifies test execution and coverage. |
-| `commands/sdd/sdd.6c-acceptance-test.prompt.md` | Runs end-to-end acceptance tests against the implementation. |
 | `commands/sdd/sdd.7-post-implementation-review.prompt.md` | Performs post-implementation review and final validation. |
 
 #### Instructions (`instructions/`)
