@@ -1,6 +1,6 @@
 """System commands for TeamBot REPL.
 
-Provides /help, /status, /history, /quit, /tasks, /models, /model commands.
+Provides /help, /status, /quit, /tasks, /models, /model commands.
 """
 
 import importlib.metadata
@@ -112,7 +112,6 @@ Available commands:
   /use-agent <id> - Set default agent for plain text input
   /reset-agent   - Reset default agent to config value
   /tokens        - Show session token usage (`/cost` is alias, `-d` for details)
-  /history       - Show command history
   /quit          - Exit interactive mode
 
 Model Selection:
@@ -160,40 +159,6 @@ def handle_status(args: list[str], router: "AgentRouter | None" = None) -> Comma
     lines.append(f"  {'-' * 12} {'-' * 10} {'-' * 20}")
     for agent in agents:
         lines.append(f"  {agent:<12} {'idle':<10} {'(default)':<20}")
-
-    return CommandResult(output="\n".join(lines))
-
-
-def handle_history(args: list[str], history: list[dict[str, Any]]) -> CommandResult:
-    """Handle /history command.
-
-    Args:
-        args: Optional agent filter.
-        history: Command history list.
-
-    Returns:
-        CommandResult with history.
-    """
-    if not history:
-        return CommandResult(output="No command history.")
-
-    # Filter by agent if specified
-    if args:
-        agent_filter = args[0]
-        history = [h for h in history if h.get("agent_id") == agent_filter]
-        if not history:
-            return CommandResult(output=f"No history for agent: {agent_filter}")
-
-    # Show last 20 entries
-    entries = history[-20:]
-    lines = ["Command History:", ""]
-    for entry in entries:
-        agent = entry.get("agent_id", "?")
-        content = entry.get("content", "")
-        # Truncate long content
-        if len(content) > 50:
-            content = content[:47] + "..."
-        lines.append(f"  @{agent:12} {content}")
 
     return CommandResult(output="\n".join(lines))
 
@@ -723,7 +688,6 @@ class SystemCommands:
         handlers = {
             "help": self.help,
             "status": self.status,
-            "history": self.history,
             "quit": self.quit,
             "exit": self.quit,  # Alias
             "tasks": self.tasks,
@@ -768,10 +732,6 @@ class SystemCommands:
                 pass
 
         return handle_status(args, self._router)
-
-    def history(self, args: list[str]) -> CommandResult:
-        """Handle /history command."""
-        return handle_history(args, self._history)
 
     def quit(self, args: list[str]) -> CommandResult:
         """Handle /quit command."""

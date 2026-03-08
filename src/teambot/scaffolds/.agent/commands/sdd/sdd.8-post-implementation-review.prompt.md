@@ -407,3 +407,91 @@ Congratulations! The Spec-Driven Development workflow is complete.
 
 Thank you for using the Spec-Driven Development workflow!
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "POST_REVIEW",
+  "decision": "APPROVED",
+  "all_tests_passing": true,
+  "acceptance_tests_passing": true,
+  "coverage_targets_met": true,
+  "ready_for_merge": true,
+  "blockers": [],
+  "artifacts_produced": ["post_review.md"]
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "POST_REVIEW" | Stage identifier (must be exactly "POST_REVIEW") |
+| `decision` | string | Yes | "APPROVED", "NEEDS_WORK", "BLOCKED" | Final review outcome |
+| `all_tests_passing` | boolean | Yes | true, false | Whether all unit/integration tests pass |
+| `acceptance_tests_passing` | boolean | Yes | true, false | Whether all acceptance tests pass |
+| `coverage_targets_met` | boolean | No | true, false | Whether coverage meets defined targets |
+| `ready_for_merge` | boolean | No | true, false | Whether feature is ready to merge |
+| `blockers` | array | No | Array of strings | List of issues preventing approval. Use empty array `[]` when no blockers |
+| `artifacts_produced` | array | No | Array of strings | List of files created (typically `["post_review.md"]`) |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Post Implementation Review: [Feature Name]
+
+[Your markdown review here...]
+
+### ✅ Feature Complete and Approved
+
+All success criteria met. Feature is ready for merge.
+
+```json
+{
+  "stage": "POST_REVIEW",
+  "decision": "APPROVED",
+  "all_tests_passing": true,
+  "acceptance_tests_passing": true,
+  "coverage_targets_met": true,
+  "ready_for_merge": true,
+  "blockers": [],
+  "artifacts_produced": ["post_review.md"]
+}
+```
+````
+
+### Decision Field Logic
+
+- Use `"decision": "APPROVED"` when all tests pass and feature meets success criteria
+- Use `"decision": "NEEDS_WORK"` when fixable issues exist (minor test failures, documentation gaps)
+- Use `"decision": "BLOCKED"` when critical issues prevent completion (acceptance tests fail, major bugs)
+- **CRITICAL**: Cannot approve if `acceptance_tests_passing: false` (workflow requirement)
+- Populate `blockers` array with specific issues when decision is not "APPROVED"
+
+### Example: Feature Needs Work
+
+```json
+{
+  "stage": "POST_REVIEW",
+  "decision": "NEEDS_WORK",
+  "all_tests_passing": true,
+  "acceptance_tests_passing": false,
+  "coverage_targets_met": true,
+  "ready_for_merge": false,
+  "blockers": [
+    "Acceptance test 2 fails: User cannot delete their own account",
+    "Documentation missing API rate limit examples",
+    "Migration script needs review for production safety"
+  ],
+  "artifacts_produced": ["post_review.md"]
+}
+```

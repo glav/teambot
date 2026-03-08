@@ -382,11 +382,11 @@ class TestCriticalFailureAcceptance:
         teambot_dir = tmp_path / ".teambot"
         teambot_dir.mkdir()
 
-        # Create artifact in SECONDARY location (docs/feature-specs/)
-        docs_dir = tmp_path / "docs" / "feature-specs"
-        docs_dir.mkdir(parents=True)
-        (docs_dir / "feature_spec.md").write_text(
-            "# Feature Spec from docs",
+        # Create artifact in .agent-tracking/specs/ (preferred SDD spec location)
+        specs_dir = tmp_path / ".agent-tracking" / "specs"
+        specs_dir.mkdir(parents=True)
+        (specs_dir / "feature_spec.md").write_text(
+            "# Feature Spec from .agent-tracking/specs",
             encoding="utf-8",
         )
 
@@ -406,11 +406,11 @@ class TestCriticalFailureAcceptance:
             feature_name="test-feature",
         )
 
-        # VERIFY: Finds feature_spec.md in docs location
+        # VERIFY: Finds feature_spec.md in .agent-tracking/specs location
         spec_path = validator.find_artifact("feature_spec.md")
-        assert spec_path is not None, "Should find feature_spec.md in docs/feature-specs/"
+        assert spec_path is not None, "Should find feature_spec.md in .agent-tracking/specs/"
         assert spec_path.exists()
-        assert "docs" in str(spec_path) or "feature-specs" in str(spec_path)
+        assert ".agent-tracking" in str(spec_path) and "specs" in str(spec_path)
 
         # VERIFY: Finds research.md in .agent-tracking location
         research_path = validator.find_artifact("research.md")

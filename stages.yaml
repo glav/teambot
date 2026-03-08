@@ -70,19 +70,36 @@
 # ARTIFACT STORAGE
 # =============================================================================
 #
-# Artifacts listed in the 'artifacts' field are stored at:
+# Artifacts listed in the 'artifacts' field can be:
 #
-#   {teambot_dir}/{feature_name}/artifacts/{artifact_filename}
+# 1. Simple filenames (no directory separators):
+#    Stored at: {teambot_dir}/{feature_name}/artifacts/{artifact_filename}
+#
+#    Example:
+#      Artifact: feature_spec.md
+#      Full path: .teambot/add-user-login/artifacts/feature_spec.md
+#
+# 2. Directory-based paths (contains /):
+#    Treated as repository-root-relative paths.
+#    All SDD artifacts (specs, research, plans, test strategies) use this format.
+#
+#    Examples:
+#      Artifact: .agent-tracking/specs/{name}.md
+#      Full path: .agent-tracking/specs/{name}.md (relative to repo root)
+#
+#      Artifact: .agent-tracking/research/{date}-{name}-research.md
+#      Full path: .agent-tracking/research/{date}-{name}-research.md (relative to repo root)
 #
 # Where:
 #   teambot_dir  = .teambot (or custom path from teambot.json "teambot_dir")
 #   feature_name = Derived from objective file (## Feature Name or filename)
 #
-# Example:
-#   Objective: objectives/add-user-login.md
-#   Feature name: add-user-login
-#   Artifact: feature_spec.md
-#   Full path: .teambot/add-user-login/artifacts/feature_spec.md
+# Note: The 'artifacts' field defines display paths shown to agents.
+#       The ArtifactValidator handles finding files in multiple locations.
+#
+# Path Rendering: When displaying artifacts to agents, simple filenames are
+#                 rendered relative to the project root. If relative path
+#                 calculation fails, absolute paths are used as a fallback.
 #
 # =============================================================================
 # REVIEW STAGE MAPPING
@@ -192,7 +209,10 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - feature_spec.md
+      # Note: Actual file created at .agent-tracking/specs/{name}.md
+      # This is a pattern/description, not exact filename
+      - .agent-tracking/specs/{name}.md
+      - feature_spec.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts: []  # First content stage, no prereqs
     exit_criteria:
       - Complete specification with all required sections
@@ -256,9 +276,12 @@ stages:
       - technical_writer
       - writer
     artifacts:
-      - research.md
+      # Note: Actual file created at .agent-tracking/research/YYYYMMDD-{name}-research.md
+      # This is a pattern/description, not exact filename
+      - .agent-tracking/research/{date}-{name}-research.md
+      - research.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts:
-      - feature_spec.md
+      - feature_spec.md  # Will match *{feature_name}*.md in docs/feature-specs/ via feature-scoped glob
     exit_criteria:
       - Research document with implementation recommendations
     optional: false
@@ -286,9 +309,14 @@ stages:
       - builder
       - developer
     artifacts:
-      - implementation_plan.md
+      # Note: Actual files created at .agent-tracking/plans/YYYYMMDD-{name}-plan.instructions.md
+      # and .agent-tracking/details/YYYYMMDD-{name}-details.md
+      # These are patterns/descriptions, not exact filenames
+      - .agent-tracking/plans/{date}-{name}-plan.instructions.md
+      - .agent-tracking/details/{date}-{name}-details.md
+      - implementation_plan.md  # Simplified reference for prerequisite_artifacts
     prerequisite_artifacts:
-      - research.md
+      - research.md  # Will match *{feature_name}*research*.md in .agent-tracking/research/ via feature-scoped glob
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false

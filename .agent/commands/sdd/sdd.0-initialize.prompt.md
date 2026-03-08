@@ -185,3 +185,73 @@ After resolving, run this initialization step again.
 * Check for existing work to avoid duplicate efforts
 * Verify technical stack to inform later steps
 * Ensure clean state before beginning
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "SETUP",
+  "status": "PASS",
+  "environment_ready": true,
+  "blockers": []
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "SETUP" | Stage identifier (must be exactly "SETUP") |
+| `status` | string | Yes | "PASS", "FAIL" | Initialization outcome |
+| `environment_ready` | boolean | Yes | true, false | Whether all prerequisites are met |
+| `blockers` | array | Yes | Array of strings | List of issues preventing workflow start. Use empty array `[]` when no blockers exist |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## ✅ SDD Workflow Initialized
+
+[Your markdown tables and reports here...]
+
+### ➡️ Ready to Proceed
+Run **Step 1** to begin creating a feature specification.
+
+```json
+{
+  "stage": "SETUP",
+  "status": "PASS",
+  "environment_ready": true,
+  "blockers": []
+}
+```
+````
+
+### Status Field Logic
+
+- Use `"status": "PASS"` when all prerequisites are met and directories created
+- Use `"status": "FAIL"` when prerequisites are missing or directory creation failed
+- Set `environment_ready: true` only when status is "PASS"
+- Populate `blockers` array with specific issues when status is "FAIL"
+
+### Example: Failed Initialization
+
+```json
+{
+  "stage": "SETUP",
+  "status": "FAIL",
+  "environment_ready": false,
+  "blockers": [
+    "uv package manager not found",
+    "Python version 3.8 is below required 3.9+",
+    "Failed to create .agent-tracking/plans/ directory"
+  ]
+}
+```

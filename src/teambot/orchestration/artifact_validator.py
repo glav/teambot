@@ -10,11 +10,14 @@ Note: The 'artifacts' field on StageConfig lists outputs produced by a stage.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from teambot.orchestration.exceptions import MissingArtifactError
 from teambot.orchestration.stage_config import StagesConfiguration
 from teambot.workflow.stages import WorkflowStage
+
+logger = logging.getLogger(__name__)
 
 
 class ArtifactValidator:
@@ -28,11 +31,18 @@ class ArtifactValidator:
     not 'artifacts' (outputs produced by a stage).
 
     Search order:
-    1. .teambot/{feature}/artifacts/{artifact_name}
-    2. .agent-tracking/plans/ (for *plan*.md)
-    3. .agent-tracking/research/ (for *research*.md)
-    4. .agent-tracking/test-strategies/ (for *test_strategy*.md)
-    5. docs/feature-specs/ (for *spec*.md)
+    1. .teambot/{feature}/artifacts/{artifact_name} (exact match)
+    2. .agent-tracking/plans/ (exact match for *plan*.md)
+    3. .agent-tracking/research/ (exact match for *research*.md)
+    4. .agent-tracking/test-strategies/ (exact match for *test_strategy*.md)
+    5. .agent-tracking/specs/ (exact match for *spec*.md)
+    6. Glob patterns in .agent-tracking subdirectories (handles dated filenames):
+       - .agent-tracking/research/*research*.md
+       - .agent-tracking/plans/*plan*.md
+       - .agent-tracking/test-strategies/*test*strategy*.md
+       - .agent-tracking/specs/*.md
+
+    Note: Glob patterns return the most recently modified file when multiple matches exist.
     """
 
     def __init__(
@@ -88,8 +98,21 @@ class ArtifactValidator:
 
         for location in search_locations:
             if location.exists():
+                logger.debug("Found artifact '%s' at exact path: %s", artifact_name, location)
                 return location
 
+        # If not found with exact name, try glob patterns in .agent-tracking subdirectories
+        glob_result = self._find_artifact_with_glob(artifact_name)
+        if glob_result:
+            logger.debug(
+                "Found artifact '%s' via glob pattern: %s (feature: %s)",
+                artifact_name,
+                glob_result,
+                self.feature_name,
+            )
+            return glob_result
+
+        logger.debug("Artifact '%s' not found (feature: %s)", artifact_name, self.feature_name)
         return None
 
     def _get_search_locations(self, artifact_name: str) -> list[Path]:
@@ -119,11 +142,73 @@ class ArtifactValidator:
             locations.append(self._agent_tracking_dir / "test-strategies" / artifact_name)
 
         if "spec" in artifact_lower:
-            # Check both docs/feature-specs and .agent-tracking/specs
-            locations.append(self.teambot_dir.parent / "docs" / "feature-specs" / artifact_name)
+            # Check .agent-tracking/specs (preferred SDD spec location)
             locations.append(self._agent_tracking_dir / "specs" / artifact_name)
 
         return locations
+
+    def _find_artifact_with_glob(self, artifact_name: str) -> Path | None:
+        """Find artifact using glob patterns in .agent-tracking subdirectories.
+
+        This handles cases where prompts create dated files like:
+        - YYYYMMDD-{name}-research.md instead of research.md
+        - YYYYMMDD-{name}-plan.instructions.md instead of implementation_plan.md
+        - {name}.md instead of feature_spec.md
+
+        IMPORTANT: When multiple features exist, glob patterns include feature_name
+        to prevent cross-feature contamination. Returns None if feature_name is not
+        set to maintain safety (cannot safely glob without risk of wrong feature match).
+
+        Args:
+            artifact_name: Name of the artifact file (e.g., "research.md")
+
+        Returns:
+            Path to the most recent matching file, or None if not found
+        """
+        # Safety check: Cannot safely use glob without feature name (risk of cross-contamination)
+        if not self.feature_name:
+            return None
+
+        artifact_lower = artifact_name.lower()
+        glob_patterns: list[tuple[Path, str]] = []
+
+        # Map artifact names to .agent-tracking subdirectories and patterns
+        # CRITICAL: Include feature_name in patterns to prevent cross-feature contamination
+        if "research" in artifact_lower:
+            # Look for files containing both feature name and "research"
+            pattern = f"*{self.feature_name}*research*.md"
+            glob_patterns.append((self._agent_tracking_dir / "research", pattern))
+
+        if "plan" in artifact_lower or "implementation_plan" in artifact_lower:
+            # Look for files containing both feature name and "plan"
+            pattern = f"*{self.feature_name}*plan*.md"
+            glob_patterns.append((self._agent_tracking_dir / "plans", pattern))
+
+        if "test_strategy" in artifact_lower or "test-strategy" in artifact_lower:
+            # Look for files containing both feature name and "strategy"
+            pattern = f"*{self.feature_name}*strategy*.md"
+            glob_patterns.append((self._agent_tracking_dir / "test-strategies", pattern))
+
+        if "spec" in artifact_lower or "feature_spec" in artifact_lower:
+            # Look for spec files containing feature name in .agent-tracking/specs/
+            # Note: SPEC prompts create files like {name}.md, not feature_spec.md
+            pattern = f"*{self.feature_name}*.md"
+            glob_patterns.append((self._agent_tracking_dir / "specs", pattern))
+
+        # Search each location with its pattern
+        candidates = []
+        for directory, pattern in glob_patterns:
+            if directory.exists():
+                matches = list(directory.glob(pattern))
+                candidates.extend(matches)
+
+        # Return the most recent file if multiple matches found
+        if candidates:
+            # Sort by modification time, newest first
+            candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            return candidates[0]
+
+        return None
 
     def validate_artifact(self, artifact_name: str, stage: WorkflowStage) -> Path:
         """Validate that a specific artifact exists.

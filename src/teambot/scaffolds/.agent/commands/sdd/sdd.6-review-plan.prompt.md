@@ -591,3 +591,98 @@ PLAN_REVIEW_VALIDATION: PASS | FAIL
 - Test Integration: CORRECT | INCORRECT
 - Critical Issues: X unresolved (list if any)
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "PLAN_REVIEW",
+  "decision": "APPROVED",
+  "scores": {
+    "completeness": 9,
+    "actionability": 9,
+    "test_integration": 8,
+    "implementation_readiness": 9
+  },
+  "blockers": [],
+  "artifacts_produced": ["plan_review.md"]
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "PLAN_REVIEW" | Stage identifier (must be exactly "PLAN_REVIEW") |
+| `decision` | string | Yes | "APPROVED", "NEEDS_REVISION", "BLOCKED" | Review outcome |
+| `scores` | object | Yes | Object with 4 integer fields | Quality assessment scores (0-10 for each dimension) |
+| `scores.completeness` | integer | Yes | 0-10 | All tasks defined with clear scope |
+| `scores.actionability` | integer | Yes | 0-10 | Tasks are atomic and have clear file references |
+| `scores.test_integration` | integer | Yes | 0-10 | Test tasks properly integrated with implementation tasks |
+| `scores.implementation_readiness` | integer | Yes | 0-10 | Plan is ready for builder execution |
+| `blockers` | array | No | Array of strings | List of issues preventing approval. Use empty array `[]` when no blockers |
+| `artifacts_produced` | array | No | Array of strings | List of files created (typically `["plan_review.md"]`) |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Plan Review: [Feature Name]
+
+[Your markdown review here...]
+
+### ✅ Plan Approved
+
+The implementation plan meets all quality criteria and is ready for execution.
+
+```json
+{
+  "stage": "PLAN_REVIEW",
+  "decision": "APPROVED",
+  "scores": {
+    "completeness": 9,
+    "actionability": 9,
+    "test_integration": 8,
+    "implementation_readiness": 9
+  },
+  "blockers": [],
+  "artifacts_produced": ["plan_review.md"]
+}
+```
+````
+
+### Decision Field Logic
+
+- Use `"decision": "APPROVED"` when plan is ready for implementation (all scores >= 7)
+- Use `"decision": "NEEDS_REVISION"` when fixable issues exist (some scores < 7)
+- Use `"decision": "BLOCKED"` when critical issues prevent proceeding (any score < 4)
+- Populate `blockers` array with specific issues when decision is not "APPROVED"
+
+### Example: Plan Needs Revision
+
+```json
+{
+  "stage": "PLAN_REVIEW",
+  "decision": "NEEDS_REVISION",
+  "scores": {
+    "completeness": 8,
+    "actionability": 6,
+    "test_integration": 5,
+    "implementation_readiness": 7
+  },
+  "blockers": [
+    "Task 3 file reference is incorrect (file does not exist)",
+    "Phase 2 tasks lack dependency ordering",
+    "Test tasks are not integrated with implementation flow",
+    "Task descriptions too vague for builder execution"
+  ],
+  "artifacts_produced": ["plan_review.md"]
+}
+```

@@ -311,3 +311,90 @@ graph TD
 ```
 
 **Key Rule**: Never skip the pre-check. A complete but buggy implementation is better than an incomplete one - but we must know it's complete first.
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "IMPLEMENTATION_REVIEW",
+  "decision": "APPROVED",
+  "tasks_complete": true,
+  "tests_passing": true,
+  "coverage_met": true,
+  "linting_passed": true,
+  "blockers": [],
+  "artifacts_produced": ["impl_review.md", "test_results.md"]
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "IMPLEMENTATION_REVIEW" | Stage identifier (must be exactly "IMPLEMENTATION_REVIEW") |
+| `decision` | string | Yes | "APPROVED", "NEEDS_REVISION", "BLOCKED" | Review outcome |
+| `tasks_complete` | boolean | Yes | true, false | Whether all planned tasks are finished |
+| `tests_passing` | boolean | Yes | true, false | Whether all tests pass |
+| `coverage_met` | boolean | No | true, false | Whether coverage targets are met |
+| `linting_passed` | boolean | No | true, false | Whether linting/formatting checks pass |
+| `blockers` | array | No | Array of strings | List of issues preventing approval. Use empty array `[]` when no blockers |
+| `artifacts_produced` | array | No | Array of strings | List of files created (typically `["impl_review.md", "test_results.md"]`) |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Implementation Review: [Feature Name]
+
+[Your markdown review here...]
+
+### ✅ Implementation Approved
+
+All tasks complete, tests passing, and code quality meets standards.
+
+```json
+{
+  "stage": "IMPLEMENTATION_REVIEW",
+  "decision": "APPROVED",
+  "tasks_complete": true,
+  "tests_passing": true,
+  "coverage_met": true,
+  "linting_passed": true,
+  "blockers": [],
+  "artifacts_produced": ["impl_review.md", "test_results.md"]
+}
+```
+````
+
+### Decision Field Logic
+
+- Use `"decision": "APPROVED"` when all checks pass (`tasks_complete: true`, `tests_passing: true`)
+- Use `"decision": "NEEDS_REVISION"` when fixable issues exist (tests fail, coverage low, linting errors)
+- Use `"decision": "BLOCKED"` when critical issues prevent proceeding (incomplete tasks, major test failures)
+- Populate `blockers` array with specific issues when decision is not "APPROVED"
+
+### Example: Implementation Needs Revision
+
+```json
+{
+  "stage": "IMPLEMENTATION_REVIEW",
+  "decision": "NEEDS_REVISION",
+  "tasks_complete": true,
+  "tests_passing": false,
+  "coverage_met": false,
+  "linting_passed": true,
+  "blockers": [
+    "3 unit tests failing in test_api.py",
+    "Coverage is 72% (target: 80%)",
+    "Missing tests for error handling paths"
+  ],
+  "artifacts_produced": ["impl_review.md", "test_results.md"]
+}
+```

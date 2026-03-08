@@ -444,3 +444,90 @@ RESEARCH_VALIDATION: PASS | FAIL
 - Test Infrastructure: RESEARCHED | INCOMPLETE
 - Implementation Ready: YES | NO
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "RESEARCH",
+  "status": "COMPLETE",
+  "artifacts_produced": ["research.md"],
+  "key_findings": [
+    "Existing authentication uses JWT tokens",
+    "Test framework is pytest with 80% coverage requirement",
+    "API endpoints follow REST conventions"
+  ],
+  "blockers": []
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "RESEARCH" | Stage identifier (must be exactly "RESEARCH") |
+| `status` | string | Yes | "COMPLETE", "INCOMPLETE" | Research outcome |
+| `artifacts_produced` | array | Yes | Array of strings | List of files created (typically `["research.md"]`) |
+| `key_findings` | array | No | Array of strings | 3-7 most important technical discoveries |
+| `blockers` | array | No | Array of strings | List of issues preventing completion. Use empty array `[]` when no blockers exist |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Research: [Feature Name]
+
+[Your markdown research here...]
+
+### ✅ Research Complete
+
+All technical approaches have been analyzed and documented.
+
+```json
+{
+  "stage": "RESEARCH",
+  "status": "COMPLETE",
+  "artifacts_produced": ["research.md"],
+  "key_findings": [
+    "Existing authentication uses JWT tokens",
+    "Test framework is pytest with 80% coverage requirement",
+    "API endpoints follow REST conventions"
+  ],
+  "blockers": []
+}
+```
+````
+
+### Status Field Logic
+
+- Use `"status": "COMPLETE"` when all technical research is documented and implementation approach is clear
+- Use `"status": "INCOMPLETE"` when critical technical questions remain unanswered
+- Always include `"research.md"` in `artifacts_produced` if the file was created
+- Populate `key_findings` with 3-7 most important technical discoveries
+- Populate `blockers` array with specific issues when status is "INCOMPLETE"
+
+### Example: Incomplete Research
+
+```json
+{
+  "stage": "RESEARCH",
+  "status": "INCOMPLETE",
+  "artifacts_produced": ["research.md"],
+  "key_findings": [
+    "Authentication layer exists but documentation is missing",
+    "Test infrastructure needs upgrade to support async tests"
+  ],
+  "blockers": [
+    "Unable to locate database migration scripts",
+    "Legacy API versioning strategy is undocumented",
+    "No access to staging environment for integration testing"
+  ]
+}
+```

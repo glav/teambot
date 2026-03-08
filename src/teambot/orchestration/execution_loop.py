@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
@@ -27,6 +28,8 @@ from teambot.workflow.stages import STAGE_METADATA, WorkflowStage
 
 if TYPE_CHECKING:
     from teambot.tokens.tracker import TokenTracker
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionResult(Enum):
@@ -134,6 +137,9 @@ class ExecutionLoop:
         # Will be set during run()
         self.sdk_client: Any = None
         self.review_iterator: ReviewIterator | None = None
+
+        # Error tracking for critical failures
+        self.last_error_message: str | None = None
 
         # Artifact validator for pre-stage checks
         self.artifact_validator = ArtifactValidator(
@@ -263,8 +269,13 @@ class ExecutionLoop:
             self._save_state(ExecutionResult.COMPLETE)
             return ExecutionResult.COMPLETE
 
-        except (MissingArtifactError, OutputSchemaValidationError):
+        except (MissingArtifactError, OutputSchemaValidationError) as e:
             # Critical failure - missing required artifact or invalid stage output schema
+            logger.exception("Critical failure: %s", e)
+
+            # Store error message for user display
+            self.last_error_message = str(e)
+
             self._emit_completed_event(on_progress, "critical_failure")
             self._save_state(ExecutionResult.CRITICAL_FAILURE)
             return ExecutionResult.CRITICAL_FAILURE
@@ -441,7 +452,7 @@ class ExecutionLoop:
         """Execute acceptance test stage via code-level validation.
 
         This stage:
-        1. Finds the feature spec (from artifacts or docs/feature-specs/)
+        1. Finds the feature spec (from artifacts or .agent-tracking/specs/)
         2. Parses acceptance test scenarios from the spec
         3. Asks the builder to write and run pytest tests for each scenario
         4. Parses results and reports pass/fail status
@@ -841,19 +852,21 @@ class ExecutionLoop:
 
         Searches in order:
         1. .teambot/{feature}/artifacts/feature_spec.md
-        2. docs/feature-specs/*.md (matching feature name)
+        2. .agent-tracking/specs/*.md (matching feature name)
         """
         # Check artifacts directory first
         artifacts_spec = self.teambot_dir / "artifacts" / "feature_spec.md"
         if artifacts_spec.exists():
             return artifacts_spec.read_text(encoding="utf-8")
 
-        # Check docs/feature-specs/
-        feature_specs_dir = self.teambot_dir.parent.parent / "docs" / "feature-specs"
-        if feature_specs_dir.exists():
+        # Check .agent-tracking/specs/ (preferred SDD spec location)
+        # .agent-tracking is always colocated with .teambot, so use .teambot's parent
+        # rather than _resolve_project_root() which follows stages.yaml location.
+        agent_tracking_specs_dir = self.teambot_dir.parent.parent / ".agent-tracking" / "specs"
+        if agent_tracking_specs_dir.exists():
             # Normalize feature name for case-insensitive matching
             normalized_feature = self.feature_name.replace("-", "").lower()
-            for spec_file in feature_specs_dir.glob("*.md"):
+            for spec_file in agent_tracking_specs_dir.glob("*.md"):
                 # Case-insensitive matching with hyphens removed
                 normalized_spec = spec_file.stem.replace("-", "").lower()
                 if normalized_feature in normalized_spec:
@@ -1072,13 +1085,29 @@ class ExecutionLoop:
                 parts.extend(["", "## Project Configuration"] + config_parts)
 
         # Add working directory information
+        # Use _resolve_project_root() to get the canonical project root rather than
+        # relying on a fixed parent.parent traversal that may not match runtime cwd.
+        project_root = self._resolve_project_root()
         parts.extend(
             [
                 "",
-                "## Working Directory",
-                f"All artifacts for this objective should be saved to: `{self.teambot_dir}`",
-                f"- Artifacts directory: `{self.teambot_dir / 'artifacts'}`",
-                f"- Example: `{self.teambot_dir / 'artifacts' / 'feature_spec.md'}`",
+                "## Repository Root",
+                f"**Repository root**: `{project_root}`",
+                "To confirm the root at runtime you can also run: `git rev-parse --show-toplevel`",
+                "",
+                "## Artifact Locations",
+                "All paths below are **relative to the repository root** shown above.",
+                "- **SDD artifacts** (specs, research, plans): Write to "
+                "`.agent-tracking/{type}/` subdirectories "
+                "(specs, research, plans, test-strategies)",
+                f"- **Feature working files** (temporary/transient): "
+                f"`.teambot/{self.feature_name}/artifacts/`",
+                "",
+                "**CRITICAL for PLAN stage**: Plan and details files MUST be written to:",
+                "- Plans: `.agent-tracking/plans/YYYYMMDD-{feature}-plan.instructions.md`",
+                "- Details: `.agent-tracking/details/YYYYMMDD-{feature}-details.md`",
+                "",
+                "These paths are relative to the repository root shown above.",
             ]
         )
 
@@ -1097,8 +1126,27 @@ class ExecutionLoop:
             stage_config = self.stages_config.stages.get(stage)
             if stage_config and stage_config.artifacts:
                 parts.extend(["", "## Required Artifacts for This Stage"])
+                project_root = self._resolve_project_root()
                 for artifact in stage_config.artifacts:
-                    parts.append(f"- `{self.teambot_dir / 'artifacts' / artifact}`")
+                    # If artifact contains path separators, treat as repo-root-relative
+                    # Otherwise, treat as simple filename under .teambot/{feature}/artifacts/
+                    # Note: Uses forward slash check as all artifact paths use
+                    # Unix-style conventions
+                    if "/" in artifact:
+                        # Directory-based path (e.g., docs/feature-specs/{name}.md)
+                        # Display as repo-root-relative path
+                        artifact_path = artifact
+                    else:
+                        # Simple filename (e.g., feature_spec.md)
+                        # Render relative to project root
+                        full_path = self.teambot_dir / "artifacts" / artifact
+                        try:
+                            artifact_path = full_path.relative_to(project_root).as_posix()
+                        except ValueError:
+                            # If relative_to fails (e.g., paths on different drives),
+                            # fall back to absolute path as a safety mechanism
+                            artifact_path = full_path.as_posix()
+                    parts.append(f"- `{artifact_path}`")
 
             # Add exit criteria from config
             if stage_config and stage_config.exit_criteria:
@@ -1155,11 +1203,7 @@ class ExecutionLoop:
         Returns:
             The (possibly truncated) context string.
         """
-        import logging
-
         from teambot.history.compactor import estimate_tokens
-
-        logger = logging.getLogger(__name__)
 
         estimated = estimate_tokens(context)
         if estimated <= max_context_tokens:
@@ -1242,11 +1286,8 @@ class ExecutionLoop:
                 fails schema validation.
         """
         import json
-        import logging
 
         import jsonschema
-
-        logger = logging.getLogger(__name__)
 
         json_str = self._extract_json_from_output(output)
         if json_str is None:
@@ -1393,6 +1434,10 @@ class ExecutionLoop:
             "parallel_group_status": self.parallel_group_status,
         }
 
+        # Include error message if present
+        if self.last_error_message:
+            state["error_message"] = self.last_error_message
+
         # Add token tracking data if tracker enabled
         if self._token_tracker:
             state["token_tracking"] = self._token_tracker.to_dict()
@@ -1406,10 +1451,7 @@ class ExecutionLoop:
         Failures are logged but do not halt the workflow.
         Only runs when git_checkpoints is enabled in config.
         """
-        import logging
         import subprocess
-
-        logger = logging.getLogger(__name__)
 
         # Only create checkpoints when explicitly enabled
         if not self.config.get("git_checkpoints", False):

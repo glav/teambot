@@ -681,3 +681,74 @@ VALIDATION_STATUS: PASS | FAIL
 - Testing Approach: DEFINED | MISSING
 - Acceptance Tests: X scenarios defined | MISSING
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "SPEC",
+  "status": "COMPLETE",
+  "artifacts_produced": ["feature_spec.md"],
+  "blockers": []
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "SPEC" | Stage identifier (must be exactly "SPEC") |
+| `status` | string | Yes | "COMPLETE", "INCOMPLETE" | Specification creation outcome |
+| `artifacts_produced` | array | Yes | Array of strings | List of files created (typically `["feature_spec.md"]`) |
+| `blockers` | array | No | Array of strings | List of issues preventing completion. Use empty array `[]` when no blockers exist |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Feature Specification: [Feature Name]
+
+[Your markdown specification here...]
+
+### ✅ Specification Complete
+
+All required sections have been defined.
+
+```json
+{
+  "stage": "SPEC",
+  "status": "COMPLETE",
+  "artifacts_produced": ["feature_spec.md"],
+  "blockers": []
+}
+```
+````
+
+### Status Field Logic
+
+- Use `"status": "COMPLETE"` when the feature specification is fully written with all required sections
+- Use `"status": "INCOMPLETE"` when the specification cannot be completed (missing critical information, unresolved questions, etc.)
+- Always include `"feature_spec.md"` in `artifacts_produced` if the file was created
+- Populate `blockers` array with specific issues when status is "INCOMPLETE"
+
+### Example: Incomplete Specification
+
+```json
+{
+  "stage": "SPEC",
+  "status": "INCOMPLETE",
+  "artifacts_produced": ["feature_spec.md"],
+  "blockers": [
+    "Missing critical business requirements from stakeholder",
+    "Authentication approach requires security team approval",
+    "Database schema dependencies unclear"
+  ]
+}
+```

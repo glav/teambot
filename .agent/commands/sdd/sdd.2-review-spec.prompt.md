@@ -380,3 +380,97 @@ REVIEW_VALIDATION: PASS | FAIL
 - User Confirmation: OBTAINED | PENDING
 - Critical Issues: X (list if any unresolved)
 ```
+
+## Output Format
+
+**CRITICAL**: Your response MUST include both human-readable markdown (for logs) AND structured JSON (for validation).
+
+### Required JSON Output
+
+After your markdown report, you MUST append a JSON code block. **Place the JSON code block at the very end of your response, after all markdown content, as the final element.**
+
+```json
+{
+  "stage": "SPEC_REVIEW",
+  "decision": "APPROVED",
+  "scores": {
+    "completeness": 9,
+    "clarity": 8,
+    "testability": 9,
+    "technical_readiness": 8
+  },
+  "blockers": [],
+  "artifacts_produced": ["spec_review.md"]
+}
+```
+
+### JSON Field Requirements
+
+| Field | Type | Required | Valid Values | Description |
+|-------|------|----------|--------------|-------------|
+| `stage` | string | Yes | "SPEC_REVIEW" | Stage identifier (must be exactly "SPEC_REVIEW") |
+| `decision` | string | Yes | "APPROVED", "NEEDS_REVISION", "BLOCKED" | Review outcome |
+| `scores` | object | Yes | Object with 4 integer fields | Quality assessment scores (0-10 for each dimension) |
+| `scores.completeness` | integer | Yes | 0-10 | All required sections present and detailed |
+| `scores.clarity` | integer | Yes | 0-10 | Requirements are clear and unambiguous |
+| `scores.testability` | integer | Yes | 0-10 | Acceptance criteria are testable |
+| `scores.technical_readiness` | integer | Yes | 0-10 | Technical approach is feasible and well-defined |
+| `blockers` | array | No | Array of strings | List of issues preventing approval. Use empty array `[]` when no blockers |
+| `artifacts_produced` | array | No | Array of strings | List of files created (typically `["spec_review.md"]`) |
+
+### Output Structure Example
+
+Your complete response should follow this pattern:
+
+````markdown
+## Specification Review: [Feature Name]
+
+[Your markdown review here...]
+
+### ✅ Specification Approved
+
+The specification meets all quality criteria and is ready for research phase.
+
+```json
+{
+  "stage": "SPEC_REVIEW",
+  "decision": "APPROVED",
+  "scores": {
+    "completeness": 9,
+    "clarity": 8,
+    "testability": 9,
+    "technical_readiness": 8
+  },
+  "blockers": [],
+  "artifacts_produced": ["spec_review.md"]
+}
+```
+````
+
+### Decision Field Logic
+
+- Use `"decision": "APPROVED"` when specification is ready for implementation (all scores >= 7)
+- Use `"decision": "NEEDS_REVISION"` when fixable issues exist (some scores < 7)
+- Use `"decision": "BLOCKED"` when critical issues prevent proceeding (any score < 4 or critical missing sections)
+- Populate `blockers` array with specific issues when decision is not "APPROVED"
+
+### Example: Specification Needs Revision
+
+```json
+{
+  "stage": "SPEC_REVIEW",
+  "decision": "NEEDS_REVISION",
+  "scores": {
+    "completeness": 6,
+    "clarity": 7,
+    "testability": 5,
+    "technical_readiness": 7
+  },
+  "blockers": [
+    "Acceptance criteria lack measurable success metrics",
+    "Data migration strategy is not defined",
+    "Error handling approach is incomplete"
+  ],
+  "artifacts_produced": ["spec_review.md"]
+}
+```
