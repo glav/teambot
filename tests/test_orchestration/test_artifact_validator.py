@@ -804,8 +804,8 @@ class TestSearchOrderAndPrecedence:
         # First location should be feature artifacts directory
         assert locations[0] == teambot_dir / "my-feature" / "artifacts" / "research.md"
 
-        # Second location should be .agent-tracking/research/
-        assert any(".agent-tracking/research" in str(loc) for loc in locations)
+        # Second location should be .agent-tracking/research/ (use as_posix for cross-platform)
+        assert any(".agent-tracking/research" in loc.as_posix() for loc in locations)
 
     def test_case_sensitivity_matches_filesystem(
         self, tmp_path: Path, stages_config: StagesConfiguration
