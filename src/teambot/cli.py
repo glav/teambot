@@ -79,11 +79,11 @@ A sequential workflow with quality gates for spec-to-implementation.
 | `commands/sdd/sdd.1-create-feature-spec.prompt.md` | Guides feature spec creation with Q&A. |
 | `commands/sdd/sdd.2-review-spec.prompt.md` | Reviews specs before research phase. |
 | `commands/sdd/sdd.3-research-feature.prompt.md` | Conducts research and analysis for features. |
-| `commands/sdd/sdd.4-determine-test-strategy.prompt.md` | Recommends optimal testing strategy. |
-| `commands/sdd/sdd.5-task-planner-for-feature.prompt.md` | Creates implementation plans. |
-| `commands/sdd/sdd.6-review-plan.prompt.md` | Reviews plans before execution. |
-| `commands/sdd/sdd.7-task-implementer-for-feature.prompt.md` | Implements plans with tracking. |
-| `commands/sdd/sdd.8-post-implementation-review.prompt.md` | Performs post-implementation review. |
+| `commands/sdd/sdd.4-task-planner-for-feature.prompt.md` | Creates implementation plans. |
+| `commands/sdd/sdd.5-review-plan.prompt.md` | Reviews plans before execution. |
+| `commands/sdd/sdd.6-task-implementer-for-feature.prompt.md` | Implements plans with tracking. |
+| `commands/sdd/sdd.6b-implementation-review.prompt.md` | Reviews implementation changes and verifies tests. |
+| `commands/sdd/sdd.7-post-implementation-review.prompt.md` | Performs post-implementation review. |
 
 #### Instructions (`instructions/`)
 
