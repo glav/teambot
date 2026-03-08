@@ -13,7 +13,7 @@ tools: ['search/usages', 'read/problems', 'web/fetch', 'web/githubRepo', 'execut
 | **Input** | Approved plan + details + test strategy |
 | **Output** | Working code + tests + `.agent-tracking/changes/{{date}}-{{name}}-changes.md` |
 | **Key Actions** | Implement tasks, run tests, update tracking, mark complete |
-| **Next Step** | `sdd.8-post-implementation-review.prompt.md` (when all phases complete) |
+| **Next Step** | `sdd.7-post-implementation-review.prompt.md` (when all phases complete) |
 
 ---
 
@@ -301,7 +301,7 @@ All implementation tasks have been completed.
 * Linting passed: ✅
 
 **➡️ Recommended Next Step:**
-Run **Step 8** (`sdd.8-post-implementation-review.prompt.md`) for final validation and cleanup.
+Run **Step 7** (`sdd.7-post-implementation-review.prompt.md`) for final validation and cleanup.
 ```
 
 ## Output Format

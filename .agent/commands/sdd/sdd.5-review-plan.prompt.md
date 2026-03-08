@@ -13,8 +13,8 @@ tools: ['edit/createFile', 'edit/createDirectory', 'edit/editFiles', 'search', '
 | **Input** | Plan + Details + Research + Test Strategy files |
 | **Output** | `.agent-tracking/plan-reviews/YYYYMMDD-{{name}}-plan-review.md` |
 | **Decision** | APPROVED / NEEDS_REVISION / BLOCKED |
-| **If Approved** | `sdd.7-task-implementer-for-feature.prompt.md` |
-| **If Revision Needed** | Return to `sdd.5-task-planner-for-feature.prompt.md` |
+| **If Approved** | `sdd.6-task-implementer-for-feature.prompt.md` |
+| **If Revision Needed** | Return to `sdd.4-task-planner-for-feature.prompt.md` |
 
 ---
 
@@ -470,14 +470,14 @@ You WILL provide:
 
 If plan is **APPROVED**:
 1. Provide review report file path
-2. Confirm readiness for Step 7 (Implementation)
+2. Confirm readiness for Step 6 (Implementation)
 3. Highlight any conditional approval notes
-4. Suggest user run **Step 7** (`sdd.7-task-implementer-for-feature.prompt.md`)
+4. Suggest user run **Step 6** (`sdd.6-task-implementer-for-feature.prompt.md`)
 
 If **REVISIONS NEEDED**:
 1. Provide review report file path
 2. List top 3 critical fixes needed with examples
-3. Suggest user return to **Step 5** (`sdd.5-task-planner-for-feature.prompt.md`)
+3. Suggest user return to **Step 4** (`sdd.4-task-planner-for-feature.prompt.md`)
 4. Offer to help address specific gaps or invalid references
 
 If **BLOCKED**:

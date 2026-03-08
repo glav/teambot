@@ -10,7 +10,7 @@ tools: ['edit/createFile', 'edit/createDirectory', 'edit/editFiles', 'search', '
 | Item | Value |
 |------|-------|
 | **Purpose** | Final validation of implementation, tests, coverage, and cleanup |
-| **Input** | Completed implementation from Step 4 |
+| **Input** | Completed implementation from Step 6 |
 | **Output** | `.agent-tracking/implementation-reviews/YYYYMMDD-{{name}}-final-review.md` |
 | **Key Validations** | All tests pass, coverage met, code quality verified |
 | **Final Action** | Clean up tracking files, generate completion report |

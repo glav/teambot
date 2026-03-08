@@ -320,7 +320,7 @@ stages:
     exit_criteria:
       - Actionable plan with atomic tasks and clear dependencies
     optional: false
-    prompt_template: .agent/commands/sdd/sdd.5-task-planner-for-feature.prompt.md
+    prompt_template: .agent/commands/sdd/sdd.4-task-planner-for-feature.prompt.md
     include_objective: true
     output_schema:
       type: object
@@ -351,7 +351,7 @@ stages:
       - Plan approved or revision feedback provided
     optional: false
     is_review_stage: true
-    prompt_template: .agent/commands/sdd/sdd.6-review-plan.prompt.md
+    prompt_template: .agent/commands/sdd/sdd.5-review-plan.prompt.md
     include_objective: true
     output_schema:
       type: object
@@ -388,7 +388,7 @@ stages:
     parallel_agents:
       - builder-1
       - builder-2
-    prompt_template: .agent/commands/sdd/sdd.7-task-implementer-for-feature.prompt.md
+    prompt_template: .agent/commands/sdd/sdd.6-task-implementer-for-feature.prompt.md
     include_objective: true
     output_schema:
       type: object
@@ -425,7 +425,7 @@ stages:
       - Coverage targets met
     optional: false
     is_review_stage: true
-    prompt_template: .agent/commands/sdd/sdd.7b-implementation-review.prompt.md
+    prompt_template: .agent/commands/sdd/sdd.6b-implementation-review.prompt.md
     include_objective: true
     output_schema:
       type: object
@@ -503,7 +503,7 @@ stages:
     optional: false
     is_review_stage: true
     requires_acceptance_tests_passed: true  # Blocks completion if acceptance tests failed
-    prompt_template: .agent/commands/sdd/sdd.8-post-implementation-review.prompt.md
+    prompt_template: .agent/commands/sdd/sdd.7-post-implementation-review.prompt.md
     include_objective: true
     output_schema:
       type: object

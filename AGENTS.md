@@ -163,13 +163,12 @@ A sequential workflow with quality gates for taking a feature from specification
 | `commands/sdd/sdd.1-create-feature-spec.prompt.md` | Guides creation of feature specifications with Q&A and reference integration. |
 | `commands/sdd/sdd.2-review-spec.prompt.md` | Reviews and validates specifications before the research phase. |
 | `commands/sdd/sdd.3-research-feature.prompt.md` | Conducts comprehensive research and analysis for the feature. |
-| `commands/sdd/sdd.4-determine-test-strategy.prompt.md` | Analyses specs and research to recommend an optimal testing strategy. |
-| `commands/sdd/sdd.5-task-planner-for-feature.prompt.md` | Creates actionable implementation plans for the feature. |
-| `commands/sdd/sdd.6-review-plan.prompt.md` | Reviews and validates implementation plans before execution. |
-| `commands/sdd/sdd.7-task-implementer-for-feature.prompt.md` | Implements task plans with progressive tracking and change records. |
-| `commands/sdd/sdd.7b-implementation-review.prompt.md` | Reviews implementation changes, verifies test execution and coverage. |
-| `commands/sdd/sdd.7c-acceptance-test.prompt.md` | Runs end-to-end acceptance tests against the implementation. |
-| `commands/sdd/sdd.8-post-implementation-review.prompt.md` | Performs post-implementation review and final validation. |
+| `commands/sdd/sdd.4-task-planner-for-feature.prompt.md` | Creates actionable implementation plans for the feature. |
+| `commands/sdd/sdd.5-review-plan.prompt.md` | Reviews and validates implementation plans before execution. |
+| `commands/sdd/sdd.6-task-implementer-for-feature.prompt.md` | Implements task plans with progressive tracking and change records. |
+| `commands/sdd/sdd.6b-implementation-review.prompt.md` | Reviews implementation changes, verifies test execution and coverage. |
+| `commands/sdd/sdd.6c-acceptance-test.prompt.md` | Runs end-to-end acceptance tests against the implementation. |
+| `commands/sdd/sdd.7-post-implementation-review.prompt.md` | Performs post-implementation review and final validation. |
 
 #### Instructions (`instructions/`)
 

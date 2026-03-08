@@ -247,7 +247,7 @@ class TestSyncSddPrompts:
         # Setup scaffold with files in non-alphabetical order
         scaffold_dir = tmp_path / "scaffolds" / ".agent" / "commands" / "sdd"
         scaffold_dir.mkdir(parents=True)
-        (scaffold_dir / "sdd.5-task.prompt.md").write_text("# 5")
+        (scaffold_dir / "sdd.4-task.prompt.md").write_text("# 4")
         (scaffold_dir / "sdd.1-spec.prompt.md").write_text("# 1")
         (scaffold_dir / "sdd.3-research.prompt.md").write_text("# 3")
 

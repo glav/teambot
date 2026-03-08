@@ -294,11 +294,11 @@ End of file.
         assert "commands/project/proj.sprint-planning.prompt.md" in content
         assert "commands/setup/setup.agents-md-creation.prompt.md" in content
 
-        # SDD workflow table (10 entries)
+        # SDD workflow table (9 entries)
         assert "commands/sdd/README.md" in content
         assert "commands/sdd/sdd.0-initialize.prompt.md" in content
         assert "commands/sdd/sdd.1-create-feature-spec.prompt.md" in content
-        assert "commands/sdd/sdd.8-post-implementation-review.prompt.md" in content
+        assert "commands/sdd/sdd.7-post-implementation-review.prompt.md" in content
 
         # Instructions table (6 entries)
         assert "instructions/prompt.instructions.md" in content

@@ -13,7 +13,7 @@ tools: ['search/usages', 'read/problems', 'web/fetch', 'web/githubRepo', 'execut
 | **Input** | Approved specification from `docs/feature-specs/{{name}}.md` |
 | **Output** | `.agent-tracking/research/YYYYMMDD-{{name}}-research.md` |
 | **Key Deliverables** | Technical approach, code patterns, test framework, implementation guidance |
-| **Next Step** | `sdd.4-determine-test-strategy.prompt.md` |
+| **Next Step** | `sdd.4-task-planner-for-feature.prompt.md` |
 
 ---
 
@@ -388,9 +388,7 @@ When research is complete, you WILL:
 * Share a brief highlight of critical discoveries impacting implementation.
 * Provide the exact filename and path to the research document.
 * Confirm testing strategy research is included and comprehensive.
-* Instruct the user to do the following steps:
-  1. Run **Step 4** (`sdd.4-determine-test-strategy.prompt.md`) to create formal test strategy document
-  2. After test strategy is approved, proceed to **Step 5** (`sdd.5-task-planner-for-feature.prompt.md`)
+* Instruct the user to proceed to **Step 4** (`sdd.4-task-planner-for-feature.prompt.md`) to create the implementation plan
   
 **Handoff Message Template**:
 ```markdown
@@ -413,11 +411,8 @@ Deep research is complete and documented.
 * Entry point analysis complete ✅
 * Implementation guidance ready ✅
 
-**➡️ Recommended Next Steps:**
-1. Run **Step 4** (`sdd.4-determine-test-strategy.prompt.md`) to create formal test strategy
-2. After test strategy approval, proceed to **Step 5** (`sdd.5-task-planner-for-feature.prompt.md`)
-
-The test strategy step will analyze this research and recommend the optimal testing approach (TDD vs Code-First) for each component.
+**➡️ Recommended Next Step:**
+Proceed to **Step 4** (`sdd.4-task-planner-for-feature.prompt.md`) to create the implementation plan based on this research.
 ```
 
 ## Output Validation Checklist (MANDATORY)
