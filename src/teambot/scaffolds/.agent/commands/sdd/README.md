@@ -4,7 +4,7 @@ This directory contains the enhanced Spec-Driven Development workflow with integ
 
 ## 📋 Workflow Overview
 
-The SDD workflow consists of 8 sequential steps with built-in quality gates:
+The SDD workflow consists of 9 sequential steps with built-in quality gates:
 
 ```
 0. sdd.0-initialize.prompt.md                → Initialize environment
@@ -20,6 +20,8 @@ The SDD workflow consists of 8 sequential steps with built-in quality gates:
 5. sdd.5-review-plan.prompt.md               → Review plan for readiness
    ↓
 6. sdd.6-task-implementer-for-feature.prompt.md → Execute implementation
+   ↓
+6b. sdd.6b-implementation-review.prompt.md   → Review code + verify tests
    ↓
 7. sdd.7-post-implementation-review.prompt.md → Final validation
 ```
@@ -243,7 +245,30 @@ The SDD workflow consists of 8 sequential steps with built-in quality gates:
 - Test files (when applicable)
 - Changes log: `.agent-tracking/changes/{{date}}-{{name}}-changes.md`
 
-**Next Step**: Run `sdd.7-post-implementation-review.prompt.md`
+**Next Step**: Run `sdd.6b-implementation-review.prompt.md`
+
+---
+
+### Step 6b: Implementation Review
+**File**: `sdd.6b-implementation-review.prompt.md`  
+**Role**: Implementation Review Specialist
+
+**Purpose**: Review implemented code for quality, correctness, and verify that tests execute successfully with adequate coverage.
+
+**Validation Checks**:
+- ✅ Code follows project conventions and patterns from research
+- ✅ Implementation matches the task plan and feature specification
+- ✅ All tests pass (`uv run pytest` or equivalent)
+- ✅ Coverage targets from test strategy are met
+- ✅ No regressions introduced
+- ✅ Error handling and edge cases addressed
+
+**Outputs**:
+- Review report: `.agent-tracking/implementation-reviews/{{date}}-{{name}}-impl-review.md`
+- Decision: APPROVED | NEEDS_REVISION | BLOCKED
+
+**If Approved**: Proceed to `sdd.7-post-implementation-review.prompt.md`  
+**If Revisions Needed**: Return to `sdd.6-task-implementer-for-feature.prompt.md` with feedback
 
 ---
 
