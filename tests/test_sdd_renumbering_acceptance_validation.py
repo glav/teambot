@@ -13,8 +13,6 @@ NOTE: These tests call REAL implementation code, not mocks.
 """
 
 import argparse
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
