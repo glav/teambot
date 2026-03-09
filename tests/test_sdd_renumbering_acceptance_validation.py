@@ -28,6 +28,7 @@ STAGES_YAML = REPO_ROOT / "stages.yaml"
 SCAFFOLD_STAGES_YAML = REPO_ROOT / "src" / "teambot" / "scaffolds" / "stages.yaml"
 
 
+@pytest.mark.acceptance
 class TestSDDPromptRenumberingAcceptance:
     """Acceptance tests for SDD prompt renumbering feature."""
 
