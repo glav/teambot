@@ -13,14 +13,12 @@ NOTE: These tests call REAL implementation code, not mocks.
 """
 
 import os
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 import yaml
-
 
 # Repository root for all tests
 REPO_ROOT = Path(__file__).parent.parent.absolute()
@@ -36,25 +34,29 @@ class TestSDDPromptRenumberingAcceptance:
     def test_at_001_repository_file_renumbering(self):
         """
         AT-001: Verify all SDD prompt files in .agent/commands/sdd/ are correctly renumbered.
-        
+
         Expected: 9 prompt files (sdd.0-7 with sdd.6b), no sdd.4-determine-test-strategy,
                   no sdd.6c (ACCEPTANCE_TEST is code-driven, not prompt-based)
         """
         # List all prompt files
         prompt_files = sorted(AGENT_DIR.glob("sdd.*.prompt.md"))
         prompt_names = [f.name for f in prompt_files]
-        
+
         # Verify count: should be 9 files
-        assert len(prompt_files) == 9, f"Expected 9 prompt files, found {len(prompt_files)}: {prompt_names}"
-        
+        assert len(prompt_files) == 9, (
+            f"Expected 9 prompt files, found {len(prompt_files)}: {prompt_names}"
+        )
+
         # Verify sdd.4-determine-test-strategy does NOT exist
-        assert not (AGENT_DIR / "sdd.4-determine-test-strategy.prompt.md").exists(), \
+        assert not (AGENT_DIR / "sdd.4-determine-test-strategy.prompt.md").exists(), (
             "sdd.4-determine-test-strategy.prompt.md should be deleted"
-        
+        )
+
         # Verify sdd.6c does NOT exist (ACCEPTANCE_TEST is code-driven)
-        assert not (AGENT_DIR / "sdd.6c-acceptance-test.prompt.md").exists(), \
+        assert not (AGENT_DIR / "sdd.6c-acceptance-test.prompt.md").exists(), (
             "sdd.6c-acceptance-test.prompt.md should not exist (ACCEPTANCE_TEST is code-driven)"
-        
+        )
+
         # Verify expected files DO exist (renamed correctly)
         expected_files = [
             "sdd.0-initialize.prompt.md",
@@ -67,58 +69,67 @@ class TestSDDPromptRenumberingAcceptance:
             "sdd.6b-implementation-review.prompt.md",  # Was sdd.7b
             "sdd.7-post-implementation-review.prompt.md",  # Was sdd.8
         ]
-        
+
         for expected_file in expected_files:
             file_path = AGENT_DIR / expected_file
             assert file_path.exists(), f"Expected file {expected_file} does not exist"
-        
+
         # Verify the actual list matches expected
-        assert prompt_names == expected_files, f"File list mismatch.\nExpected: {expected_files}\nActual: {prompt_names}"
+        assert prompt_names == expected_files, (
+            f"File list mismatch.\nExpected: {expected_files}\nActual: {prompt_names}"
+        )
 
     def test_at_002_scaffold_file_renumbering(self):
         """
         AT-002: Verify scaffold directory mirrors repository structure with new numbering.
-        
+
         Expected: Scaffold has identical structure to repository (9 files, no sdd.4 or sdd.6c)
         """
         # List files in both directories
         repo_files = sorted([f.name for f in AGENT_DIR.glob("sdd.*.prompt.md")])
         scaffold_files = sorted([f.name for f in SCAFFOLD_DIR.glob("sdd.*.prompt.md")])
-        
+
         # Verify counts match
-        assert len(scaffold_files) == 9, f"Expected 9 scaffold files, found {len(scaffold_files)}: {scaffold_files}"
-        assert len(repo_files) == len(scaffold_files), \
+        assert len(scaffold_files) == 9, (
+            f"Expected 9 scaffold files, found {len(scaffold_files)}: {scaffold_files}"
+        )
+        assert len(repo_files) == len(scaffold_files), (
             f"Repository has {len(repo_files)} files but scaffold has {len(scaffold_files)}"
-        
+        )
+
         # Verify file lists are identical
-        assert repo_files == scaffold_files, \
-            f"Scaffold files don't match repository.\nRepo: {repo_files}\nScaffold: {scaffold_files}"
-        
+        assert repo_files == scaffold_files, (
+            f"Scaffold files don't match repository.\n"
+            f"Repo: {repo_files}\nScaffold: {scaffold_files}"
+        )
+
         # Verify sdd.4-determine-test-strategy does NOT exist in scaffold
-        assert not (SCAFFOLD_DIR / "sdd.4-determine-test-strategy.prompt.md").exists(), \
+        assert not (SCAFFOLD_DIR / "sdd.4-determine-test-strategy.prompt.md").exists(), (
             "sdd.4-determine-test-strategy.prompt.md should be deleted from scaffold"
-        
+        )
+
         # Verify sdd.6c does NOT exist in scaffold
-        assert not (SCAFFOLD_DIR / "sdd.6c-acceptance-test.prompt.md").exists(), \
+        assert not (SCAFFOLD_DIR / "sdd.6c-acceptance-test.prompt.md").exists(), (
             "sdd.6c-acceptance-test.prompt.md should not exist in scaffold"
+        )
 
     def test_at_003_stages_yaml_configuration_validation(self):
         """
         AT-003: Verify stages.yaml references correct new prompt file paths.
-        
+
         Expected: All prompt_template paths point to existing files with new numbering;
                   no references to old sdd.4-determine-test-strategy
         """
         # Load stages.yaml
         with open(STAGES_YAML) as f:
             stages_config = yaml.safe_load(f)
-        
+
         # Extract all prompt_template values
         prompt_templates = {}
         for stage_name, stage_config in stages_config.get("stages", {}).items():
             if "prompt_template" in stage_config:
                 prompt_templates[stage_name] = stage_config["prompt_template"]
-        
+
         # Verify specific stage mappings
         expected_mappings = {
             "PLAN": ".agent/commands/sdd/sdd.4-task-planner-for-feature.prompt.md",
@@ -127,91 +138,99 @@ class TestSDDPromptRenumberingAcceptance:
             "IMPLEMENTATION_REVIEW": ".agent/commands/sdd/sdd.6b-implementation-review.prompt.md",
             "POST_REVIEW": ".agent/commands/sdd/sdd.7-post-implementation-review.prompt.md",
         }
-        
+
         for stage_name, expected_path in expected_mappings.items():
             actual_path = prompt_templates.get(stage_name)
-            assert actual_path == expected_path, \
+            assert actual_path == expected_path, (
                 f"Stage {stage_name}: expected '{expected_path}', got '{actual_path}'"
-            
+            )
+
             # Verify file actually exists
             full_path = REPO_ROOT / expected_path
-            assert full_path.exists(), f"Prompt file referenced by {stage_name} does not exist: {expected_path}"
-        
+            assert full_path.exists(), (
+                f"Prompt file referenced by {stage_name} does not exist: {expected_path}"
+            )
+
         # Verify no references to old sdd.4-determine-test-strategy
-        stages_yaml_content = STAGES_YAML.read_text()
-        assert "sdd.4-determine-test-strategy" not in stages_yaml_content, \
+        stages_yaml_content = STAGES_YAML.read_text(encoding="utf-8")
+        assert "sdd.4-determine-test-strategy" not in stages_yaml_content, (
             "Found reference to old sdd.4-determine-test-strategy in stages.yaml"
-        
+        )
+
         # Also check scaffold stages.yaml
         with open(SCAFFOLD_STAGES_YAML) as f:
             scaffold_stages_config = yaml.safe_load(f)
-        
+
         scaffold_prompt_templates = {}
         for stage_name, stage_config in scaffold_stages_config.get("stages", {}).items():
             if "prompt_template" in stage_config:
                 scaffold_prompt_templates[stage_name] = stage_config["prompt_template"]
-        
+
         # Verify scaffold matches repository
         for stage_name, expected_path in expected_mappings.items():
             scaffold_path = scaffold_prompt_templates.get(stage_name)
-            assert scaffold_path == expected_path, \
+            assert scaffold_path == expected_path, (
                 f"Scaffold stage {stage_name}: expected '{expected_path}', got '{scaffold_path}'"
+            )
 
     def test_at_004_full_workflow_execution_simulation(self):
         """
         AT-004: Verify workflow can load all prompt files correctly.
-        
+
         This is a simulation test - we verify all prompt files referenced in stages.yaml
         can be loaded and are valid markdown files.
         """
         # Load stages.yaml
         with open(STAGES_YAML) as f:
             stages_config = yaml.safe_load(f)
-        
+
         # For each stage with a prompt_template, verify the file can be loaded
         stages_with_prompts = [
             "PLAN",
-            "PLAN_REVIEW", 
+            "PLAN_REVIEW",
             "IMPLEMENTATION",
             "IMPLEMENTATION_REVIEW",
             "POST_REVIEW",
         ]
-        
+
         for stage_name in stages_with_prompts:
             stage_config = stages_config["stages"][stage_name]
             prompt_path = stage_config.get("prompt_template")
-            
+
             assert prompt_path is not None, f"Stage {stage_name} missing prompt_template"
-            
+
             full_path = REPO_ROOT / prompt_path
             assert full_path.exists(), f"Prompt file for {stage_name} does not exist: {prompt_path}"
-            
+
             # Verify file can be read and contains content
-            content = full_path.read_text()
+            content = full_path.read_text(encoding="utf-8")
             assert len(content) > 0, f"Prompt file {prompt_path} is empty"
             # Prompt files may start with YAML frontmatter (---) or markdown heading (#)
-            assert content.strip().startswith(("---", "#")), \
-                f"Prompt file {prompt_path} doesn't appear to be valid (no YAML frontmatter or markdown heading)"
+            assert content.strip().startswith(("---", "#")), (
+                f"Prompt file {prompt_path} doesn't appear to be valid "
+                f"(no YAML frontmatter or markdown heading)"
+            )
 
     def test_at_005_test_suite_validation(self):
         """
         AT-005: Verify all existing tests pass after renumbering changes.
-        
+
         This runs the existing test suite to ensure no regressions.
         """
         # Run pytest on prompt-related tests
         result = subprocess.run(
-            ["python3", "-m", "pytest", "tests/test_prompt_sync.py", "-v"],
+            ["uv", "run", "pytest", "tests/test_prompt_sync.py", "-v"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
-            env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")}
+            env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
         )
-        
+
         # Check exit code
-        assert result.returncode == 0, \
+        assert result.returncode == 0, (
             f"Test suite failed:\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
-        
+        )
+
         # Verify no references to old file names in output
         old_patterns = [
             "sdd.4-determine-test-strategy",
@@ -221,57 +240,63 @@ class TestSDDPromptRenumberingAcceptance:
             "sdd.7b-implementation",  # Old name
             "sdd.8-post",  # Old name
         ]
-        
+
         for pattern in old_patterns:
-            assert pattern not in result.stdout, \
+            assert pattern not in result.stdout, (
                 f"Found old file name pattern '{pattern}' in test output"
+            )
 
     def test_at_006_scaffold_initialization_test(self):
         """
         AT-006: Verify `teambot init` creates correctly numbered prompt files.
-        
+
         Expected: 9 prompt files created (sdd.0-7 with sdd.6b); no sdd.4-test-strategy or sdd.6c
         """
         # Create temporary directory
         with tempfile.TemporaryDirectory() as tmpdir:
             test_dir = Path(tmpdir)
-            
+
             # Run teambot init
             result = subprocess.run(
                 ["uv", "run", "teambot", "init"],
                 cwd=test_dir,
                 capture_output=True,
                 text=True,
-                env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")}
+                env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
             )
-            
+
             # Check command succeeded
-            assert result.returncode == 0, \
+            assert result.returncode == 0, (
                 f"teambot init failed:\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
-            
+            )
+
             # Check created prompt files
             sdd_dir = test_dir / ".agent" / "commands" / "sdd"
             assert sdd_dir.exists(), ".agent/commands/sdd directory was not created"
-            
+
             prompt_files = sorted(sdd_dir.glob("sdd.*.prompt.md"))
             prompt_names = [f.name for f in prompt_files]
-            
+
             # Verify count: 9 files
-            assert len(prompt_files) == 9, \
+            assert len(prompt_files) == 9, (
                 f"Expected 9 prompt files, found {len(prompt_files)}: {prompt_names}"
-            
+            )
+
             # Verify sdd.4-determine-test-strategy does NOT exist
-            assert not (sdd_dir / "sdd.4-determine-test-strategy.prompt.md").exists(), \
+            assert not (sdd_dir / "sdd.4-determine-test-strategy.prompt.md").exists(), (
                 "sdd.4-determine-test-strategy.prompt.md should not be created"
-            
+            )
+
             # Verify sdd.6c does NOT exist
-            assert not (sdd_dir / "sdd.6c-acceptance-test.prompt.md").exists(), \
+            assert not (sdd_dir / "sdd.6c-acceptance-test.prompt.md").exists(), (
                 "sdd.6c-acceptance-test.prompt.md should not be created"
-            
+            )
+
             # Verify sdd.4-task-planner DOES exist
-            assert (sdd_dir / "sdd.4-task-planner-for-feature.prompt.md").exists(), \
+            assert (sdd_dir / "sdd.4-task-planner-for-feature.prompt.md").exists(), (
                 "sdd.4-task-planner-for-feature.prompt.md should be created"
-            
+            )
+
             # Verify all expected files exist
             expected_files = [
                 "sdd.0-initialize.prompt.md",
@@ -284,74 +309,89 @@ class TestSDDPromptRenumberingAcceptance:
                 "sdd.6b-implementation-review.prompt.md",
                 "sdd.7-post-implementation-review.prompt.md",
             ]
-            
-            assert prompt_names == expected_files, \
-                f"Created files don't match expected.\nExpected: {expected_files}\nActual: {prompt_names}"
+
+            assert prompt_names == expected_files, (
+                f"Created files don't match expected.\n"
+                f"Expected: {expected_files}\nActual: {prompt_names}"
+            )
 
     def test_at_007_documentation_accuracy_validation(self):
         """
         AT-007: Verify all documentation reflects new numbering scheme.
-        
+
         Expected: No references to old file names; workflow diagrams show 9-step process
         """
         # Check README.md
         readme_path = AGENT_DIR / "README.md"
-        readme_content = readme_path.read_text()
-        
+        readme_content = readme_path.read_text(encoding="utf-8")
+
         # Verify no references to old sdd.4-determine-test-strategy
-        assert "sdd.4-determine-test-strategy" not in readme_content, \
+        assert "sdd.4-determine-test-strategy" not in readme_content, (
             "Found reference to old sdd.4-determine-test-strategy in README.md"
-        
+        )
+
         # Verify sdd.6c is not listed as an actual file (it's okay to mention it doesn't exist)
         # Check the workflow diagram doesn't list sdd.6c as a step
-        lines = readme_content.split('\n')
+        lines = readme_content.split("\n")
         workflow_diagram_started = False
         for line in lines:
-            if '```' in line and not workflow_diagram_started:
+            if "```" in line and not workflow_diagram_started:
                 workflow_diagram_started = True
                 continue
-            if workflow_diagram_started and '```' in line:
+            if workflow_diagram_started and "```" in line:
                 break
-            if workflow_diagram_started and 'sdd.6c-acceptance-test.prompt.md' in line:
-                pytest.fail("Workflow diagram incorrectly lists sdd.6c-acceptance-test.prompt.md as a step")
-        
+            if workflow_diagram_started and "sdd.6c-acceptance-test.prompt.md" in line:
+                pytest.fail(
+                    "Workflow diagram incorrectly lists sdd.6c-acceptance-test.prompt.md as a step"
+                )
+
         # Check AGENTS.md
         agents_md_path = REPO_ROOT / "AGENTS.md"
-        agents_content = agents_md_path.read_text()
-        
+        agents_content = agents_md_path.read_text(encoding="utf-8")
+
         # Count SDD entries in table
         sdd_entries = agents_content.count("| `commands/sdd/sdd.")
         assert sdd_entries == 9, f"Expected 9 SDD entries in AGENTS.md, found {sdd_entries}"
-        
+
         # Verify no references to old files
-        assert "sdd.4-determine-test-strategy" not in agents_content, \
+        assert "sdd.4-determine-test-strategy" not in agents_content, (
             "Found reference to old sdd.4-determine-test-strategy in AGENTS.md"
-        
+        )
+
         # Verify no references to sdd.6c
-        assert "sdd.6c-acceptance-test" not in agents_content, \
+        assert "sdd.6c-acceptance-test" not in agents_content, (
             "Found reference to sdd.6c-acceptance-test in AGENTS.md"
-        
+        )
+
         # Verify correct new file names are present
-        assert "sdd.4-task-planner-for-feature" in agents_content, \
+        assert "sdd.4-task-planner-for-feature" in agents_content, (
             "Missing reference to sdd.4-task-planner-for-feature in AGENTS.md"
-        assert "sdd.5-review-plan" in agents_content, \
+        )
+        assert "sdd.5-review-plan" in agents_content, (
             "Missing reference to sdd.5-review-plan in AGENTS.md"
-        assert "sdd.6-task-implementer-for-feature" in agents_content, \
+        )
+        assert "sdd.6-task-implementer-for-feature" in agents_content, (
             "Missing reference to sdd.6-task-implementer-for-feature in AGENTS.md"
-        assert "sdd.6b-implementation-review" in agents_content, \
+        )
+        assert "sdd.6b-implementation-review" in agents_content, (
             "Missing reference to sdd.6b-implementation-review in AGENTS.md"
-        assert "sdd.7-post-implementation-review" in agents_content, \
+        )
+        assert "sdd.7-post-implementation-review" in agents_content, (
             "Missing reference to sdd.7-post-implementation-review in AGENTS.md"
-        
+        )
+
         # Check scaffold AGENTS.md too
         scaffold_agents_md = REPO_ROOT / "src" / "teambot" / "scaffolds" / "AGENTS.md"
-        scaffold_agents_content = scaffold_agents_md.read_text()
-        
+        scaffold_agents_content = scaffold_agents_md.read_text(encoding="utf-8")
+
         sdd_entries_scaffold = scaffold_agents_content.count("| `commands/sdd/sdd.")
-        assert sdd_entries_scaffold == 9, \
+        assert sdd_entries_scaffold == 9, (
             f"Expected 9 SDD entries in scaffold AGENTS.md, found {sdd_entries_scaffold}"
-        
-        assert "sdd.4-determine-test-strategy" not in scaffold_agents_content, \
+        )
+
+        assert "sdd.4-determine-test-strategy" not in scaffold_agents_content, (
             "Found reference to old sdd.4-determine-test-strategy in scaffold AGENTS.md"
-        assert "sdd.6c-acceptance-test" not in scaffold_agents_content, \
+        )
+        assert "sdd.6c-acceptance-test" not in scaffold_agents_content, (
             "Found reference to sdd.6c-acceptance-test in scaffold AGENTS.md"
+        )
