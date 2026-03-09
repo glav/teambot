@@ -82,7 +82,7 @@ A sequential workflow with quality gates for spec-to-implementation.
 | `commands/sdd/sdd.4-task-planner-for-feature.prompt.md` | Creates implementation plans. |
 | `commands/sdd/sdd.5-review-plan.prompt.md` | Reviews plans before execution. |
 | `commands/sdd/sdd.6-task-implementer-for-feature.prompt.md` | Implements plans with tracking. |
-| `commands/sdd/sdd.6b-implementation-review.prompt.md` | Reviews implementation changes and verifies tests. |
+| `commands/sdd/sdd.6b-implementation-review.prompt.md` | Reviews implementation and tests. |
 | `commands/sdd/sdd.7-post-implementation-review.prompt.md` | Performs post-implementation review. |
 
 #### Instructions (`instructions/`)
