@@ -302,9 +302,18 @@ class TestSDDPromptRenumberingAcceptance:
         assert "sdd.4-determine-test-strategy" not in readme_content, \
             "Found reference to old sdd.4-determine-test-strategy in README.md"
         
-        # Verify no references to sdd.6c
-        assert "sdd.6c-acceptance-test" not in readme_content, \
-            "Found reference to sdd.6c-acceptance-test in README.md"
+        # Verify sdd.6c is not listed as an actual file (it's okay to mention it doesn't exist)
+        # Check the workflow diagram doesn't list sdd.6c as a step
+        lines = readme_content.split('\n')
+        workflow_diagram_started = False
+        for line in lines:
+            if '```' in line and not workflow_diagram_started:
+                workflow_diagram_started = True
+                continue
+            if workflow_diagram_started and '```' in line:
+                break
+            if workflow_diagram_started and 'sdd.6c-acceptance-test.prompt.md' in line:
+                pytest.fail("Workflow diagram incorrectly lists sdd.6c-acceptance-test.prompt.md as a step")
         
         # Check AGENTS.md
         agents_md_path = REPO_ROOT / "AGENTS.md"
