@@ -213,25 +213,35 @@ class TestSDDPromptRenumberingAcceptance:
 
     def test_at_005_test_suite_validation(self):
         """
-        AT-005: Verify all existing tests pass after renumbering changes.
+        AT-005: Verify post-renumbering invariants hold for the prompt configuration.
 
-        This runs the existing test suite to ensure no regressions.
+        Validates directly using the underlying helpers:
+        - All prompt templates in stages.yaml reference existing files
+        - No orphaned (old-numbered) prompts remain
+        - tests/test_prompt_sync.py contains no references to old file names
         """
-        # Run pytest on prompt-related tests
-        result = subprocess.run(
-            ["uv", "run", "pytest", "tests/test_prompt_sync.py", "-v"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+        from teambot.prompt_sync import (
+            PromptValidationError,
+            detect_orphaned_prompts,
+            validate_prompt_files,
         )
 
-        # Check exit code
-        assert result.returncode == 0, (
-            f"Test suite failed:\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        # Verify all prompt templates referenced in stages.yaml exist
+        try:
+            validate_prompt_files(REPO_ROOT)
+        except PromptValidationError as exc:
+            pytest.fail(f"Prompt validation failed after renumbering:\n{exc}")
+
+        # Verify no orphaned prompts (old-numbered files left behind)
+        orphaned = detect_orphaned_prompts(REPO_ROOT)
+        assert orphaned == [], (
+            f"Found orphaned prompt files after renumbering (old files not deleted): {orphaned}"
         )
 
-        # Verify no references to old file names in output
+        # Verify tests/test_prompt_sync.py does not reference old file names
+        test_file_content = (REPO_ROOT / "tests" / "test_prompt_sync.py").read_text(
+            encoding="utf-8"
+        )
         old_patterns = [
             "sdd.4-determine-test-strategy",
             "sdd.5-task-planner",  # Old name
@@ -242,8 +252,8 @@ class TestSDDPromptRenumberingAcceptance:
         ]
 
         for pattern in old_patterns:
-            assert pattern not in result.stdout, (
-                f"Found old file name pattern '{pattern}' in test output"
+            assert pattern not in test_file_content, (
+                f"Found old file name pattern '{pattern}' in tests/test_prompt_sync.py"
             )
 
     def test_at_006_scaffold_initialization_test(self):
