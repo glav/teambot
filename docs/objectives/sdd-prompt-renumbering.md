@@ -10,9 +10,9 @@ acceptance_scenarios:
       - "Verify sdd.4-determine-test-strategy.prompt.md is removed from .agent/commands/sdd/"
       - "Verify sdd.5 through sdd.8 files are renumbered to sdd.4 through sdd.7"
       - "Verify sdd.7b is renumbered to sdd.6b"
-      - "Verify sdd.7c is renumbered to sdd.6c"
+      - "Verify sdd.7c (acceptance-test) is removed — acceptance testing is code-driven via AcceptanceTestExecutor with no prompt file"
       - "Verify all files exist with new names in .agent/commands/sdd/"
-    expected: "All SDD prompt files are sequentially numbered 0-7 (with 6b, 6c) and the test strategy prompt is removed"
+    expected: "All SDD prompt files are sequentially numbered 0-7 (with 6b only, 9 files total) and the test strategy prompt is removed; no sdd.6c prompt file exists because ACCEPTANCE_TEST uses AcceptanceTestExecutor"
   - name: "Scaffold directory reflects prompt renumbering"
     steps:
       - "Verify sdd.4-determine-test-strategy.prompt.md is removed from src/teambot/scaffolds/.agent/commands/sdd/"
@@ -65,7 +65,7 @@ acceptance_scenarios:
 
 **Success Criteria**:
 - [ ] `sdd.4-determine-test-strategy.prompt.md` removed from both `.agent/commands/sdd/` and `src/teambot/scaffolds/.agent/commands/sdd/`
-- [ ] All subsequent SDD prompts renumbered sequentially (5→4, 6→5, 7→6, 7b→6b, 7c→6c, 8→7)
+- [ ] All subsequent SDD prompts renumbered sequentially (5→4, 6→5, 7→6, 7b→6b, 8→7); `sdd.7c-acceptance-test.prompt.md` deleted (ACCEPTANCE_TEST stage is code-driven — no prompt file)
 - [ ] `stages.yaml` updated with correct `prompt_template` paths for each stage
 - [ ] `.agent/commands/sdd/README.md` updated with new workflow diagram and step numbers
 - [ ] `AGENTS.md` updated with correct file names in the SDD table
@@ -119,8 +119,9 @@ After renumbering, the structure should be:
 - `sdd.5-review-plan.prompt.md` → PLAN_REVIEW stage (was sdd.6)
 - `sdd.6-task-implementer-for-feature.prompt.md` → IMPLEMENTATION stage (was sdd.7)
 - `sdd.6b-implementation-review.prompt.md` → IMPLEMENTATION_REVIEW stage (was sdd.7b)
-- `sdd.6c-acceptance-test.prompt.md` → ACCEPTANCE_TEST stage (was sdd.7c) - **Note: Still not used by orchestrator**
 - `sdd.7-post-implementation-review.prompt.md` → POST_REVIEW stage (was sdd.8)
+
+**Note**: There is no `sdd.6c-acceptance-test.prompt.md`. The ACCEPTANCE_TEST stage is handled entirely by `AcceptanceTestExecutor` in code, which builds its own prompt from the feature spec scenarios. The old `sdd.7c-acceptance-test.prompt.md` file is deleted (not renamed) as part of this renumbering.
 
 ### Affected Files and Locations
 
@@ -130,7 +131,7 @@ After renumbering, the structure should be:
 - `.agent/commands/sdd/sdd.6-review-plan.prompt.md` → RENAME to sdd.5-review-plan.prompt.md
 - `.agent/commands/sdd/sdd.7-task-implementer-for-feature.prompt.md` → RENAME to sdd.6-task-implementer-for-feature.prompt.md
 - `.agent/commands/sdd/sdd.7b-implementation-review.prompt.md` → RENAME to sdd.6b-implementation-review.prompt.md
-- `.agent/commands/sdd/sdd.7c-acceptance-test.prompt.md` → RENAME to sdd.6c-acceptance-test.prompt.md
+- `.agent/commands/sdd/sdd.7c-acceptance-test.prompt.md` → DELETE (ACCEPTANCE_TEST is code-driven, no prompt file needed)
 - `.agent/commands/sdd/sdd.8-post-implementation-review.prompt.md` → RENAME to sdd.7-post-implementation-review.prompt.md
 
 **Scaffold files (same changes)**:
@@ -160,7 +161,7 @@ Each SDD prompt file contains internal references to other steps. These need upd
 
 ### Notes
 
-- The `sdd.7c-acceptance-test.prompt.md` file exists but is **not actually used** by the orchestrator. The `ACCEPTANCE_TEST` stage uses `AcceptanceTestExecutor` which builds its own prompt from feature spec scenarios. However, we should still rename it for consistency and potential future use.
+- The `sdd.7c-acceptance-test.prompt.md` file exists but is **not actually used** by the orchestrator. The `ACCEPTANCE_TEST` stage uses `AcceptanceTestExecutor` which builds its own prompt from feature spec scenarios. Because acceptance testing is entirely code-driven, **this file should be deleted rather than renamed** — there is no `sdd.6c` prompt in the final structure.
 - The `.agent/commands/sdd/README.md` file notes on line 7: "There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage." This is correct and should be preserved.
 - The stages.yaml file does not reference `sdd.4-determine-test-strategy.prompt.md` in any `prompt_template` field, confirming it's truly obsolete.
-- The AGENTS.md table on line 161 says "9 sequential steps" but there are actually 11 prompt files. After renumbering, there will be **10 prompt files** (0-7, plus 6b and 6c), so the description should state '10 sequential prompt files' rather than '9 sequential steps'.
+- The AGENTS.md table on line 161 says "9 sequential steps" but there are actually 11 prompt files. After renumbering, there will be **9 prompt files** (0–7, plus 6b only), so the description should state '9 sequential prompt files' rather than '9 sequential steps'.
