@@ -6,7 +6,7 @@ This directory contains the enhanced Spec-Driven Development workflow with integ
 
 The SDD workflow consists of 9 prompt files (steps 0–7, plus 6b) spanning 11 stages with built-in quality gates. The workflow goes directly from SETUP → SPEC (problem definition is captured in the objective template frontmatter and the SPEC stage's Q&A process). There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage. ACCEPTANCE_TEST stage is code-driven via AcceptanceTestExecutor (no prompt file).
 
-**Stages (10):** SETUP, SPEC, SPEC_REVIEW, RESEARCH, PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, ACCEPTANCE_TEST, POST_REVIEW, COMPLETE
+**Stages (11):** SETUP, SPEC, SPEC_REVIEW, RESEARCH, PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, ACCEPTANCE_TEST, POST_REVIEW, COMPLETE
 
 ```
 0. sdd.0-initialize.prompt.md                → Initialize environment
