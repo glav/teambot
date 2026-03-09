@@ -12,9 +12,9 @@ Tests validate the REAL implementation against acceptance criteria:
 NOTE: These tests call REAL implementation code, not mocks.
 """
 
+import argparse
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -256,74 +256,67 @@ class TestSDDPromptRenumberingAcceptance:
                 f"Found old file name pattern '{pattern}' in tests/test_prompt_sync.py"
             )
 
-    def test_at_006_scaffold_initialization_test(self):
+    def test_at_006_scaffold_initialization_test(self, tmp_path, monkeypatch):
         """
         AT-006: Verify `teambot init` creates correctly numbered prompt files.
 
         Expected: 9 prompt files created (sdd.0-7 with sdd.6b); no sdd.4-test-strategy or sdd.6c
         """
-        # Create temporary directory
-        with tempfile.TemporaryDirectory() as tmpdir:
-            test_dir = Path(tmpdir)
+        from teambot.cli import ConsoleDisplay, cmd_init
 
-            # Run teambot init
-            result = subprocess.run(
-                ["uv", "run", "teambot", "init"],
-                cwd=test_dir,
-                capture_output=True,
-                text=True,
-                env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
-            )
+        monkeypatch.chdir(tmp_path)
 
-            # Check command succeeded
-            assert result.returncode == 0, (
-                f"teambot init failed:\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
-            )
+        # Run teambot init directly (faster and hermetic — no subprocess/uv dependency)
+        args = argparse.Namespace(force=False)
+        return_code = cmd_init(args, ConsoleDisplay())
 
-            # Check created prompt files
-            sdd_dir = test_dir / ".agent" / "commands" / "sdd"
-            assert sdd_dir.exists(), ".agent/commands/sdd directory was not created"
+        # Check command succeeded
+        assert return_code == 0, "teambot init returned non-zero exit code"
 
-            prompt_files = sorted(sdd_dir.glob("sdd.*.prompt.md"))
-            prompt_names = [f.name for f in prompt_files]
+        # Check created prompt files
+        sdd_dir = tmp_path / ".agent" / "commands" / "sdd"
+        assert sdd_dir.exists(), ".agent/commands/sdd directory was not created"
 
-            # Verify count: 9 files
-            assert len(prompt_files) == 9, (
-                f"Expected 9 prompt files, found {len(prompt_files)}: {prompt_names}"
-            )
+        prompt_files = sorted(sdd_dir.glob("sdd.*.prompt.md"))
+        prompt_names = [f.name for f in prompt_files]
 
-            # Verify sdd.4-determine-test-strategy does NOT exist
-            assert not (sdd_dir / "sdd.4-determine-test-strategy.prompt.md").exists(), (
-                "sdd.4-determine-test-strategy.prompt.md should not be created"
-            )
+        # Verify count: 9 files
+        assert len(prompt_files) == 9, (
+            f"Expected 9 prompt files, found {len(prompt_files)}: {prompt_names}"
+        )
 
-            # Verify sdd.6c does NOT exist
-            assert not (sdd_dir / "sdd.6c-acceptance-test.prompt.md").exists(), (
-                "sdd.6c-acceptance-test.prompt.md should not be created"
-            )
+        # Verify sdd.4-determine-test-strategy does NOT exist
+        assert not (sdd_dir / "sdd.4-determine-test-strategy.prompt.md").exists(), (
+            "sdd.4-determine-test-strategy.prompt.md should not be created"
+        )
 
-            # Verify sdd.4-task-planner DOES exist
-            assert (sdd_dir / "sdd.4-task-planner-for-feature.prompt.md").exists(), (
-                "sdd.4-task-planner-for-feature.prompt.md should be created"
-            )
+        # Verify sdd.6c does NOT exist
+        assert not (sdd_dir / "sdd.6c-acceptance-test.prompt.md").exists(), (
+            "sdd.6c-acceptance-test.prompt.md should not be created"
+        )
 
-            # Verify all expected files exist
-            expected_files = [
-                "sdd.0-initialize.prompt.md",
-                "sdd.1-create-feature-spec.prompt.md",
-                "sdd.2-review-spec.prompt.md",
-                "sdd.3-research-feature.prompt.md",
-                "sdd.4-task-planner-for-feature.prompt.md",
-                "sdd.5-review-plan.prompt.md",
-                "sdd.6-task-implementer-for-feature.prompt.md",
-                "sdd.6b-implementation-review.prompt.md",
-                "sdd.7-post-implementation-review.prompt.md",
-            ]
+        # Verify sdd.4-task-planner DOES exist
+        assert (sdd_dir / "sdd.4-task-planner-for-feature.prompt.md").exists(), (
+            "sdd.4-task-planner-for-feature.prompt.md should be created"
+        )
 
-            assert prompt_names == expected_files, (
-                f"Created files don't match expected.\n"
-                f"Expected: {expected_files}\nActual: {prompt_names}"
-            )
+        # Verify all expected files exist
+        expected_files = [
+            "sdd.0-initialize.prompt.md",
+            "sdd.1-create-feature-spec.prompt.md",
+            "sdd.2-review-spec.prompt.md",
+            "sdd.3-research-feature.prompt.md",
+            "sdd.4-task-planner-for-feature.prompt.md",
+            "sdd.5-review-plan.prompt.md",
+            "sdd.6-task-implementer-for-feature.prompt.md",
+            "sdd.6b-implementation-review.prompt.md",
+            "sdd.7-post-implementation-review.prompt.md",
+        ]
+
+        assert prompt_names == expected_files, (
+            f"Created files don't match expected.\n"
+            f"Expected: {expected_files}\nActual: {prompt_names}"
+        )
 
     def test_at_007_documentation_accuracy_validation(self):
         """
