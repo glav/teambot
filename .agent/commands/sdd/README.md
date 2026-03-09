@@ -25,8 +25,6 @@ The SDD workflow consists of 10 prompt files (steps 0–7, plus 6b and 6c) spann
    ↓
 6b. sdd.6b-implementation-review.prompt.md   → Review code + verify tests
    ↓
-6c. sdd.6c-acceptance-test.prompt.md          → Execute acceptance tests
-   ↓
 7. sdd.7-post-implementation-review.prompt.md → Final validation
 ```
 
@@ -278,18 +276,14 @@ The SDD workflow consists of 10 prompt files (steps 0–7, plus 6b and 6c) spann
 - Review report: `.agent-tracking/implementation-reviews/{{date}}-{{name}}-impl-review.md`
 - Decision: APPROVED | NEEDS_REVISION | BLOCKED
 
-**If Approved**: Proceed to `sdd.6c-acceptance-test.prompt.md`  
+**If Approved**: Proceed to ACCEPTANCE_TEST stage (code-driven, no prompt) or `sdd.7-post-implementation-review.prompt.md` if acceptance testing is complete  
 **If Revisions Needed**: Return to `sdd.6-task-implementer-for-feature.prompt.md` with feedback
 
 ---
 
-### Step 6c: Acceptance Test
-**File**: `sdd.6c-acceptance-test.prompt.md`  
-**Role**: Acceptance Test Specialist
+### Step 6c: Acceptance Test (Code-Driven Stage)
 
-**Purpose**: Execute acceptance test scenarios derived from the feature specification to validate that the implementation meets the stated requirements and user expectations.
-
-**Key Features**:
+**Note**: The ACCEPTANCE_TEST stage is executed directly by the orchestrator using `AcceptanceTestExecutor`. There is no `sdd.6c-acceptance-test.prompt.md` file. This stage:
 - Reads acceptance criteria and scenarios from the feature spec
 - Executes each scenario against the implemented code
 - Reports PASS/FAIL per scenario with evidence
