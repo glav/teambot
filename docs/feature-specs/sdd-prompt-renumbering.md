@@ -25,7 +25,7 @@ Streamline the SDD workflow by removing the redundant test strategy step and ren
 ### Goals
 | Goal ID | Statement | Type | Baseline | Target | Timeframe | Priority |
 |---------|-----------|------|----------|--------|-----------|----------|
-| G-001 | Eliminate obsolete test strategy prompt | Efficiency | 11 SDD prompts (0-8, 7b, 7c) with step 4 unused | 10 SDD prompts (0-7, 6b, 6c) with sequential numbering | Immediate | P0 |
+| G-001 | Eliminate obsolete test strategy prompt | Efficiency | 11 SDD prompts (0-8, 7b, 7c) with step 4 unused | 9 SDD prompts (0-7, 6b) with sequential numbering | Immediate | P0 |
 | G-002 | Update all references to use new numbering | Correctness | Multiple docs/code files reference old numbering | All references updated and validated | Immediate | P0 |
 | G-003 | Ensure seamless scaffold generation | Quality | `teambot init` creates correctly numbered prompts | All scaffold operations use new structure | Immediate | P0 |
 | G-004 | Maintain backward compatibility for in-progress workflows | Stability | In-progress workflows use existing prompt paths | In-progress workflows unaffected until restart | Immediate | P1 |
@@ -33,7 +33,7 @@ Streamline the SDD workflow by removing the redundant test strategy step and ren
 ### Objectives (Optional)
 | Objective | Key Result | Priority | Owner |
 |-----------|------------|----------|-------|
-| Simplify SDD workflow | Reduce prompt count from 11 to 10 with clear sequential numbering | P0 | Builder |
+| Simplify SDD workflow | Reduce prompt count from 11 to 9 with clear sequential numbering | P0 | Builder |
 | Improve documentation accuracy | 100% of documentation reflects new numbering scheme | P0 | Builder |
 | Validate workflow integrity | All tests pass and scaffold operations work correctly | P0 | Reviewer |
 
@@ -49,8 +49,9 @@ The SDD workflow contains 11 prompt files:
 - `sdd.6-review-plan.prompt.md`
 - `sdd.7-task-implementer-for-feature.prompt.md`
 - `sdd.7b-implementation-review.prompt.md`
-- `sdd.7c-acceptance-test.prompt.md` (not affected by renumbering)
 - `sdd.8-post-implementation-review.prompt.md`
+
+Note: The ACCEPTANCE_TEST stage (`sdd.7c-acceptance-test.prompt.md` in older documentation) is **code-driven** via `AcceptanceTestExecutor` and has never had an on-disk prompt file in the current codebase.
 
 Step 4 (test strategy determination) is no longer executed in the workflow because:
 1. Testing approach preference is captured during specification creation (step 1)
@@ -59,12 +60,12 @@ Step 4 (test strategy determination) is no longer executed in the workflow becau
 
 This creates confusion because:
 - The numbering is non-sequential (jumps from 4 to 5)
-- Documentation mentions 11 steps when only 10 are active
+- Documentation mentions 11 steps when only 9 have active prompt files (ACCEPTANCE_TEST is code-driven)
 - Users may try to invoke an obsolete prompt
 - Maintenance burden of keeping unused file in sync with workflow changes
 
 ### Problem Statement
-**The SDD workflow contains an obsolete test strategy determination step (step 4) that is no longer executed, creating workflow confusion and maintenance overhead. Subsequent prompts are numbered non-sequentially (5, 6, 7, 7b, 7c, 8), making the workflow harder to understand and maintain.**
+**The SDD workflow contains an obsolete test strategy determination step (step 4) that is no longer executed, creating workflow confusion and maintenance overhead. Subsequent prompts are numbered non-sequentially (5, 6, 7, 7b, 8), making the workflow harder to understand and maintain.**
 
 ### Root Causes
 * Test strategy determination was initially designed as a separate decision point but was later integrated into other stages for better workflow cohesion
@@ -76,7 +77,7 @@ This creates confusion because:
 * **User Confusion**: Users see references to 11 steps when only 10 are active, creating cognitive overhead
 * **Documentation Drift**: Maintaining documentation for unused workflow steps increases error risk
 * **Maintenance Burden**: Changes to workflow require updating unused file to maintain consistency
-* **Workflow Clarity**: Non-sequential numbering (4→5→6→7→7b→7c→8) obscures the actual workflow progression
+* **Workflow Clarity**: Non-sequential numbering (4→5→6→7→7b→8) obscures the actual workflow progression
 * **Developer Onboarding**: New contributors struggle to understand which prompts are actually used
 
 ## 3. Users & Personas
@@ -91,10 +92,10 @@ This creates confusion because:
 **End User Journey**:
 1. User runs `teambot init` to scaffold new project
 2. Reads `.agent/commands/sdd/README.md` to understand workflow
-3. Sees workflow diagram showing steps 0-8 (with 7b, 7c)
+3. Sees workflow diagram showing steps 0-8 (with 7b)
 4. Begins executing prompts sequentially
 5. Current state: Confused why step 4 is missing/skipped
-6. Future state: Clear sequential progression through 0-7 (with 6b, 6c)
+6. Future state: Clear sequential progression through 0-7 (with 6b)
 
 **Developer Maintenance Journey**:
 1. Developer needs to update workflow logic
@@ -111,9 +112,8 @@ This creates confusion because:
   - `sdd.6-review-plan.prompt.md` → `sdd.5-review-plan.prompt.md`
   - `sdd.7-task-implementer-for-feature.prompt.md` → `sdd.6-task-implementer-for-feature.prompt.md`
   - `sdd.7b-implementation-review.prompt.md` → `sdd.6b-implementation-review.prompt.md`
-  - `sdd.7c-acceptance-test.prompt.md` → `sdd.6c-acceptance-test.prompt.md`
   - `sdd.8-post-implementation-review.prompt.md` → `sdd.7-post-implementation-review.prompt.md`
-* Update `stages.yaml` with correct `prompt_template` paths for affected stages (PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, ACCEPTANCE_TEST, POST_REVIEW)
+* Update `stages.yaml` with correct `prompt_template` paths for affected stages (PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, POST_REVIEW)
 * Update `.agent/commands/sdd/README.md` workflow diagram and step descriptions
 * Update `AGENTS.md` SDD command table with new file names
 * Update scaffold files in `src/teambot/scaffolds/.agent/commands/sdd/` to match repository structure
@@ -124,7 +124,7 @@ This creates confusion because:
 * Changes to workflow stage logic (RESEARCH stage still runs, only the unused TEST_STRATEGY determination is removed)
 * Changes to prompt file content (content remains identical, only file names change)
 * Migration of in-progress workflows (they will continue using their existing prompt paths until restarted)
-* Changes to acceptance test execution (7c/6c) logic (only file name changes)
+* Changes to acceptance test execution logic (ACCEPTANCE_TEST stage is code-driven via `AcceptanceTestExecutor`; there is no on-disk prompt file for this stage)
 * Modifications to objective template structure
 
 ### Assumptions
@@ -174,10 +174,10 @@ UX Status: Documentation updates required
 | FR-003 | Renumber plan review prompt | Rename `sdd.6-review-plan.prompt.md` to `sdd.5-review-plan.prompt.md` in both locations | G-001 | Developers, End Users | P0 | File exists with new name; content unchanged | Update `stages.yaml` PLAN_REVIEW stage prompt_template |
 | FR-004 | Renumber implementation prompt | Rename `sdd.7-task-implementer-for-feature.prompt.md` to `sdd.6-task-implementer-for-feature.prompt.md` in both locations | G-001 | Developers, End Users | P0 | File exists with new name; content unchanged | Update `stages.yaml` IMPLEMENTATION stage prompt_template |
 | FR-005 | Renumber implementation review prompt | Rename `sdd.7b-implementation-review.prompt.md` to `sdd.6b-implementation-review.prompt.md` in both locations | G-001 | Developers, End Users | P0 | File exists with new name; content unchanged | Update `stages.yaml` IMPLEMENTATION_REVIEW stage prompt_template |
-| FR-006 | Renumber acceptance test prompt | Rename `sdd.7c-acceptance-test.prompt.md` to `sdd.6c-acceptance-test.prompt.md` in both locations | G-001 | Developers, End Users | P0 | File exists with new name; content unchanged | Update `stages.yaml` ACCEPTANCE_TEST stage prompt_template (if present) |
+| FR-006 | Acknowledge ACCEPTANCE_TEST has no prompt file | The ACCEPTANCE_TEST stage is code-driven via `AcceptanceTestExecutor`; there is no `sdd.7c-acceptance-test.prompt.md` or `sdd.6c-acceptance-test.prompt.md` file on disk. No file rename or `stages.yaml` update is required for this stage. | G-001 | Developers | P0 | No `sdd.*c-acceptance-test.prompt.md` file exists; `stages.yaml` ACCEPTANCE_TEST stage has no `prompt_template` | Verify `AcceptanceTestExecutor` handles stage execution |
 | FR-007 | Renumber post-review prompt | Rename `sdd.8-post-implementation-review.prompt.md` to `sdd.7-post-implementation-review.prompt.md` in both locations | G-001 | Developers, End Users | P0 | File exists with new name; content unchanged | Update `stages.yaml` POST_REVIEW stage prompt_template |
-| FR-008 | Update stages.yaml references | Update all `prompt_template` fields in `stages.yaml` to reference new file names | G-002 | Developers | P0 | All prompt_template paths point to new file names; workflow executes correctly | Affects PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, POST_REVIEW stages |
-| FR-009 | Update README workflow diagram | Update `.agent/commands/sdd/README.md` workflow diagram to show new numbering (0, 1, 2, 3, 4, 5, 6, 6b, 6c, 7) | G-002 | End Users, Documentation Writers | P0 | README shows 10-step workflow with sequential numbering; no references to step 4 test strategy | Update step descriptions and quick reference tables |
+| FR-008 | Update stages.yaml references | Update all `prompt_template` fields in `stages.yaml` to reference new file names | G-002 | Developers | P0 | All prompt_template paths point to new file names; workflow executes correctly | Affects PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, POST_REVIEW stages; ACCEPTANCE_TEST has no prompt_template |
+| FR-009 | Update README workflow diagram | Update `.agent/commands/sdd/README.md` workflow diagram to show new numbering (0, 1, 2, 3, 4, 5, 6, 6b, 7) | G-002 | End Users, Documentation Writers | P0 | README shows 9-step workflow with sequential numbering; no references to step 4 test strategy or step 6c | Update step descriptions and quick reference tables |
 | FR-010 | Update AGENTS.md SDD table | Update `AGENTS.md` SDD command table with new file names | G-002 | Developers, New Contributors | P0 | AGENTS.md table shows correct new file paths | Located in repository root |
 | FR-011 | Update test fixtures | Update test files that reference old prompt file names to use new names | G-002 | Developers | P0 | All tests pass with new file names | Search for hardcoded references to old file names |
 | FR-012 | Validate scaffold operations | Ensure `teambot init` command creates correctly numbered prompt files in user projects | G-003 | End Users | P0 | Running `teambot init` creates prompt files with new numbering; no step 4 test strategy file | Test in clean environment |
@@ -187,7 +187,7 @@ UX Status: Documentation updates required
 SDD Prompt Renumbering
 ├── File Operations
 │   ├── Delete obsolete test strategy prompt (FR-001)
-│   └── Rename subsequent prompts (FR-002 through FR-007)
+│   └── Rename subsequent prompts (FR-002 through FR-005, FR-007; FR-006 documents code-driven ACCEPTANCE_TEST)
 ├── Configuration Updates
 │   └── Update stages.yaml prompt_template paths (FR-008)
 ├── Documentation Updates
@@ -213,7 +213,7 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 
 ## 8. Data & Analytics (Conditional)
 ### Inputs
-* Current SDD prompt files (0-8, including 7b, 7c, with 4 obsolete)
+* Current SDD prompt files (0-8, including 7b, with 4 obsolete; ACCEPTANCE_TEST stage has no on-disk prompt file—it is code-driven via `AcceptanceTestExecutor`)
 * `stages.yaml` configuration with prompt_template mappings
 * Documentation files (README.md, AGENTS.md)
 * Test fixtures referencing old file names
@@ -221,7 +221,7 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 
 ### Outputs / Events
 * Deleted file: `sdd.4-determine-test-strategy.prompt.md` (both locations)
-* Renamed files: 6 prompt files with new sequential numbering
+* Renamed files: 5 prompt files with new sequential numbering
 * Updated files: `stages.yaml`, `README.md`, `AGENTS.md`, test fixtures
 * Git commit showing all file operations
 
@@ -339,7 +339,7 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 | Prompt Template | Markdown file containing instructions for AI agents at specific workflow stages |
 | Scaffold | Template files copied during `teambot init` to initialize new projects |
 | Stage | Discrete phase in the TeamBot workflow (e.g., SPEC, RESEARCH, PLAN) |
-| Acceptance Test | End-to-end test validating complete user flows (step 7c/6c) |
+| Acceptance Test | ACCEPTANCE_TEST workflow stage validated via `AcceptanceTestExecutor` (code-driven); there is no on-disk prompt file for this stage |
 
 ### Additional Notes
 **Implementation Strategy**:
@@ -371,10 +371,10 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 4. Verify `sdd.5-review-plan.prompt.md` exists (renamed from step 6)
 5. Verify `sdd.6-task-implementer-for-feature.prompt.md` exists (renamed from step 7)
 6. Verify `sdd.6b-implementation-review.prompt.md` exists (renamed from step 7b)
-7. Verify `sdd.6c-acceptance-test.prompt.md` exists (renamed from step 7c)
-8. Verify `sdd.7-post-implementation-review.prompt.md` exists (renamed from step 8)
-**Expected Result**: File listing shows 10 prompt files (0-7, with 6b and 6c) with no step 4
-**Verification**: `ls .agent/commands/sdd/sdd.*.prompt.md | wc -l` returns 10; no file matches `sdd.4-determine-test-strategy`
+7. Verify `sdd.7-post-implementation-review.prompt.md` exists (renamed from step 8)
+8. Verify no `sdd.6c-acceptance-test.prompt.md` exists (ACCEPTANCE_TEST stage is code-driven, not prompt-based)
+**Expected Result**: File listing shows 9 prompt files (0-7, with 6b) with no step 4 and no step 6c
+**Verification**: `ls .agent/commands/sdd/sdd.*.prompt.md | wc -l` returns 9; no file matches `sdd.4-determine-test-strategy` or `sdd.*c-acceptance-test`
 
 ### AT-002: Scaffold File Renumbering
 **Description**: Verify scaffold directory mirrors repository structure with new numbering
@@ -384,7 +384,7 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 2. Verify structure matches repository `.agent/commands/sdd/` directory
 3. Verify `sdd.4-determine-test-strategy.prompt.md` does not exist in scaffold
 4. Verify all other renamed files exist with new numbering
-**Expected Result**: Scaffold directory has identical structure to repository (10 files, no step 4)
+**Expected Result**: Scaffold directory has identical structure to repository (9 files, no step 4, no step 6c)
 **Verification**: `diff <(ls .agent/commands/sdd/) <(ls src/teambot/scaffolds/.agent/commands/sdd/)` shows no differences
 
 ### AT-003: stages.yaml Configuration Validation
@@ -398,9 +398,10 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 5. Check IMPLEMENTATION stage references `sdd.6-task-implementer-for-feature.prompt.md`
 6. Check IMPLEMENTATION_REVIEW stage references `sdd.6b-implementation-review.prompt.md`
 7. Check POST_REVIEW stage references `sdd.7-post-implementation-review.prompt.md`
-8. Verify no stage references `sdd.4-determine-test-strategy.prompt.md`
-**Expected Result**: All prompt_template paths point to existing files with new numbering; no references to old step 4
-**Verification**: `grep 'sdd\.[0-9]' stages.yaml` shows only new numbering; `grep 'sdd.4-determine-test-strategy' stages.yaml` returns no matches
+8. Verify ACCEPTANCE_TEST stage has no `prompt_template` entry (it is code-driven via `AcceptanceTestExecutor`)
+9. Verify no stage references `sdd.4-determine-test-strategy.prompt.md`
+**Expected Result**: All prompt_template paths point to existing files with new numbering; ACCEPTANCE_TEST stage has no prompt_template; no references to old step 4
+**Verification**: `grep 'sdd\.[0-9]' stages.yaml` shows only new numbering; `grep 'sdd.4-determine-test-strategy\|sdd.*c-acceptance-test' stages.yaml` returns no matches
 
 ### AT-004: Full Workflow Execution
 **Description**: Run complete SDD workflow from SETUP to COMPLETE to verify orchestration works
@@ -438,19 +439,19 @@ Categories: Performance, Reliability, Scalability, Security, Privacy, Accessibil
 5. Verify `sdd.4-task-planner-for-feature.prompt.md` DOES exist
 6. Verify all other renamed files exist with new numbering
 7. Count total prompt files created
-**Expected Result**: 10 prompt files created (0-7, with 6b and 6c); no step 4 test strategy file
-**Verification**: `ls .agent/commands/sdd/sdd.*.prompt.md | wc -l` returns 10; specific check for absence of old step 4
+**Expected Result**: 9 prompt files created (0-7, with 6b); no step 4 test strategy file; no step 6c acceptance test file (ACCEPTANCE_TEST is code-driven)
+**Verification**: `ls .agent/commands/sdd/sdd.*.prompt.md | wc -l` returns 9; specific check for absence of old step 4 and any `*c-acceptance-test` file
 
 ### AT-007: Documentation Accuracy Validation
 **Description**: Verify all documentation reflects new numbering scheme
 **Preconditions**: README.md, AGENTS.md, and other docs updated
 **Steps**:
 1. Read `.agent/commands/sdd/README.md` workflow diagram
-2. Verify diagram shows steps 0-7 (with 6b, 6c) with no reference to step 4 test strategy
+2. Verify diagram shows steps 0-7 (with 6b) with no reference to step 4 test strategy and no step 6c
 3. Read `AGENTS.md` SDD workflow table
 4. Verify all file paths use new numbering
 5. Search all markdown files for old file name patterns: `grep -r "sdd.4-determine-test-strategy\|sdd.5-task-planner\|sdd.6-review-plan\|sdd.7-task-implementer\|sdd.7b-implementation\|sdd.8-post" docs/ .agent/`
-**Expected Result**: No references to old file names in documentation; workflow diagrams show 10-step process
+**Expected Result**: No references to old file names in documentation; workflow diagrams show 9-step process; ACCEPTANCE_TEST noted as code-driven with no prompt file
 **Verification**: Grep search returns zero matches; manual review of README confirms new numbering
 
 Generated 2026-03-08T23:01:11Z by BA Agent (mode: interactive)
