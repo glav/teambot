@@ -14,7 +14,7 @@ import yaml
 @pytest.fixture
 def prompt_path() -> Path:
     """Path to the implementation review prompt file."""
-    return Path(".agent/commands/sdd/sdd.7b-implementation-review.prompt.md")
+    return Path(".agent/commands/sdd/sdd.6b-implementation-review.prompt.md")
 
 
 @pytest.fixture
@@ -190,7 +190,7 @@ class TestImplementationReviewAcceptance:
         )
 
         impl_review = stages_config["stages"]["IMPLEMENTATION_REVIEW"]
-        expected_path = ".agent/commands/sdd/sdd.7b-implementation-review.prompt.md"
+        expected_path = ".agent/commands/sdd/sdd.6b-implementation-review.prompt.md"
 
         assert impl_review.get("prompt_template") is not None, (
             "IMPLEMENTATION_REVIEW.prompt_template should not be null"

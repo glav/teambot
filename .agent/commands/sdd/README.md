@@ -4,7 +4,7 @@ This directory contains the enhanced Spec-Driven Development workflow with integ
 
 ## 📋 Workflow Overview
 
-The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spanning 12 stages with built-in quality gates. The workflow goes directly from SETUP → SPEC (problem definition is captured in the objective template frontmatter and the SPEC stage's Q&A process). There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage.
+The SDD workflow consists of 9 prompt files (steps 0–7, plus 6b) spanning 11 stages with built-in quality gates. The workflow goes directly from SETUP → SPEC (problem definition is captured in the objective template frontmatter and the SPEC stage's Q&A process). There is no separate TEST stage — test verification is merged into the IMPLEMENTATION_REVIEW stage. ACCEPTANCE_TEST stage is code-driven via AcceptanceTestExecutor (no prompt file).
 
 **Stages (11):** SETUP, SPEC, SPEC_REVIEW, RESEARCH, PLAN, PLAN_REVIEW, IMPLEMENTATION, IMPLEMENTATION_REVIEW, ACCEPTANCE_TEST, POST_REVIEW, COMPLETE
 
@@ -17,19 +17,15 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
    ↓
 3. sdd.3-research-feature.prompt.md          → Research implementation approach
    ↓
-4. sdd.4-determine-test-strategy.prompt.md   → Determine testing approach
+4. sdd.4-task-planner-for-feature.prompt.md  → Create implementation plan
    ↓
-5. sdd.5-task-planner-for-feature.prompt.md  → Create implementation plan
+5. sdd.5-review-plan.prompt.md               → Review plan for readiness
    ↓
-6. sdd.6-review-plan.prompt.md               → Review plan for readiness
+6. sdd.6-task-implementer-for-feature.prompt.md → Execute implementation
    ↓
-7. sdd.7-task-implementer-for-feature.prompt.md → Execute implementation
+6b. sdd.6b-implementation-review.prompt.md   → Review code + verify tests
    ↓
-7b. sdd.7b-implementation-review.prompt.md   → Review code + verify tests
-   ↓
-7c. sdd.7c-acceptance-test.prompt.md          → Execute acceptance tests
-   ↓
-8. sdd.8-post-implementation-review.prompt.md → Final validation
+7. sdd.7-post-implementation-review.prompt.md → Final validation
 ```
 
 ## 🎯 Key Features
@@ -169,42 +165,12 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
 **Outputs**:
 - Research doc: `.agent-tracking/research/{{date}}-{{name}}-research.md`
 
-**Next Step**: Run `sdd.4-determine-test-strategy.prompt.md`
+**Next Step**: Run `sdd.4-task-planner-for-feature.prompt.md`
 
 ---
 
-### Step 4: Determine Test Strategy
-**File**: `sdd.4-determine-test-strategy.prompt.md`  
-**Role**: Test Architect
-
-**Purpose**: Analyze feature and recommend optimal testing approach per component.
-
-**Decision Framework**:
-1. **Analyze Feature Characteristics**
-   - Complexity (algorithm-heavy vs simple)
-   - Risk profile (critical vs low-impact)
-   - Requirements clarity (well-defined vs exploratory)
-   
-2. **Recommend Approach**
-   - **TDD**: High complexity, clear requirements, critical logic
-   - **Code-First**: Simple features, exploratory work, low risk
-   - **Hybrid**: Mix of both based on component
-
-3. **Specify Coverage & Patterns**
-   - Coverage targets per component
-   - Test framework from research
-   - Example test patterns
-   - Critical scenarios to test
-
-**Outputs**:
-- Test strategy: `.agent-tracking/test-strategies/{{date}}-{{name}}-test-strategy.md`
-
-**Next Step**: Run `sdd.5-task-planner-for-feature.prompt.md`
-
----
-
-### Step 5: Create Task Plan
-**File**: `sdd.5-task-planner-for-feature.prompt.md`  
+### Step 4: Create Task Plan
+**File**: `sdd.4-task-planner-for-feature.prompt.md`  
 **Role**: Planning Specialist
 
 **Purpose**: Create actionable implementation plan with integrated test phases.
@@ -226,12 +192,12 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
 - Plan: `.agent-tracking/plans/{{date}}-{{name}}-plan.instructions.md`
 - Details: `.agent-tracking/details/{{date}}-{{name}}-details.md`
 
-**Next Step**: Run `sdd.6-review-plan.prompt.md`
+**Next Step**: Run `sdd.5-review-plan.prompt.md`
 
 ---
 
-### Step 6: Review Implementation Plan
-**File**: `sdd.6-review-plan.prompt.md`  
+### Step 5: Review Implementation Plan
+**File**: `sdd.5-review-plan.prompt.md`  
 **Role**: Implementation Readiness Specialist
 
 **Purpose**: Validate plan quality and implementation readiness.
@@ -255,13 +221,13 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
 - Review report: `.agent-tracking/plan-reviews/{{date}}-{{name}}-plan-review.md`
 - Decision: APPROVED | NEEDS_REVISION | BLOCKED
 
-**If Approved**: Proceed to `sdd.7-task-implementer-for-feature.prompt.md`  
-**If Revisions Needed**: Return to `sdd.5-task-planner-for-feature.prompt.md` with feedback
+**If Approved**: Proceed to `sdd.6-task-implementer-for-feature.prompt.md`  
+**If Revisions Needed**: Return to `sdd.4-task-planner-for-feature.prompt.md` with feedback
 
 ---
 
-### Step 7: Implement Tasks
-**File**: `sdd.7-task-implementer-for-feature.prompt.md`  
+### Step 6: Implement Tasks
+**File**: `sdd.6-task-implementer-for-feature.prompt.md`  
 **Role**: Implementation Specialist
 
 **Purpose**: Execute implementation plan systematically with test implementation.
@@ -288,12 +254,12 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
 - Test files (when applicable)
 - Changes log: `.agent-tracking/changes/{{date}}-{{name}}-changes.md`
 
-**Next Step**: Run `sdd.7b-implementation-review.prompt.md`
+**Next Step**: Run `sdd.6b-implementation-review.prompt.md`
 
 ---
 
-### Step 7b: Implementation Review
-**File**: `sdd.7b-implementation-review.prompt.md`  
+### Step 6b: Implementation Review
+**File**: `sdd.6b-implementation-review.prompt.md`  
 **Role**: Implementation Review Specialist
 
 **Purpose**: Review implemented code for quality, correctness, and verify that tests execute successfully with adequate coverage. This step replaces the previously separate TEST stage by combining code review with test verification.
@@ -310,18 +276,14 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
 - Review report: `.agent-tracking/implementation-reviews/{{date}}-{{name}}-impl-review.md`
 - Decision: APPROVED | NEEDS_REVISION | BLOCKED
 
-**If Approved**: Proceed to `sdd.7c-acceptance-test.prompt.md`  
-**If Revisions Needed**: Return to `sdd.7-task-implementer-for-feature.prompt.md` with feedback
+**If Approved**: Proceed to ACCEPTANCE_TEST stage (code-driven, no prompt) or `sdd.7-post-implementation-review.prompt.md` if acceptance testing is complete  
+**If Revisions Needed**: Return to `sdd.6-task-implementer-for-feature.prompt.md` with feedback
 
 ---
 
-### Step 7c: Acceptance Test
-**File**: `sdd.7c-acceptance-test.prompt.md`  
-**Role**: Acceptance Test Specialist
+### Step 6c: Acceptance Test (Code-Driven Stage)
 
-**Purpose**: Execute acceptance test scenarios derived from the feature specification to validate that the implementation meets the stated requirements and user expectations.
-
-**Key Features**:
+**Note**: The ACCEPTANCE_TEST stage is executed directly by the orchestrator using `AcceptanceTestExecutor`. There is no `sdd.6c-acceptance-test.prompt.md` file. This stage:
 - Reads acceptance criteria and scenarios from the feature spec
 - Executes each scenario against the implemented code
 - Reports PASS/FAIL per scenario with evidence
@@ -331,13 +293,13 @@ The SDD workflow consists of 11 prompt files (steps 0–8, plus 7b and 7c) spann
 - Acceptance test report: `.agent-tracking/acceptance-tests/{{date}}-{{name}}-acceptance.md`
 - Decision: PASSED | FAILED
 
-**If Passed**: Proceed to `sdd.8-post-implementation-review.prompt.md`  
-**If Failed**: Return to `sdd.7-task-implementer-for-feature.prompt.md` with failure details
+**If Passed**: Proceed to `sdd.7-post-implementation-review.prompt.md`  
+**If Failed**: Return to `sdd.6-task-implementer-for-feature.prompt.md` with failure details
 
 ---
 
-### Step 8: Post-Implementation Review
-**File**: `sdd.8-post-implementation-review.prompt.md`  
+### Step 7: Post-Implementation Review
+**File**: `sdd.7-post-implementation-review.prompt.md`  
 **Role**: Post-Implementation Review Specialist
 
 **Purpose**: Final validation of implementation before marking workflow complete.
@@ -387,7 +349,7 @@ For code-related features:
 - [ ] Plan reviewed before implementation (Step 6)
 - [ ] Implementation reviewed and tests verified (Step 7b)
 - [ ] Acceptance tests executed (Step 7c)
-- [ ] Post-implementation review before completion (Step 8)
+- [ ] Post-implementation review before completion (Step 7)
 
 ### Validation Command Checklist (NEW)
 Each step must output explicit validation status:
@@ -407,7 +369,7 @@ Each step must output explicit validation status:
 ├── details/                   # Step 5 task details
 ├── plan-reviews/              # Step 6 review reports
 ├── changes/                   # Step 7 change logs
-├── implementation-reviews/    # Step 7b reviews + Step 8 final reviews
+├── implementation-reviews/    # Step 6b reviews + Step 7 final reviews
 └── acceptance-tests/          # Step 7c acceptance test reports
 
 docs/
@@ -515,7 +477,7 @@ A successfully completed SDD workflow results in:
 
 ### Version 3.0 (2026-01-21)
 - **NEW**: Added Step 0: Environment Initialization
-- **NEW**: Added Step 8: Post-Implementation Review
+- **NEW**: Added Step 7: Post-Implementation Review
 - **NEW**: Added Quick Reference tables to all steps
 - **NEW**: Added Output Validation Checklists with explicit PASS/FAIL status
 - **NEW**: Added Deterministic Decision Matrix for test strategy (scoring system)

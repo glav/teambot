@@ -15,15 +15,15 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
    ↓
 3. sdd.3-research-feature.prompt.md          → Research implementation approach
    ↓
-4. sdd.4-determine-test-strategy.prompt.md   → Determine testing approach
+4. sdd.4-task-planner-for-feature.prompt.md  → Create implementation plan
    ↓
-5. sdd.5-task-planner-for-feature.prompt.md  → Create implementation plan
+5. sdd.5-review-plan.prompt.md               → Review plan for readiness
    ↓
-6. sdd.6-review-plan.prompt.md               → Review plan for readiness
+6. sdd.6-task-implementer-for-feature.prompt.md → Execute implementation
    ↓
-7. sdd.7-task-implementer-for-feature.prompt.md → Execute implementation
+6b. sdd.6b-implementation-review.prompt.md   → Review code + verify tests
    ↓
-8. sdd.8-post-implementation-review.prompt.md → Final validation
+7. sdd.7-post-implementation-review.prompt.md → Final validation
 ```
 
 ## 🎯 Key Features
@@ -156,42 +156,12 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 **Outputs**:
 - Research doc: `.agent-tracking/research/{{date}}-{{name}}-research.md`
 
-**Next Step**: Run `sdd.4-determine-test-strategy.prompt.md`
+**Next Step**: Run `sdd.4-task-planner-for-feature.prompt.md`
 
 ---
 
-### Step 4: Determine Test Strategy
-**File**: `sdd.4-determine-test-strategy.prompt.md`  
-**Role**: Test Architect
-
-**Purpose**: Analyze feature and recommend optimal testing approach per component.
-
-**Decision Framework**:
-1. **Analyze Feature Characteristics**
-   - Complexity (algorithm-heavy vs simple)
-   - Risk profile (critical vs low-impact)
-   - Requirements clarity (well-defined vs exploratory)
-   
-2. **Recommend Approach**
-   - **TDD**: High complexity, clear requirements, critical logic
-   - **Code-First**: Simple features, exploratory work, low risk
-   - **Hybrid**: Mix of both based on component
-
-3. **Specify Coverage & Patterns**
-   - Coverage targets per component
-   - Test framework from research
-   - Example test patterns
-   - Critical scenarios to test
-
-**Outputs**:
-- Test strategy: `.agent-tracking/test-strategies/{{date}}-{{name}}-test-strategy.md`
-
-**Next Step**: Run `sdd.5-task-planner-for-feature.prompt.md`
-
----
-
-### Step 5: Create Task Plan
-**File**: `sdd.5-task-planner-for-feature.prompt.md`  
+### Step 4: Create Task Plan
+**File**: `sdd.4-task-planner-for-feature.prompt.md`  
 **Role**: Planning Specialist
 
 **Purpose**: Create actionable implementation plan with integrated test phases.
@@ -213,12 +183,12 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 - Plan: `.agent-tracking/plans/{{date}}-{{name}}-plan.instructions.md`
 - Details: `.agent-tracking/details/{{date}}-{{name}}-details.md`
 
-**Next Step**: Run `sdd.6-review-plan.prompt.md`
+**Next Step**: Run `sdd.5-review-plan.prompt.md`
 
 ---
 
-### Step 6: Review Implementation Plan
-**File**: `sdd.6-review-plan.prompt.md`  
+### Step 5: Review Implementation Plan
+**File**: `sdd.5-review-plan.prompt.md`  
 **Role**: Implementation Readiness Specialist
 
 **Purpose**: Validate plan quality and implementation readiness.
@@ -242,13 +212,13 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 - Review report: `.agent-tracking/plan-reviews/{{date}}-{{name}}-plan-review.md`
 - Decision: APPROVED | NEEDS_REVISION | BLOCKED
 
-**If Approved**: Proceed to `sdd.7-task-implementer-for-feature.prompt.md`  
-**If Revisions Needed**: Return to `sdd.5-task-planner-for-feature.prompt.md` with feedback
+**If Approved**: Proceed to `sdd.6-task-implementer-for-feature.prompt.md`  
+**If Revisions Needed**: Return to `sdd.4-task-planner-for-feature.prompt.md` with feedback
 
 ---
 
-### Step 7: Implement Tasks
-**File**: `sdd.7-task-implementer-for-feature.prompt.md`  
+### Step 6: Implement Tasks
+**File**: `sdd.6-task-implementer-for-feature.prompt.md`  
 **Role**: Implementation Specialist
 
 **Purpose**: Execute implementation plan systematically with test implementation.
@@ -275,12 +245,35 @@ The SDD workflow consists of 9 sequential steps with built-in quality gates:
 - Test files (when applicable)
 - Changes log: `.agent-tracking/changes/{{date}}-{{name}}-changes.md`
 
-**Next Step**: Run `sdd.8-post-implementation-review.prompt.md`
+**Next Step**: Run `sdd.6b-implementation-review.prompt.md`
 
 ---
 
-### Step 8: Post-Implementation Review
-**File**: `sdd.8-post-implementation-review.prompt.md`  
+### Step 6b: Implementation Review
+**File**: `sdd.6b-implementation-review.prompt.md`  
+**Role**: Implementation Review Specialist
+
+**Purpose**: Review implemented code for quality, correctness, and verify that tests execute successfully with adequate coverage.
+
+**Validation Checks**:
+- ✅ Code follows project conventions and patterns from research
+- ✅ Implementation matches the task plan and feature specification
+- ✅ All tests pass (`uv run pytest` or equivalent)
+- ✅ Coverage targets from test strategy are met
+- ✅ No regressions introduced
+- ✅ Error handling and edge cases addressed
+
+**Outputs**:
+- Review report: `.agent-tracking/implementation-reviews/{{date}}-{{name}}-impl-review.md`
+- Decision: APPROVED | NEEDS_REVISION | BLOCKED
+
+**If Approved**: Proceed to `sdd.7-post-implementation-review.prompt.md`  
+**If Revisions Needed**: Return to `sdd.6-task-implementer-for-feature.prompt.md` with feedback
+
+---
+
+### Step 7: Post-Implementation Review
+**File**: `sdd.7-post-implementation-review.prompt.md`  
 **Role**: Post-Implementation Review Specialist
 
 **Purpose**: Final validation of implementation before marking workflow complete.
@@ -328,7 +321,7 @@ For code-related features:
 - [ ] Spec reviewed before research (Step 2)
 - [ ] Test strategy determined before planning (Step 4)
 - [ ] Plan reviewed before implementation (Step 6)
-- [ ] Implementation reviewed before completion (Step 8)
+- [ ] Implementation reviewed before completion (Step 7)
 
 ### Validation Command Checklist (NEW)
 Each step must output explicit validation status:
@@ -348,7 +341,7 @@ Each step must output explicit validation status:
 ├── details/                   # Step 5 task details
 ├── plan-reviews/              # Step 6 review reports
 ├── changes/                   # Step 7 change logs
-└── implementation-reviews/    # Step 8 final reviews
+└── implementation-reviews/    # Step 7 final reviews
 
 docs/
 └── feature-specs/             # Step 1 specifications
@@ -439,7 +432,7 @@ A successfully completed SDD workflow results in:
 
 ### Version 3.0 (2026-01-21)
 - **NEW**: Added Step 0: Environment Initialization
-- **NEW**: Added Step 8: Post-Implementation Review
+- **NEW**: Added Step 7: Post-Implementation Review
 - **NEW**: Added Quick Reference tables to all steps
 - **NEW**: Added Output Validation Checklists with explicit PASS/FAIL status
 - **NEW**: Added Deterministic Decision Matrix for test strategy (scoring system)

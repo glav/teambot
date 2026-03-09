@@ -13,7 +13,7 @@ tools: ['search/usages', 'read/problems', 'web/fetch', 'web/githubRepo', 'execut
 | **Input** | Research document + Test strategy |
 | **Output** | `.agent-tracking/plans/{{date}}-{{name}}-plan.instructions.md` + `.agent-tracking/details/{{date}}-{{name}}-details.md` |
 | **Key Deliverables** | Phased plan with dependencies, atomic tasks, test phases |
-| **Next Step** | `sdd.6-review-plan.prompt.md` |
+| **Next Step** | `sdd.5-review-plan.prompt.md` |
 
 ---
 
@@ -316,7 +316,7 @@ Implementation plan is ready for review.
 * Coverage validation tasks: {{included}}
 
 **➡️ Recommended Next Step:**
-Run **Step 6** (`sdd.6-review-plan.prompt.md`) to validate the implementation plan before proceeding to execution.
+Run **Step 5** (`sdd.5-review-plan.prompt.md`) to validate the implementation plan before proceeding to execution.
 
 This review will ensure:
 * All tasks are actionable

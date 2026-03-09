@@ -20,27 +20,26 @@ class TestPromptSyncAcceptanceValidation:
 
         Expected:
         - 2 new files are copied to user's directory
-        - 8 existing files are unchanged (customizations preserved)
-        - Summary shows "2 added, 8 skipped"
+        - 7 existing files are unchanged (customizations preserved)
+        - Summary shows "2 added, 7 skipped"
         """
         from teambot.prompt_sync import sync_sdd_prompts
 
-        # Setup scaffold with 10 files (8 existing + 2 new)
+        # Setup scaffold with 9 files (7 existing + 2 new)
         scaffold_dir = tmp_path / "scaffolds" / ".agent" / "commands" / "sdd"
         scaffold_dir.mkdir(parents=True)
 
-        # Create 10 scaffold files
+        # Create 9 scaffold files
         scaffold_files = [
             "sdd.0-initialize.prompt.md",
             "sdd.1-create-feature-spec.prompt.md",
             "sdd.2-review-spec.prompt.md",
             "sdd.3-research-feature.prompt.md",
-            "sdd.4-determine-test-strategy.prompt.md",
-            "sdd.5-task-planner-for-feature.prompt.md",
-            "sdd.6-review-plan.prompt.md",
-            "sdd.7-task-implementer-for-feature.prompt.md",
-            "sdd.8-post-implementation-review.prompt.md",  # NEW
-            "sdd.9-new-stage.prompt.md",  # NEW
+            "sdd.4-task-planner-for-feature.prompt.md",
+            "sdd.5-review-plan.prompt.md",
+            "sdd.6-task-implementer-for-feature.prompt.md",
+            "sdd.7-post-implementation-review.prompt.md",  # NEW
+            "sdd.8-new-stage.prompt.md",  # NEW
         ]
         for f in scaffold_files:
             (scaffold_dir / f).write_text(f"# Scaffold content for {f}")
@@ -50,12 +49,12 @@ class TestPromptSyncAcceptanceValidation:
             return_value=tmp_path / "scaffolds",
         )
 
-        # Setup target with 8 existing customized files
+        # Setup target with 7 existing customized files
         target_root = tmp_path / "project"
         target_dir = target_root / ".agent" / "commands" / "sdd"
         target_dir.mkdir(parents=True)
 
-        existing_files = scaffold_files[:8]  # First 8 files exist
+        existing_files = scaffold_files[:7]  # First 7 files exist
         original_content = {}
         for f in existing_files:
             custom_content = f"# CUSTOMIZED - My Custom {f} - DO NOT OVERWRITE"
@@ -70,7 +69,7 @@ class TestPromptSyncAcceptanceValidation:
         skipped = [r for r in results if not r.copied]
 
         assert len(added) == 2, f"Expected 2 files added, got {len(added)}"
-        assert len(skipped) == 8, f"Expected 8 files skipped, got {len(skipped)}"
+        assert len(skipped) == 7, f"Expected 7 files skipped, got {len(skipped)}"
 
         # Verify existing files preserved (MD5 equivalent - content check)
         for f, expected_content in original_content.items():
@@ -78,18 +77,18 @@ class TestPromptSyncAcceptanceValidation:
             assert actual_content == expected_content, f"File {f} was modified!"
 
         # Verify new files were copied
-        assert (target_dir / "sdd.8-post-implementation-review.prompt.md").exists()
-        assert (target_dir / "sdd.9-new-stage.prompt.md").exists()
+        assert (target_dir / "sdd.7-post-implementation-review.prompt.md").exists()
+        assert (target_dir / "sdd.8-new-stage.prompt.md").exists()
 
         # Verify new files match scaffold content
-        for f in ["sdd.8-post-implementation-review.prompt.md", "sdd.9-new-stage.prompt.md"]:
+        for f in ["sdd.7-post-implementation-review.prompt.md", "sdd.8-new-stage.prompt.md"]:
             expected = (scaffold_dir / f).read_text()
             actual = (target_dir / f).read_text()
             assert actual == expected, f"New file {f} content doesn't match scaffold"
 
-        # Verify total count (ls .agent/commands/sdd/ | wc -l returns 10)
+        # Verify total count (ls .agent/commands/sdd/ | wc -l returns 9)
         all_files = list(target_dir.glob("sdd.*.prompt.md"))
-        assert len(all_files) == 10, f"Expected 10 files total, got {len(all_files)}"
+        assert len(all_files) == 9, f"Expected 9 files total, got {len(all_files)}"
 
     def test_at_002_validation_blocks_run_when_prompt_missing(self, tmp_path):
         """AT-002: Validation blocks run when prompt file is missing.
