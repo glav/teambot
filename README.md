@@ -16,6 +16,16 @@ TeamBot is a CLI tool that uses the [GitHub Copilot SDK](https://github.com/gith
 - **uv** - [Install uv](https://astral.sh/uv)
 - **GitHub Copilot CLI** - [Install Copilot CLI](https://githubnext.com/projects/copilot-cli/) and authenticate with `copilot login`
 
+### Terminal Requirements
+
+TeamBot's split-pane UI works with all modern terminal emulators. For the best experience:
+
+* **VSCode integrated terminal** - Recommended (Kitty protocol support enabled by default)
+* **Kitty**, **Alacritty**, **WezTerm** - Full support for enhanced keyboard protocol
+* **Standard terminals** - xterm, GNOME Terminal, Konsole, Terminal.app all work correctly
+
+For troubleshooting input issues, see [Terminal Compatibility Guide](docs/guides/terminal-compatibility.md).
+
 ### Installation Methods
 
 | Method | Command | Best For |
