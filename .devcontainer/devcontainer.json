@@ -16,8 +16,7 @@
                     }
                 ],
                 "python.terminal.activateEnvironment": false,
-                "python.terminal.activateEnvInCurrentTerminal": false,
-                "terminal.integrated.enableKittyKeyboardProtocol": false
+                "python.terminal.activateEnvInCurrentTerminal": false
             },
             "extensions": [
                 "mads-hartmann.bash-ide-vscode",
