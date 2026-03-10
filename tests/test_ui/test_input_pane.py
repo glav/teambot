@@ -105,6 +105,32 @@ class TestInputPane:
             assert input_pane.text == "new"
 
 
+class TestKittyProtocolSpace:
+    """Tests for Kitty keyboard protocol space handling."""
+
+    @pytest.mark.asyncio
+    async def test_kitty_space_inserts_space(self):
+        """Space via Kitty protocol (character=None) is still inserted."""
+        from textual.events import Key
+
+        from teambot.ui.app import TeamBotApp
+
+        app = TeamBotApp()
+        async with app.run_test() as pilot:
+            input_pane = app.query_one("#prompt")
+            await pilot.click("#prompt")
+            await pilot.press("h", "i")
+
+            # Simulate Kitty protocol space: Key('space', None)
+            await input_pane._on_key(Key("space", None))
+            await pilot.pause()
+
+            await pilot.press("y", "o", "u")
+            await pilot.pause()
+
+            assert input_pane.text == "hi you"
+
+
 class TestMultiLineInput:
     """Tests for multi-line input behavior."""
 

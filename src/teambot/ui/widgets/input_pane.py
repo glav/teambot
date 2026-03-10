@@ -64,6 +64,12 @@ class InputPane(TextArea):
             self._navigate_history(-1)
             return
 
+        # Kitty keyboard protocol sends space as an escape sequence,
+        # producing Key('space', None). TextArea requires character to be
+        # set for printable insertion, so inject it here.
+        if event.key == "space" and event.character is None:
+            event.character = " "
+
         # All other keys: default TextArea behavior
         await super()._on_key(event)
 
