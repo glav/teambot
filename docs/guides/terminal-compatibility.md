@@ -104,7 +104,7 @@ If space characters don't appear when typing in TeamBot:
 3. **Verify Textual Version:**
    ```bash
    python -c "import textual; print(textual.__version__)"
-   # Should be 7.4.0 or higher (requires >=0.47.0 for Kitty protocol support)
+   # Must be 0.47.0 or higher for Kitty protocol support (uv.lock currently pins textual 7.4.0)
    ```
 
 4. **Check for Conflicting Software:**
