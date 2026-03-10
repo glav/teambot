@@ -7,7 +7,7 @@ scope: small
 acceptance_scenarios:
   - name: "Space input works with Kitty protocol enabled"
     steps:
-      - "Start TeamBot in VSCode with Kitty protocol enabled (default in recent VSCode, verify with `echo $TERM` showing 'xterm-256color' or check VSCode terminal supports CSI ? 2026 h query)"
+      - "Start TeamBot in VSCode with Kitty protocol enabled (default in recent VSCode, verify by running `printf '\\x1b[>1u'` to enable Kitty protocol then `cat -v` and pressing Space — you should see `^[[32u`, confirming Kitty protocol is active)"
       - "Attempt to type a space character in the input field"
       - "Type additional text after the space"
       - "Submit the input"
