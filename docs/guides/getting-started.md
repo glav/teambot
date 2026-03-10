@@ -22,6 +22,19 @@ uv sync
 uv run teambot --version
 ```
 
+## Terminal Compatibility
+
+TeamBot works with all modern terminal emulators. For the best experience, we recommend:
+
+* **VSCode Integrated Terminal** (recommended) - Kitty protocol enabled by default
+* **Kitty**, **Alacritty**, **WezTerm** - Full keyboard protocol support
+* **iTerm2** (macOS) - Enhanced keyboard handling
+* **Legacy terminals** (xterm, GNOME Terminal, etc.) - Fully compatible
+
+TeamBot automatically adapts to your terminal's capabilities. No configuration is required.
+
+**Having input issues?** See the [Terminal Compatibility Guide](./terminal-compatibility.md) for troubleshooting.
+
 ## Initialize a Project
 
 Create TeamBot configuration in your project directory:
