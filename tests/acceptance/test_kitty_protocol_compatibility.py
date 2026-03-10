@@ -48,7 +48,7 @@ def test_space_character_input_with_kitty_protocol():
     * If space doesn't appear: Check terminal Kitty protocol support
     * VSCode users: Verify terminal.integrated.enableKittyProtocol is true
     """
-    pass  # Manual test case - no automated assertion
+    pytest.skip("manual test")
 
 
 @pytest.mark.acceptance
@@ -84,7 +84,7 @@ def test_multi_word_input_in_vscode_terminal():
     * If spaces missing: Check VSCode version (update to latest)
     * Restart terminal: Ctrl+Shift+P → "Terminal: Kill All Terminals"
     """
-    pass  # Manual test case
+    pytest.skip("manual test")
 
 
 @pytest.mark.acceptance
@@ -122,7 +122,7 @@ def test_backward_compatibility_without_kitty_protocol():
     * Textual's XTermParser handles both paths
     * Application receives same events.Key objects in both modes
     """
-    pass  # Manual test case
+    pytest.skip("manual test")
 
 
 @pytest.mark.acceptance
@@ -187,4 +187,4 @@ def test_all_keyboard_input_with_kitty_protocol():
     * InputPane key handling: src/teambot/ui/widgets/input_pane.py
     * Textual's automatic Kitty protocol support enables this functionality
     """
-    pass  # Manual test case
+    pytest.skip("manual test")
