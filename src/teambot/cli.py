@@ -789,9 +789,16 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     )
 
     target_agent = Path.cwd() / ".agent"
-    force_copy = force  # Track if we should force the scaffold copy
+    # When on_conflict is set it governs .agent copying; force_copy is set only by resolution
+    force_copy = force if not on_conflict else False
 
-    if target_agent.exists() and not force:
+    # --on-conflict takes precedence over --force for .agent conflict resolution
+    if force and on_conflict:
+        display.print_warning(
+            "--on-conflict overrides --force for .agent directory conflict resolution"
+        )
+
+    if target_agent.exists() and (not force or on_conflict):
         conflicts = detect_sdd_conflicts(get_scaffolds_dir(), Path.cwd())
         if conflicts:
             # Determine resolution

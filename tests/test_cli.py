@@ -1603,7 +1603,7 @@ class TestInitConflictHandling:
         assert (target_sdd / "sdd.4-old-name.prompt.md").read_text() == "old content"
 
     def test_force_bypasses_conflict_detection(self, tmp_path, monkeypatch):
-        """--force replaces without conflict prompt."""
+        """--force without --on-conflict replaces without conflict prompt."""
         import argparse
         from unittest.mock import AsyncMock, patch
 
@@ -1626,6 +1626,74 @@ class TestInitConflictHandling:
         assert result == 0
         # Old file should be gone (force replaces)
         assert not (target_sdd / "sdd.4-old-name.prompt.md").exists()
+
+    def test_on_conflict_takes_precedence_over_force_with_skip(self, tmp_path, monkeypatch):
+        """--on-conflict takes precedence over --force; emits a warning."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Setup conflicting .agent directory
+        target_sdd = tmp_path / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-old-name.prompt.md").write_text("old content")
+
+        warnings = []
+        original_warn = ConsoleDisplay.print_warning
+
+        def capture_warning(self, msg):
+            warnings.append(msg)
+            original_warn(self, msg)
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                with patch.object(ConsoleDisplay, "print_warning", capture_warning):
+                    args = argparse.Namespace(force=True, on_conflict="skip", no_animation=True)
+                    display = ConsoleDisplay()
+                    result = cmd_init(args, display)
+
+        assert result == 0
+        # --on-conflict=skip means existing .agent files are kept
+        assert (target_sdd / "sdd.4-old-name.prompt.md").exists()
+        # A warning about precedence should have been emitted
+        assert any("--on-conflict" in w and "--force" in w for w in warnings)
+
+    def test_on_conflict_takes_precedence_over_force_with_replace(self, tmp_path, monkeypatch):
+        """--on-conflict=replace takes precedence over --force, clears .agent and warns."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Setup conflicting .agent directory
+        target_sdd = tmp_path / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-old-name.prompt.md").write_text("old content")
+
+        warnings = []
+        original_warn = ConsoleDisplay.print_warning
+
+        def capture_warning(self, msg):
+            warnings.append(msg)
+            original_warn(self, msg)
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                with patch.object(ConsoleDisplay, "print_warning", capture_warning):
+                    args = argparse.Namespace(force=True, on_conflict="replace", no_animation=True)
+                    display = ConsoleDisplay()
+                    result = cmd_init(args, display)
+
+        assert result == 0
+        # --on-conflict=replace means the old file is gone
+        assert not (target_sdd / "sdd.4-old-name.prompt.md").exists()
+        # A warning about precedence should have been emitted
+        assert any("--on-conflict" in w and "--force" in w for w in warnings)
 
     def test_interactive_prompt_backup_option(self, tmp_path, monkeypatch):
         """Interactive prompt backup option creates backup."""
