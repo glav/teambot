@@ -483,8 +483,8 @@ class TestBackupDirectory:
         assert not source.exists()  # Moved, not copied
         assert result.exists()
         assert (result / "test.txt").exists()
-        # Timestamp folder format: YYYYMMDD-HHMMSS
-        assert re.match(r"\d{8}-\d{6}", result.parent.name)
+        # Timestamp folder format: YYYYMMDD-HHMMSS-ffffff (with microseconds)
+        assert re.match(r"\d{8}-\d{6}-\d{6}", result.parent.name)
 
     def test_raises_for_missing_source(self, tmp_path):
         """Raises FileNotFoundError when source doesn't exist."""
@@ -538,3 +538,23 @@ class TestBackupDirectory:
         result = backup_directory(source, backup_root)
 
         assert result.name == ".agent"
+
+    def test_multiple_backups_create_separate_directories(self, tmp_path):
+        """Rapid successive backups each produce a distinct timestamped directory."""
+        from teambot.scaffolds import backup_directory
+
+        backup_root = tmp_path / "backups"
+        backup_paths = []
+
+        for i in range(3):
+            source = tmp_path / f"source_{i}"
+            source.mkdir()
+            (source / "file.txt").write_text(f"content {i}")
+            result = backup_directory(source, backup_root)
+            backup_paths.append(result.parent)
+
+        # All timestamp directories must be unique
+        unique_parents = set(str(p) for p in backup_paths)
+        assert len(unique_parents) == 3, (
+            f"Expected 3 distinct backup directories, got: {backup_paths}"
+        )
