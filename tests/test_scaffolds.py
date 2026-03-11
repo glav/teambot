@@ -460,6 +460,52 @@ class TestDetectSddConflicts:
 
         assert len(conflicts) == 0
 
+    def test_multiple_target_files_same_prefix_all_conflicts(self, tmp_path):
+        """Detects all conflicts when target has multiple files sharing a prefix."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("new")
+
+        # Target has two files with the same sdd.4- prefix, neither matches scaffold
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-old-a.prompt.md").write_text("old-a")
+        (target_sdd / "sdd.4-old-b.prompt.md").write_text("old-b")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        # Both target files should be reported as conflicts
+        assert len(conflicts) == 2
+        existing_names = {c.existing_name for c in conflicts}
+        assert existing_names == {"sdd.4-old-a.prompt.md", "sdd.4-old-b.prompt.md"}
+        for c in conflicts:
+            assert c.prefix == "sdd.4-"
+            assert c.scaffold_name == "sdd.4-task-planner.prompt.md"
+
+    def test_multiple_target_files_same_prefix_one_matches(self, tmp_path):
+        """Reports conflict only for target files that differ from scaffold name."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("new")
+
+        # Target has both the matching scaffold file AND an extra conflicting file
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-task-planner.prompt.md").write_text("same")
+        (target_sdd / "sdd.4-old-conflict.prompt.md").write_text("old")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        # Only the non-matching file should be reported
+        assert len(conflicts) == 1
+        assert conflicts[0].prefix == "sdd.4-"
+        assert conflicts[0].scaffold_name == "sdd.4-task-planner.prompt.md"
+        assert conflicts[0].existing_name == "sdd.4-old-conflict.prompt.md"
+
 
 # === Backup Directory Tests (TDD Phase 3) ===
 

@@ -69,19 +69,20 @@ def detect_sdd_conflicts(
         if prefix:
             scaffold_prefixes[prefix] = f.name
 
-    target_prefixes: dict[str, str] = {}
+    # Track all target filenames per prefix (multiple files may share a prefix)
+    target_prefixes: dict[str, list[str]] = {}
     for f in target_sdd.glob("sdd.*.prompt.md"):
         prefix = extract_numbered_prefix(f.name)
         if prefix:
-            target_prefixes[prefix] = f.name
+            target_prefixes.setdefault(prefix, []).append(f.name)
 
-    # Find conflicts: same prefix, different name
+    # Find conflicts: same prefix, any target filename differs from scaffold name
     conflicts = []
     for prefix, scaffold_name in scaffold_prefixes.items():
         if prefix in target_prefixes:
-            existing_name = target_prefixes[prefix]
-            if scaffold_name != existing_name:
-                conflicts.append(ConflictInfo(prefix, scaffold_name, existing_name))
+            for existing_name in sorted(target_prefixes[prefix]):
+                if scaffold_name != existing_name:
+                    conflicts.append(ConflictInfo(prefix, scaffold_name, existing_name))
 
     return sorted(conflicts, key=lambda c: c.prefix)
 
