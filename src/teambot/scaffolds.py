@@ -104,8 +104,8 @@ def backup_directory(source: Path, backup_root: Path) -> Path:
     if not source.exists():
         raise FileNotFoundError(f"Cannot backup: {source} does not exist")
 
-    # Generate filesystem-safe timestamp
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # Generate filesystem-safe timestamp with microseconds for uniqueness
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     backup_dir = backup_root / timestamp / source.name
 
     # Ensure backup parent exists
