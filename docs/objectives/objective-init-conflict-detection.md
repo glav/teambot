@@ -1,7 +1,7 @@
 ---
 feature_name: init-conflict-detection
 language: python
-framework: click
+framework: argparse
 test_preference: tdd
 scope: small
 acceptance_scenarios:
@@ -89,7 +89,7 @@ Example of the confusion (from user report):
 - `src/teambot/scaffolds.py` - Scaffold file/directory copying logic
 - `src/teambot/cli.py` - CLI entry point, `cmd_init()` function
 
-**Primary Language/Framework**: Python / Click CLI
+**Primary Language/Framework**: Python / argparse CLI
 
 **Testing Preference**: TDD - write tests for conflict detection logic first
 
@@ -257,7 +257,7 @@ teambot init --force                 # Alias for --on-conflict=replace (existing
 
 ### Phase 4: Interactive CLI Prompt
 
-- [ ] Create `prompt_conflict_resolution()` function using Click's prompt utilities
+- [ ] Create `prompt_conflict_resolution()` function using Python's `input()` for interactive prompts
 - [ ] Implement three choices: Replace, Backup, Skip
 - [ ] Update `cmd_init()` to invoke prompt on conflict detection
 - [ ] Add `--on-conflict` flag for non-interactive mode (replace/backup/skip)
