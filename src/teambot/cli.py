@@ -9,7 +9,7 @@ import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from teambot import __version__
 from teambot.config.loader import ConfigError, ConfigLoader, create_default_config
@@ -21,7 +21,10 @@ from teambot.visualization.console import ConsoleDisplay
 if TYPE_CHECKING:
     from teambot.notifications.event_bus import EventBus
     from teambot.orchestration import ExecutionLoop, ExecutionResult
-    from teambot.scaffolds import CopyResult
+    from teambot.scaffolds import ConflictInfo, CopyResult
+
+# Type alias for conflict resolution options
+ConflictResolution = Literal["replace", "backup", "skip"]
 
 
 COPILOT_CLI_INSTALL_URL = "https://githubnext.com/projects/copilot-cli/"
@@ -548,6 +551,15 @@ def create_parser() -> argparse.ArgumentParser:
     init_parser.add_argument(
         "--force", action="store_true", help="Overwrite existing configuration"
     )
+    init_parser.add_argument(
+        "--on-conflict",
+        choices=["replace", "backup", "skip"],
+        default=None,
+        help=(
+            "Handle scaffold conflicts: replace (clear and copy), "
+            "backup (preserve to .agent-tracking/backups/), skip (keep existing)"
+        ),
+    )
 
     # run command
     run_parser = subparsers.add_parser("run", help="Run TeamBot with an objective")
@@ -688,10 +700,61 @@ def _setup_telegram_notifications(config: dict, display: ConsoleDisplay) -> bool
         return False
 
 
+def prompt_conflict_resolution(
+    conflicts: list[ConflictInfo],
+    display: ConsoleDisplay,
+) -> ConflictResolution:
+    """Prompt user to resolve scaffold conflicts.
+
+    Args:
+        conflicts: List of detected conflicts
+        display: Console display for output
+
+    Returns:
+        User's choice: "replace", "backup", or "skip"
+    """
+    display.print_warning("")
+    display.print_warning("⚠ Conflict detected in .agent/commands/sdd/:")
+    display.print_warning("")
+    display.print_info("  The target directory contains files with conflicting prefixes:")
+    display.print_info("")
+
+    for conflict in conflicts:
+        display.print_info(f"  {conflict.prefix}*:")
+        display.print_warning(f"    - Existing: {conflict.existing_name}")
+        display.print_success(f"    - New:      {conflict.scaffold_name}")
+
+    display.print_info("")
+    display.print_info("How would you like to proceed?")
+    display.print_info("")
+    display.print_info("  [1] Replace - Clear existing directory and copy new scaffolds")
+    display.print_info("  [2] Backup  - Move existing to .agent-tracking/backups/ then copy new")
+    display.print_info("  [3] Skip    - Keep existing files (may cause workflow confusion)")
+    display.print_info("")
+
+    try:
+        while True:
+            response = input("Choice [1/2/3]: ").strip()
+            if response == "1":
+                return "replace"
+            elif response == "2":
+                return "backup"
+            elif response == "3":
+                return "skip"
+            else:
+                display.print_warning("Please enter 1, 2, or 3")
+    except (EOFError, KeyboardInterrupt):
+        display.print_warning("\nOperation cancelled, keeping existing files")
+        return "skip"
+
+
 def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     """Initialize TeamBot configuration."""
+    import sys
+
     config_path = Path("teambot.json")
     force = getattr(args, "force", False)
+    on_conflict = getattr(args, "on_conflict", None)
 
     if config_path.exists() and not force:
         display.print_error(f"Configuration already exists: {config_path}")
@@ -717,13 +780,45 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
     display.print_success(f"Created configuration: {config_path}")
     display.print_success(f"Created directory: {teambot_dir}")
 
-    # Copy scaffold files
-    from teambot.scaffolds import copy_all_scaffolds
+    # Check for conflicts in .agent directory (before copying scaffolds)
+    from teambot.scaffolds import (
+        backup_directory,
+        copy_all_scaffolds,
+        detect_sdd_conflicts,
+        get_scaffolds_dir,
+    )
+
+    target_agent = Path.cwd() / ".agent"
+    force_copy = force  # Track if we should force the scaffold copy
+
+    if target_agent.exists() and not force:
+        conflicts = detect_sdd_conflicts(get_scaffolds_dir(), Path.cwd())
+        if conflicts:
+            # Determine resolution
+            if on_conflict:
+                resolution: ConflictResolution = on_conflict
+            elif sys.stdin.isatty():
+                resolution = prompt_conflict_resolution(conflicts, display)
+            else:
+                resolution = "skip"
+
+            # Apply resolution
+            if resolution == "replace":
+                shutil.rmtree(target_agent)
+                display.print_info("Cleared existing .agent directory")
+                force_copy = True  # Force copy since we cleared the directory
+            elif resolution == "backup":
+                backup_root = Path.cwd() / ".agent-tracking" / "backups"
+                backup_path = backup_directory(target_agent, backup_root)
+                display.print_success(f"Backed up to: {backup_path}")
+                force_copy = True  # Force copy since we moved the directory
+            elif resolution == "skip":
+                display.print_warning("Keeping existing .agent directory")
 
     display.print_success("")
     display.print_success("=== Copying Scaffold Files ===")
 
-    results = copy_all_scaffolds(Path.cwd(), force=force)
+    results = copy_all_scaffolds(Path.cwd(), force=force_copy)
 
     for result in results:
         if result.copied:

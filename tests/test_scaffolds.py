@@ -260,3 +260,281 @@ class TestCopyAllScaffolds:
         assert isinstance(results, list)
         assert len(results) == 5
         assert all(isinstance(r, CopyResult) for r in results)
+
+
+# === Conflict Detection Tests (TDD Phase 1) ===
+
+
+class TestExtractNumberedPrefix:
+    """Tests for extract_numbered_prefix() function."""
+
+    def test_extracts_valid_sdd_prefix(self):
+        """Extracts numbered prefix from valid SDD filename."""
+        from teambot.scaffolds import extract_numbered_prefix
+
+        assert extract_numbered_prefix("sdd.4-task-planner.prompt.md") == "sdd.4-"
+
+    def test_extracts_single_digit_prefix(self):
+        """Extracts single-digit prefix."""
+        from teambot.scaffolds import extract_numbered_prefix
+
+        assert extract_numbered_prefix("sdd.0-initialize.prompt.md") == "sdd.0-"
+
+    def test_extracts_multi_digit_prefix(self):
+        """Extracts multi-digit prefix (e.g., sdd.10-)."""
+        from teambot.scaffolds import extract_numbered_prefix
+
+        assert extract_numbered_prefix("sdd.10-something.prompt.md") == "sdd.10-"
+
+    def test_returns_none_for_non_sdd_file(self):
+        """Returns None for non-SDD files like README.md."""
+        from teambot.scaffolds import extract_numbered_prefix
+
+        assert extract_numbered_prefix("README.md") is None
+
+    def test_returns_none_for_partial_match(self):
+        """Returns None when pattern doesn't match completely."""
+        from teambot.scaffolds import extract_numbered_prefix
+
+        assert extract_numbered_prefix("sdd-without-number.md") is None
+
+    def test_returns_none_for_sdd_without_dash(self):
+        """Returns None for sdd.N without trailing dash."""
+        from teambot.scaffolds import extract_numbered_prefix
+
+        assert extract_numbered_prefix("sdd.4name.md") is None
+
+
+class TestConflictInfo:
+    """Tests for ConflictInfo dataclass."""
+
+    def test_conflict_info_has_required_fields(self):
+        """ConflictInfo has prefix, scaffold_name, existing_name fields."""
+        from teambot.scaffolds import ConflictInfo
+
+        conflict = ConflictInfo(
+            prefix="sdd.4-",
+            scaffold_name="sdd.4-task-planner.prompt.md",
+            existing_name="sdd.4-determine-test.prompt.md",
+        )
+
+        assert conflict.prefix == "sdd.4-"
+        assert conflict.scaffold_name == "sdd.4-task-planner.prompt.md"
+        assert conflict.existing_name == "sdd.4-determine-test.prompt.md"
+
+    def test_conflict_info_is_dataclass(self):
+        """ConflictInfo is a dataclass (not NamedTuple)."""
+        from dataclasses import is_dataclass
+
+        from teambot.scaffolds import ConflictInfo
+
+        assert is_dataclass(ConflictInfo)
+
+
+class TestDetectSddConflicts:
+    """Tests for detect_sdd_conflicts() function."""
+
+    def test_detects_conflict_same_prefix_different_name(self, tmp_path):
+        """Detects conflict when same prefix has different filename."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # Setup scaffold with sdd.4-new.prompt.md
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("new")
+
+        # Setup target with sdd.4-old.prompt.md (same prefix, different name)
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-determine-test.prompt.md").write_text("old")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 1
+        assert conflicts[0].prefix == "sdd.4-"
+        assert conflicts[0].scaffold_name == "sdd.4-task-planner.prompt.md"
+        assert conflicts[0].existing_name == "sdd.4-determine-test.prompt.md"
+
+    def test_no_conflict_when_same_filename(self, tmp_path):
+        """No conflict when files have identical names."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # Setup scaffold and target with same file
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("content")
+
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-task-planner.prompt.md").write_text("content")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 0
+
+    def test_no_conflict_when_different_prefixes(self, tmp_path):
+        """No conflict when files have different prefix numbers."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # Setup scaffold with sdd.4-
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("new")
+
+        # Setup target with sdd.5- (different prefix)
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.5-review-plan.prompt.md").write_text("old")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 0
+
+    def test_returns_empty_when_target_sdd_missing(self, tmp_path):
+        """Returns empty list when target SDD directory doesn't exist."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # Setup scaffold only
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("new")
+
+        # No target directory
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 0
+
+    def test_returns_empty_when_scaffold_sdd_missing(self, tmp_path):
+        """Returns empty list when scaffold SDD directory doesn't exist."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # No scaffold directory
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-old.prompt.md").write_text("old")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 0
+
+    def test_detects_multiple_conflicts(self, tmp_path):
+        """Detects multiple conflicts across different prefixes."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # Setup scaffold
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "sdd.4-task-planner.prompt.md").write_text("new")
+        (scaffold_sdd / "sdd.5-review-plan.prompt.md").write_text("new")
+        (scaffold_sdd / "sdd.6-implementer.prompt.md").write_text("new")
+
+        # Setup target with conflicts on 4 and 5, but same on 6
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-determine-test.prompt.md").write_text("old")
+        (target_sdd / "sdd.5-old-planner.prompt.md").write_text("old")
+        (target_sdd / "sdd.6-implementer.prompt.md").write_text("old")  # Same name
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 2
+        # Sorted by prefix
+        assert conflicts[0].prefix == "sdd.4-"
+        assert conflicts[1].prefix == "sdd.5-"
+
+    def test_ignores_non_prompt_files(self, tmp_path):
+        """Ignores files that don't match sdd.*.prompt.md pattern."""
+        from teambot.scaffolds import detect_sdd_conflicts
+
+        # Setup scaffold with README
+        scaffold_sdd = tmp_path / "scaffold" / ".agent" / "commands" / "sdd"
+        scaffold_sdd.mkdir(parents=True)
+        (scaffold_sdd / "README.md").write_text("scaffold readme")
+
+        # Setup target with README
+        target_sdd = tmp_path / "target" / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "README.md").write_text("target readme")
+
+        conflicts = detect_sdd_conflicts(tmp_path / "scaffold", tmp_path / "target")
+
+        assert len(conflicts) == 0
+
+
+# === Backup Directory Tests (TDD Phase 3) ===
+
+
+class TestBackupDirectory:
+    """Tests for backup_directory() function."""
+
+    def test_creates_timestamped_backup(self, tmp_path):
+        """Creates backup directory with timestamp."""
+        import re
+
+        from teambot.scaffolds import backup_directory
+
+        source = tmp_path / ".agent"
+        source.mkdir()
+        (source / "test.txt").write_text("content")
+        backup_root = tmp_path / ".agent-tracking" / "backups"
+
+        result = backup_directory(source, backup_root)
+
+        assert not source.exists()  # Moved, not copied
+        assert result.exists()
+        assert (result / "test.txt").exists()
+        # Timestamp folder format: YYYYMMDD-HHMMSS
+        assert re.match(r"\d{8}-\d{6}", result.parent.name)
+
+    def test_raises_for_missing_source(self, tmp_path):
+        """Raises FileNotFoundError when source doesn't exist."""
+        import pytest
+
+        from teambot.scaffolds import backup_directory
+
+        with pytest.raises(FileNotFoundError):
+            backup_directory(tmp_path / "nonexistent", tmp_path / "backups")
+
+    def test_preserves_directory_structure(self, tmp_path):
+        """Preserves nested directory structure in backup."""
+        from teambot.scaffolds import backup_directory
+
+        source = tmp_path / ".agent"
+        (source / "commands" / "sdd").mkdir(parents=True)
+        (source / "commands" / "sdd" / "test.prompt.md").write_text("content")
+        (source / "instructions").mkdir()
+        (source / "instructions" / "bash.md").write_text("bash instructions")
+        backup_root = tmp_path / "backups"
+
+        result = backup_directory(source, backup_root)
+
+        assert (result / "commands" / "sdd" / "test.prompt.md").exists()
+        assert (result / "commands" / "sdd" / "test.prompt.md").read_text() == "content"
+        assert (result / "instructions" / "bash.md").exists()
+
+    def test_creates_backup_root_if_missing(self, tmp_path):
+        """Creates backup root directory if it doesn't exist."""
+        from teambot.scaffolds import backup_directory
+
+        source = tmp_path / ".agent"
+        source.mkdir()
+        (source / "test.txt").write_text("content")
+        backup_root = tmp_path / "deeply" / "nested" / "backups"
+
+        result = backup_directory(source, backup_root)
+
+        assert backup_root.exists()
+        assert result.exists()
+
+    def test_backup_directory_named_after_source(self, tmp_path):
+        """Backup directory retains source directory name."""
+        from teambot.scaffolds import backup_directory
+
+        source = tmp_path / ".agent"
+        source.mkdir()
+        (source / "test.txt").write_text("content")
+        backup_root = tmp_path / "backups"
+
+        result = backup_directory(source, backup_root)
+
+        assert result.name == ".agent"

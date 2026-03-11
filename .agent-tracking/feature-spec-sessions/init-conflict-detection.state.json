@@ -1,0 +1,59 @@
+{
+  "specFile": ".agent-tracking/specs/init-conflict-detection.md",
+  "lastAccessed": "2026-03-10T22:15:00Z",
+  "currentPhase": "complete",
+  "questionsAsked": [
+    "product-name",
+    "target-users",
+    "core-problem",
+    "success-metrics",
+    "technical-stack",
+    "testing-approach",
+    "scope-boundaries"
+  ],
+  "answeredQuestions": {
+    "product-name": "Init Conflict Detection",
+    "target-users": "TeamBot users initializing projects with existing .agent/ directories",
+    "core-problem": "Users cannot easily understand or resolve conflicts between existing .agent/ files and updated scaffold versions",
+    "success-metrics": "Conflicts detected and resolved on first attempt, no workflow failures from stale prompts",
+    "technical-stack": "Python / Click CLI",
+    "testing-approach": "TDD - write tests for conflict detection logic first",
+    "scope-boundaries": "Focus on .agent/ directory conflicts only, not other scaffold files"
+  },
+  "referencesProcessed": [
+    {
+      "file": "src/teambot/scaffolds.py",
+      "status": "analyzed",
+      "timestamp": "2026-03-10T22:15:00Z",
+      "keyFindings": "CopyResult with reasons: copied, skipped_exists, source_missing, skipped_not_empty. copy_scaffold_directory checks if non-empty.",
+      "integratedSections": ["problem-definition", "current-situation"]
+    },
+    {
+      "file": "src/teambot/cli.py",
+      "status": "analyzed",
+      "timestamp": "2026-03-10T22:15:00Z",
+      "keyFindings": "cmd_init() calls copy_all_scaffolds() with force flag, displays warnings for skipped_not_empty",
+      "integratedSections": ["problem-definition", "current-situation"]
+    },
+    {
+      "file": "src/teambot/prompt_sync.py",
+      "status": "analyzed",
+      "timestamp": "2026-03-10T22:15:00Z",
+      "keyFindings": "sync_sdd_prompts handles sdd.*.prompt.md pattern, similar skip logic",
+      "integratedSections": ["technical-notes"]
+    }
+  ],
+  "nextActions": [],
+  "qualityChecks": [
+    "goals-defined",
+    "scope-clarified",
+    "requirements-testable",
+    "acceptance-tests-defined",
+    "technical-stack-documented",
+    "testing-approach-recorded"
+  ],
+  "userPreferences": {
+    "detail-level": "comprehensive",
+    "question-style": "structured"
+  }
+}

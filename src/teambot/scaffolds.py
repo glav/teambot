@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import re
 import shutil
+from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from typing import NamedTuple
+
+
+@dataclass
+class ConflictInfo:
+    """Information about a file conflict."""
+
+    prefix: str  # e.g., "sdd.4-"
+    scaffold_name: str  # e.g., "sdd.4-task-planner-for-feature.prompt.md"
+    existing_name: str  # e.g., "sdd.4-determine-test-strategy.prompt.md"
 
 
 class CopyResult(NamedTuple):
@@ -15,6 +26,95 @@ class CopyResult(NamedTuple):
     target: Path
     copied: bool
     reason: str  # "copied", "skipped_exists", "source_missing", "skipped_not_empty"
+
+
+def extract_numbered_prefix(filename: str) -> str | None:
+    """Extract numbered prefix from SDD prompt filename.
+
+    Args:
+        filename: e.g., "sdd.4-task-planner-for-feature.prompt.md"
+
+    Returns:
+        Prefix like "sdd.4-" or None if not matching pattern
+    """
+    match = re.match(r"^(sdd\.\d+-)", filename)
+    return match.group(1) if match else None
+
+
+def detect_sdd_conflicts(
+    scaffold_dir: Path,
+    target_dir: Path,
+) -> list[ConflictInfo]:
+    """Detect SDD prompt file conflicts.
+
+    Looks for files with same numbered prefix but different names.
+
+    Args:
+        scaffold_dir: Path to scaffold root directory
+        target_dir: Path to target root directory
+
+    Returns:
+        List of ConflictInfo for each detected conflict
+    """
+    scaffold_sdd = scaffold_dir / ".agent" / "commands" / "sdd"
+    target_sdd = target_dir / ".agent" / "commands" / "sdd"
+
+    if not scaffold_sdd.exists() or not target_sdd.exists():
+        return []
+
+    # Build prefix -> filename maps
+    scaffold_prefixes: dict[str, str] = {}
+    for f in scaffold_sdd.glob("sdd.*.prompt.md"):
+        prefix = extract_numbered_prefix(f.name)
+        if prefix:
+            scaffold_prefixes[prefix] = f.name
+
+    target_prefixes: dict[str, str] = {}
+    for f in target_sdd.glob("sdd.*.prompt.md"):
+        prefix = extract_numbered_prefix(f.name)
+        if prefix:
+            target_prefixes[prefix] = f.name
+
+    # Find conflicts: same prefix, different name
+    conflicts = []
+    for prefix, scaffold_name in scaffold_prefixes.items():
+        if prefix in target_prefixes:
+            existing_name = target_prefixes[prefix]
+            if scaffold_name != existing_name:
+                conflicts.append(ConflictInfo(prefix, scaffold_name, existing_name))
+
+    return sorted(conflicts, key=lambda c: c.prefix)
+
+
+def backup_directory(source: Path, backup_root: Path) -> Path:
+    """Move directory to timestamped backup location.
+
+    Args:
+        source: Directory to back up (e.g., .agent/)
+        backup_root: Parent for backups (e.g., .agent-tracking/backups/)
+
+    Returns:
+        Path to created backup directory
+
+    Raises:
+        FileNotFoundError: If source doesn't exist
+    """
+    from datetime import datetime
+
+    if not source.exists():
+        raise FileNotFoundError(f"Cannot backup: {source} does not exist")
+
+    # Generate filesystem-safe timestamp
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup_dir = backup_root / timestamp / source.name
+
+    # Ensure backup parent exists
+    backup_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    # Move source to backup
+    shutil.move(str(source), str(backup_dir))
+
+    return backup_dir
 
 
 def get_scaffolds_dir() -> Path:
