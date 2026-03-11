@@ -1576,6 +1576,76 @@ class TestInitConflictHandling:
         backup_agent = backup_dirs[0] / ".agent"
         assert (backup_agent / "commands" / "sdd" / "sdd.4-old-name.prompt.md").exists()
 
+    def test_on_conflict_replace_preserves_user_customizations(self, tmp_path, monkeypatch):
+        """--on-conflict=replace does not clobber unrelated user files like AGENTS.md."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Setup conflicting .agent directory
+        target_sdd = tmp_path / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-old-name.prompt.md").write_text("old content")
+
+        # Pre-create user-customized AGENTS.md and stages.yaml
+        custom_agents_md = tmp_path / "AGENTS.md"
+        custom_agents_md.write_text("# My custom AGENTS.md\n")
+        custom_stages_yaml = tmp_path / "stages.yaml"
+        custom_stages_yaml.write_text("# My custom stages.yaml\n")
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                args = argparse.Namespace(force=False, on_conflict="replace", no_animation=True)
+                display = ConsoleDisplay()
+
+                result = cmd_init(args, display)
+
+        assert result == 0
+        # Old .agent conflict file should be gone, new scaffold should be present
+        assert not (target_sdd / "sdd.4-old-name.prompt.md").exists()
+        assert (tmp_path / ".agent" / "commands" / "sdd").exists()
+        # Unrelated user customizations must NOT be overwritten (content preserved at top)
+        assert custom_agents_md.read_text().startswith("# My custom AGENTS.md\n")
+        assert custom_stages_yaml.read_text() == "# My custom stages.yaml\n"
+
+    def test_on_conflict_backup_preserves_user_customizations(self, tmp_path, monkeypatch):
+        """--on-conflict=backup does not clobber unrelated user files like AGENTS.md."""
+        import argparse
+        from unittest.mock import AsyncMock, patch
+
+        from teambot.cli import ConsoleDisplay, cmd_init
+
+        monkeypatch.chdir(tmp_path)
+
+        # Setup conflicting .agent directory
+        target_sdd = tmp_path / ".agent" / "commands" / "sdd"
+        target_sdd.mkdir(parents=True)
+        (target_sdd / "sdd.4-old-name.prompt.md").write_text("old content")
+
+        # Pre-create user-customized AGENTS.md and stages.yaml
+        custom_agents_md = tmp_path / "AGENTS.md"
+        custom_agents_md.write_text("# My custom AGENTS.md\n")
+        custom_stages_yaml = tmp_path / "stages.yaml"
+        custom_stages_yaml.write_text("# My custom stages.yaml\n")
+
+        with patch("teambot.cli._check_auth_async", AsyncMock(return_value=(True, None))):
+            with patch("teambot.cli._refresh_model_cache_async", AsyncMock(return_value=True)):
+                args = argparse.Namespace(force=False, on_conflict="backup", no_animation=True)
+                display = ConsoleDisplay()
+
+                result = cmd_init(args, display)
+
+        assert result == 0
+        # Backup should exist with the old content
+        backup_root = tmp_path / ".agent-tracking" / "backups"
+        assert backup_root.exists()
+        # Unrelated user customizations must NOT be overwritten (content preserved at top)
+        assert custom_agents_md.read_text().startswith("# My custom AGENTS.md\n")
+        assert custom_stages_yaml.read_text() == "# My custom stages.yaml\n"
+
     def test_on_conflict_skip_keeps_existing(self, tmp_path, monkeypatch):
         """--on-conflict=skip leaves existing files unchanged."""
         import argparse

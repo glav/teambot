@@ -813,12 +813,14 @@ def cmd_init(args: argparse.Namespace, display: ConsoleDisplay) -> int:
             if resolution == "replace":
                 shutil.rmtree(target_agent)
                 display.print_info("Cleared existing .agent directory")
-                force_copy = True  # Force copy since we cleared the directory
+                # .agent is gone; non-force copy will succeed without clobbering
+                # unrelated user customizations (AGENTS.md, stages.yaml, etc.)
             elif resolution == "backup":
                 backup_root = Path.cwd() / ".agent-tracking" / "backups"
                 backup_path = backup_directory(target_agent, backup_root)
                 display.print_success(f"Backed up to: {backup_path}")
-                force_copy = True  # Force copy since we moved the directory
+                # .agent is moved; non-force copy will succeed without clobbering
+                # unrelated user customizations (AGENTS.md, stages.yaml, etc.)
             elif resolution == "skip":
                 display.print_warning("Keeping existing .agent directory")
 
