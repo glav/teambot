@@ -1,0 +1,27 @@
+{
+  "objective_file": "docs/objectives/objective-update-copilot-sdk-latest.md",
+  "current_stage": "SETUP",
+  "elapsed_seconds": 0.004130742003326304,
+  "max_seconds": 28800,
+  "status": "error",
+  "stages_config_source": "/workspaces/teambot/.teambot-worktrees/feat-update-copilot-sdk-latest/stages.yaml",
+  "feature_name": "update-copilot-sdk",
+  "acceptance_tests_passed": false,
+  "acceptance_test_iterations": 0,
+  "acceptance_test_history": [],
+  "acceptance_test_summary": null,
+  "stage_outputs": {},
+  "parallel_group_status": {},
+  "token_tracking": {
+    "schema_version": "1.0",
+    "total": {
+      "input_tokens": null,
+      "output_tokens": null,
+      "cache_read_tokens": null,
+      "cache_write_tokens": null,
+      "total_tokens": null
+    },
+    "by_agent": {},
+    "by_stage": {}
+  }
+}

@@ -21,7 +21,7 @@ class TestPackageMetadata:
         assert config["project"]["name"] == "teambot"
         assert "version" in config["project"]
         assert "description" in config["project"]
-        assert config["project"]["requires-python"] == ">=3.10"
+        assert config["project"]["requires-python"] == ">=3.11"
 
     def test_entry_point_defined(self):
         """Verify CLI entry point is defined."""
