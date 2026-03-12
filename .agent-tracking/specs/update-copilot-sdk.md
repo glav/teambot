@@ -98,7 +98,7 @@ Maintaining current SDK dependency ensures TeamBot benefits from upstream improv
 ### Technical Stack
 | Component | Technology |
 |-----------|------------|
-| Language | Python 3.10+ |
+| Language | Python 3.11+ |
 | Package Manager | uv |
 | SDK | github-copilot-sdk 0.1.32 (target) |
 | Testing | pytest |
