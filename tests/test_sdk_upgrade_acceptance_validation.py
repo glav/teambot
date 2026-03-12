@@ -9,8 +9,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 # Get repository root for file checks
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+pytestmark = pytest.mark.acceptance
 
 
 class TestSDKUpgradeAcceptanceValidation:
@@ -95,6 +99,7 @@ class TestSDKUpgradeAcceptanceValidation:
     # ------------------------------------------------------------------
     # AT-004: Linting Passes
     # ------------------------------------------------------------------
+    @pytest.mark.slow
     def test_at_004_ruff_check_passes(self):
         """AT-004: ruff check . exits with code 0."""
         result = subprocess.run(
@@ -106,6 +111,7 @@ class TestSDKUpgradeAcceptanceValidation:
         )
         assert result.returncode == 0, f"ruff check failed:\n{result.stdout}\n{result.stderr}"
 
+    @pytest.mark.slow
     def test_at_004_ruff_format_check_passes(self):
         """AT-004: ruff format --check . exits with code 0."""
         result = subprocess.run(
@@ -120,6 +126,7 @@ class TestSDKUpgradeAcceptanceValidation:
     # ------------------------------------------------------------------
     # AT-005: CLI Starts Successfully
     # ------------------------------------------------------------------
+    @pytest.mark.slow
     def test_at_005_cli_help_runs(self):
         """AT-005: teambot --help exits 0 and shows usage."""
         result = subprocess.run(
@@ -133,6 +140,7 @@ class TestSDKUpgradeAcceptanceValidation:
         assert "TeamBot" in result.stdout, "Help should mention TeamBot"
         assert "usage:" in result.stdout.lower(), "Help should show usage"
 
+    @pytest.mark.slow
     def test_at_005_cli_version_runs(self):
         """AT-005: teambot --version shows version 0.4.1."""
         result = subprocess.run(
