@@ -169,11 +169,13 @@ class TestSDKUpgradeAcceptanceValidation:
         content = pyproject_path.read_text(encoding="utf-8")
 
         # Extract version from pyproject.toml
+        pyproject_version = None
         for line in content.split("\n"):
             if line.strip().startswith("version = "):
                 pyproject_version = line.split('"')[1]
                 break
 
+        assert pyproject_version is not None, "Could not find 'version = ' in pyproject.toml"
         assert teambot.__version__ == pyproject_version, (
             f"Version mismatch: __init__.py has {teambot.__version__}, "
             f"pyproject.toml has {pyproject_version}"
