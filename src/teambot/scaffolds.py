@@ -107,7 +107,16 @@ def backup_directory(source: Path, backup_root: Path) -> Path:
 
     # Generate filesystem-safe timestamp with microseconds for uniqueness
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    backup_dir = backup_root / timestamp / source.name
+
+    # Handle potential timestamp collisions by appending a counter
+    backup_parent = backup_root / timestamp
+    if backup_parent.exists():
+        counter = 1
+        while (backup_root / f"{timestamp}-{counter}").exists():
+            counter += 1
+        backup_parent = backup_root / f"{timestamp}-{counter}"
+
+    backup_dir = backup_parent / source.name
 
     # Ensure backup parent exists
     backup_dir.parent.mkdir(parents=True, exist_ok=True)

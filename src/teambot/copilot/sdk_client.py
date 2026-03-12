@@ -33,13 +33,14 @@ class TeamBotModelInfo:
 
 
 try:
-    from copilot import CopilotClient  # type: ignore
+    from copilot import CopilotClient, PermissionHandler  # type: ignore
     from copilot.generated.session_events import SessionEventType  # type: ignore
 
     SDK_AVAILABLE = True
 except ImportError:
     CopilotClient = None  # SDK not installed
     SessionEventType = None
+    PermissionHandler = None
     SDK_AVAILABLE = False
 
 
@@ -281,6 +282,7 @@ class CopilotSDKClient:
         session_config: dict[str, Any] = {
             "session_id": session_id,
             "streaming": True,
+            "on_permission_request": PermissionHandler.approve_all,
         }
 
         # Add model if specified

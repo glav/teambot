@@ -28,7 +28,7 @@ class TestAcceptanceScenarios:
         # Also verify version is importable and correct format
         assert __version__ is not None
         assert isinstance(__version__, str)
-        assert __version__ == "0.4.0"
+        assert __version__ == "0.4.1"
 
     def test_at_001_help_command(self):
         """AT-001: teambot --help shows all commands."""
@@ -319,8 +319,8 @@ class TestAcceptanceScenarios:
     # AT-007: Cross-Python Version Compatibility
     # =========================================================================
 
-    def test_at_007_requires_python_310_plus(self):
-        """AT-007: Package requires Python 3.10+."""
+    def test_at_007_requires_python_311_plus(self):
+        """AT-007: Package requires Python 3.11+."""
         import sys
 
         if sys.version_info >= (3, 11):  # noqa: UP036
@@ -332,10 +332,10 @@ class TestAcceptanceScenarios:
             config = tomllib.load(f)
 
         requires_python = config["project"]["requires-python"]
-        assert ">=3.10" in requires_python
+        assert ">=3.11" in requires_python
 
     def test_at_007_classifiers_include_all_versions(self):
-        """AT-007: Package requires Python 3.10+ (classifiers not used without PyPI)."""
+        """AT-007: Package requires Python 3.11+ (classifiers not used without PyPI)."""
         import sys
 
         if sys.version_info >= (3, 11):  # noqa: UP036
@@ -348,7 +348,7 @@ class TestAcceptanceScenarios:
 
         # Without PyPI, we don't have classifiers, but requires-python is still set
         requires_python = config["project"]["requires-python"]
-        assert ">=3.10" in requires_python
+        assert ">=3.11" in requires_python
 
     def test_at_007_ci_matrix_configured(self):
         """AT-007: CI workflow has cross-version matrix."""
@@ -365,7 +365,6 @@ class TestAcceptanceScenarios:
 
         # Check Python versions
         python_versions = matrix["python-version"]
-        assert "3.10" in python_versions
         assert "3.11" in python_versions
         assert "3.12" in python_versions
 
@@ -379,6 +378,6 @@ class TestAcceptanceScenarios:
         """AT-007: Current Python version is supported."""
         major, minor = sys.version_info[:2]
 
-        # Must be 3.10 or higher
+        # Must be 3.11 or higher
         assert major == 3
-        assert minor >= 10
+        assert minor >= 11

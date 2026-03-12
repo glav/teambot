@@ -1,4 +1,4 @@
-"""Acceptance tests for Copilot SDK upgrade (0.1.16 → 0.1.23).
+"""Acceptance tests for Copilot SDK upgrade (0.1.23 → 0.1.32).
 
 Validates each acceptance scenario from the SDK upgrade objective.
 Tests exercise REAL implementation code — no mocking of core functionality.
@@ -18,28 +18,28 @@ class TestSDKUpgradeAcceptance:
     # AT-001: Dependency Update and Resolution
     # ------------------------------------------------------------------
     def test_at_001_uv_lock_contains_new_version(self):
-        """uv.lock reflects github-copilot-sdk 0.1.23."""
+        """uv.lock reflects github-copilot-sdk 0.1.32."""
         from pathlib import Path
 
         lock_path = Path(__file__).resolve().parents[1] / "uv.lock"
         lock_text = lock_path.read_text(encoding="utf-8")
         assert 'name = "github-copilot-sdk"' in lock_text
-        assert "0.1.23" in lock_text
+        assert "0.1.32" in lock_text
         # Ensure old version is NOT present
-        assert "0.1.16" not in lock_text
+        assert "0.1.23" not in lock_text
 
     def test_at_001_pyproject_pins_new_version(self):
-        """pyproject.toml pins github-copilot-sdk==0.1.23."""
+        """pyproject.toml pins github-copilot-sdk==0.1.32."""
         from pathlib import Path
 
         pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
         pyproject_text = pyproject_path.read_text(encoding="utf-8")
-        assert "github-copilot-sdk==0.1.23" in pyproject_text
+        assert "github-copilot-sdk==0.1.32" in pyproject_text
 
-    def test_at_001_installed_version_is_0_1_23(self):
-        """Installed package metadata reports 0.1.23."""
+    def test_at_001_installed_version_is_0_1_32(self):
+        """Installed package metadata reports 0.1.32."""
         version = importlib.metadata.version("github-copilot-sdk")
-        assert version == "0.1.23"
+        assert version == "0.1.32"
 
     # ------------------------------------------------------------------
     # AT-002: Full Test Suite Passes (meta — just verify import chain)
